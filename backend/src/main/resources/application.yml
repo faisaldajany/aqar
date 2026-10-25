@@ -1,0 +1,43 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: waslah-agent
+  datasource:
+    # The app connects as a NON-superuser role so Postgres row-level security is enforced.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/waslah}
+    username: ${DB_APP_USER:waslah_app}
+    password: ${DB_APP_PASSWORD:waslah_app}
+  flyway:
+    # Migrations run as the schema owner.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/waslah}
+    user: ${DB_OWNER_USER:waslah}
+    password: ${DB_OWNER_PASSWORD:waslah}
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+waslah:
+  jwt-secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-at-least-32-bytes}
+  # Base64 of a 32-byte key used to encrypt WhatsApp access tokens at rest (AES-256-GCM).
+  token-key: ${TOKEN_ENC_KEY:ZGV2LW9ubHkta2V5LWNoYW5nZS1tZS0zMi1ieXRlcyE=}
+  cookie-secure: ${COOKIE_SECURE:false}
+  dev-tools-enabled: ${DEV_TOOLS:false}
+  whatsapp:
+    # mock = no calls to Meta (local dev and tests); cloud = real WhatsApp Cloud API.
+    mode: ${WA_MODE:mock}
+    graph-version: ${WA_GRAPH_VERSION:v23.0}
+    app-id: ${META_APP_ID:}
+    app-secret: ${META_APP_SECRET:dev-app-secret}
+    verify-token: ${WA_VERIFY_TOKEN:dev-verify-token}
+    config-id: ${META_CONFIG_ID:}
+    registration-pin: ${WA_REGISTRATION_PIN:}
+  agent:
+    # After a marketer replies from the WhatsApp app, the agent stays silent in that chat for this long.
+    human-pause-hours: ${AGENT_HUMAN_PAUSE_HOURS:12}

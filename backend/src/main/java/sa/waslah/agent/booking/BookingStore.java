@@ -93,8 +93,8 @@ public class BookingStore {
     public List<Booking> dueReminders(Instant now) {
         return jdbc.sql(SELECT + """
                  join booking_settings s on s.office_id = b.office_id
-                 where b.status = 'CONFIRMED' and b.reminder_sent_at is null and b.starts_at > ?
-                   and b.starts_at <= ? + make_interval(mins => s.reminder_minutes)""")
+                 where b.status = 'CONFIRMED' and b.reminder_sent_at is null and b.starts_at > cast(? as timestamptz)
+                   and b.starts_at <= cast(? as timestamptz) + make_interval(mins => s.reminder_minutes)""")
                 .params(Timestamp.from(now), Timestamp.from(now)).query(BookingStore::map).list();
     }
 
@@ -102,7 +102,8 @@ public class BookingStore {
         return jdbc.sql(SELECT + """
                  join booking_settings s on s.office_id = b.office_id
                  where b.status = 'CONFIRMED' and b.follow_up_at is null and s.follow_up_enabled
-                   and b.ends_at <= ? - interval '1 hour' and b.ends_at > ? - interval '2 days'""")
+                   and b.ends_at <= cast(? as timestamptz) - interval '1 hour'
+                   and b.ends_at > cast(? as timestamptz) - interval '2 days'""")
                 .params(Timestamp.from(now), Timestamp.from(now)).query(BookingStore::map).list();
     }
 

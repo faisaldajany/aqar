@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, ApiError, parseLocation, type ListingForm, type Marketer } from "@/lib/api";
+import { ACCESS_LABELS, api, ApiError, parseLocation, type ListingForm, type Marketer } from "@/lib/api";
 
 const EMPTY: ListingForm = {
   title: "", district: "", propertyType: "", purpose: "SALE", price: 0, areaSqm: null, rooms: null,
@@ -17,6 +17,10 @@ export default function ListingFormView({ id, initial, onDone }: { id?: string; 
   const [photos, setPhotos] = useState<{ id: string; url: string }[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [access, setAccess] = useState({
+    methods: (initial?.selfVisitAccess ?? []) as string[],
+    lockNote: initial?.accessLockNote ?? "", guard: initial?.accessGuard ?? "", keyPoint: initial?.accessKeyPoint ?? "",
+  });
 
   useEffect(() => {
     api<Marketer[]>("/marketers").then(setMarketers).catch(() => undefined);
@@ -36,7 +40,10 @@ export default function ListingFormView({ id, initial, onDone }: { id?: string; 
     setBusy(true);
     try {
       const body = { ...f, latitude: p?.lat ?? null, longitude: p?.lng ?? null, videoUrl: f.videoUrl || null };
-      if (id) await api(`/listings/${id}`, { method: "PUT", json: body });
+      if (id) {
+        await api(`/listings/${id}`, { method: "PUT", json: body });
+        await api(`/listings/${id}/access`, { method: "PUT", json: access });
+      }
       else await api("/listings", { method: "POST", json: body });
       onDone();
     } catch (err) {
@@ -91,6 +98,23 @@ export default function ListingFormView({ id, initial, onDone }: { id?: string; 
         <label className="f" htmlFor="video">رابط فيديو أو جولة افتراضية<input id="video" type="url" dir="ltr" value={f.videoUrl ?? ""} onChange={(e) => set("videoUrl", e.target.value)} /></label>
       </div>
       <label className="f" htmlFor="desc">وصف إضافي يستفيد منه الوكيل<textarea id="desc" rows={3} value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} /></label>
+      {id && (
+        <div>
+          <span className="f">الزيارة الذاتية: كيف يدخل العميل دون مسوّق؟ <span className="small muted">تُرسل للعميل بعد تأكيد الموعد فقط</span></span>
+          <div className="grid3" style={{ marginTop: 6 }}>
+            {(["LOCK", "GUARD", "KEY"] as const).map((m) => (
+              <div key={m}>
+                <label className="row small"><input type="checkbox" checked={access.methods.includes(m)}
+                  onChange={(e) => setAccess({ ...access, methods: e.target.checked ? [...access.methods, m] : access.methods.filter((x) => x !== m) })} />{ACCESS_LABELS[m]}</label>
+                <input type="text" aria-label={`تفاصيل ${ACCESS_LABELS[m]}`}
+                  placeholder={m === "LOCK" ? "مثل: قفل على الباب الرئيسي" : m === "GUARD" ? "اسم الحارس أو المالك ورقمه" : "مكان استلام المفتاح"}
+                  value={m === "LOCK" ? access.lockNote : m === "GUARD" ? access.guard : access.keyPoint}
+                  onChange={(e) => setAccess({ ...access, ...(m === "LOCK" ? { lockNote: e.target.value } : m === "GUARD" ? { guard: e.target.value } : { keyPoint: e.target.value }) })} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {id ? (
         <div>
           <span className="f">الصور ({photos.length}/10) <span className="small muted">يرسل الوكيل أول 3 صور مع الموقع</span></span>

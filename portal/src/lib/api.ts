@@ -84,6 +84,10 @@ export type Listing = {
   description: string | null;
   source: string;
   sourceUrl: string | null;
+  selfVisitAccess?: string[];
+  accessLockNote?: string | null;
+  accessGuard?: string | null;
+  accessKeyPoint?: string | null;
 };
 
 export type ListingForm = Omit<Listing, "id" | "status" | "uploadedPhotos" | "source"> & { source?: string };
@@ -118,4 +122,29 @@ export function parseLocation(s: string): { lat: number; lng: number } | null {
   const t = s.trim();
   const m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll)=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)/) || t.match(/^(-?\d{1,2}\.\d+)\s*[,،]\s*(-?\d{1,3}\.\d+)$/);
   return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+}
+
+export type Booking = {
+  id: string; conversationId: string; listingId: string; marketerId: string | null;
+  mode: "WITH_MARKETER" | "SELF_VISIT"; startsAt: string; endsAt: string;
+  status: "PENDING_APPROVAL" | "CONFIRMED" | "REJECTED" | "CANCELLED" | "DONE" | "NO_SHOW";
+  accessMethod: string | null; accessCode: string | null; customerName: string | null; note: string | null;
+  confirmation: string | null; listingTitle: string; listingDistrict: string; customerWaId: string; marketerName: string | null;
+};
+
+export type BookingSettings = {
+  days: number[]; startTime: string; endTime: string; slotMinutes: number; bufferMinutes: number; minLeadMinutes: number;
+  reminderMinutes: number; selfVisitEnabled: boolean; selfVisitRequiresApproval: boolean; selfStartTime: string;
+  selfEndTime: string; selfVacantOnly: boolean; selfQualifiedOnly: boolean; codeWindowMinutes: number;
+  followUpEnabled: boolean; templateRep: string; templateSelf: string;
+};
+
+export const DAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+export const ACCESS_LABELS: Record<string, string> = { LOCK: "رمز قفل ذكي", GUARD: "الحارس أو المالك في الموقع", KEY: "استلام المفتاح" };
+
+export function riyadhDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "numeric", timeZone: "Asia/Riyadh" });
+}
+export function riyadhTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("ar-SA", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
 }

@@ -78,10 +78,15 @@ public class PlanLimits {
     }
 
     public Usage usageSince(LocalDate start) {
+        return usageBetween(start, LocalDate.now(RIYADH).plusDays(1));
+    }
+
+    /** Counted replies from {@code start} (inclusive) to {@code end} (exclusive), Riyadh days. */
+    public Usage usageBetween(LocalDate start, LocalDate end) {
         Plan p = plan();
         ZonedDateTime from = start.atStartOfDay(RIYADH);
-        int replies = jdbc.sql("select count(*) from agent_runs where outcome in " + COUNTED + " and created_at >= ?")
-                .param(java.sql.Timestamp.from(from.toInstant()))
+        int replies = jdbc.sql("select count(*) from agent_runs where outcome in " + COUNTED + " and created_at >= ? and created_at < ?")
+                .params(java.sql.Timestamp.from(from.toInstant()), java.sql.Timestamp.from(end.atStartOfDay(RIYADH).toInstant()))
                 .query(Integer.class).single();
         int over = Math.max(0, replies - p.includedReplies);
         return new Usage(p, start, replies, p.includedReplies, over, p.overagePerReplySar.multiply(BigDecimal.valueOf(over)));

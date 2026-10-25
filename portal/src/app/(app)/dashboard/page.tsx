@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, type Alert, type Stats, type Usage } from "@/lib/api";
+import { api, type Alert, type Onboarding, type Stats, type Usage } from "@/lib/api";
 import { useSession } from "../session";
 
 export default function Dashboard() {
@@ -10,11 +10,13 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [onb, setOnb] = useState<Onboarding | null>(null);
 
   useEffect(() => {
     api<Alert[]>("/alerts?unread=true").then(setAlerts).catch(() => undefined);
     api<Usage>("/usage").then(setUsage).catch(() => undefined);
     api<Stats>("/stats").then(setStats).catch(() => undefined);
+    api<Onboarding>("/onboarding").then(setOnb).catch(() => undefined);
   }, []);
 
   async function dismiss(id: string) {
@@ -25,6 +27,29 @@ export default function Dashboard() {
   return (
     <>
       <h1>أهلاً {me.user.fullName}</h1>
+      {onb && !onb.serving && (
+        <div className="card" style={{ borderColor: "var(--bad)" }} role="alert">
+          <b>الوكيل متوقف عن الرد</b> لأن الاشتراك غير فعّال. <Link href="/billing">فعّل الاشتراك</Link> ليعود فوراً.
+        </div>
+      )}
+      {onb && onb.done < onb.total && (
+        <div className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h2>جهّز الوكيل ({onb.done}/{onb.total})</h2>
+            {onb.subscription === "TRIAL" && <span className="pill p-acc">باقي {onb.trialDaysLeft} يوم من التجربة</span>}
+          </div>
+          <div className="meter" role="progressbar" aria-valuenow={onb.done} aria-valuemin={0} aria-valuemax={onb.total}><i style={{ width: `${(100 * onb.done) / onb.total}%` }} /></div>
+          <ol style={{ margin: "10px 0 0", paddingInlineStart: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+            {onb.steps.map((s) => (
+              <li key={s.key} className="small">
+                {s.done ? <span style={{ textDecoration: "line-through" }} className="muted">{s.label}</span> : <Link href={s.href}>{s.label}</Link>}
+                {s.done && " ✓"}
+              </li>
+            ))}
+          </ol>
+          {onb.falStatus === "PENDING_REVIEW" && <p className="small muted" style={{ marginTop: 8 }}>نتحقق من رخصة فال خلال يوم عمل، والوكيل يعمل خلال ذلك.</p>}
+        </div>
+      )}
       {stats && (
         <div className="kpis" style={{ marginBottom: 12 }}>
           <div className="kpi"><b>{stats.inquiriesToday}</b><span>استفسار اليوم ({stats.inquiriesWeek} هذا الأسبوع)</span></div>

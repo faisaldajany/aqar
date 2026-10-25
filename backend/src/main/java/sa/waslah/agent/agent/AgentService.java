@@ -57,12 +57,15 @@ public class AgentService {
     private final sa.waslah.agent.booking.BookingService bookingService;
     private final sa.waslah.agent.booking.BookingStore bookingStore;
     private final sa.waslah.agent.office.OfficeAlerts alerts;
+    private final sa.waslah.agent.billing.Subscription subscription;
 
     public AgentService(WaslahProperties props, AgentBrain brain, ConversationStore conversations, ListingStore listings,
                         MarketerStore marketers, OutboundMessageService outbound, WaAccounts accounts,
                         WhatsAppClient whatsapp, JdbcClient jdbc, ObjectMapper json,
                         sa.waslah.agent.billing.PlanLimits plans, sa.waslah.agent.office.OfficeAlerts alerts,
-                        sa.waslah.agent.booking.BookingService bookingService, sa.waslah.agent.booking.BookingStore bookingStore) {
+                        sa.waslah.agent.booking.BookingService bookingService, sa.waslah.agent.booking.BookingStore bookingStore,
+                        sa.waslah.agent.billing.Subscription subscription) {
+        this.subscription = subscription;
         this.bookingService = bookingService;
         this.bookingStore = bookingStore;
         this.plans = plans;
@@ -118,6 +121,13 @@ public class AgentService {
     void handle(InboundMessageEvent e) {
         Optional<ConversationStore.ConversationRef> conv = conversations.find(e.conversationId());
         if (conv.isEmpty() || !conv.get().agentActive(Instant.now())) {
+            return;
+        }
+        if (!subscription.state().serving(Instant.now())) {
+            // Trial over or subscription lapsed: the customer's message stays in the inbox for the office.
+            alerts.raise(e.officeId(), "AGENT_STOPPED", null,
+                    "الوكيل متوقف لأن الاشتراك غير فعّال، ورسائل العملاء تنتظر ردكم في المحادثات. فعّل الاشتراك من صفحة الاشتراك.",
+                    "stopped-" + LocalDate.now(RIYADH));
             return;
         }
         List<Msg> history = recent(e.conversationId(), props.agent().historyLimit());

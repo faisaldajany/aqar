@@ -69,3 +69,19 @@ waslah:
     temperature: ${LLM_TEMPERATURE:0.3}
     max-output-tokens: ${LLM_MAX_OUTPUT_TOKENS:1024}
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}
+  billing:
+    # mock = portal "pays" with one click (only when DEV_TOOLS=true); moyasar = real hosted invoices.
+    provider: ${BILLING_PROVIDER:mock}
+    moyasar-secret-key: ${MOYASAR_SECRET_KEY:}
+    portal-base-url: ${PORTAL_BASE_URL:http://localhost:3000}
+    # Public URL of this API for Moyasar's payment notification (blank = rely on the customer returning to the portal).
+    api-base-url: ${API_BASE_URL:}
+    vat-percent: ${VAT_PERCENT:15}
+    grace-days: ${BILLING_GRACE_DAYS:7}
+  report:
+    # Approved WhatsApp template for the daily manager report (feature 8), sent from the office's own number
+    # to the owner's phone. Blank = the report is kept in the portal only.
+    template: ${REPORT_TEMPLATE:}
+    template-language: ${REPORT_TEMPLATE_LANG:ar}
+  # Platform operator console (/admin/*): reviews FAL licenses across offices. Blank disables it.
+  admin-token: ${ADMIN_TOKEN:}

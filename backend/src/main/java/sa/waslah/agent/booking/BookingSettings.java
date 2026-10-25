@@ -53,7 +53,7 @@ public record BookingSettings(
         public BookingSettings save(UUID officeId, BookingSettings s) {
             get(officeId);
             jdbc.sql("""
-                    update booking_settings set days = cast(:days as int[]), start_time = :st, end_time = :et,
+                    update booking_settings set reviewed_at = now(), days = cast(:days as int[]), start_time = :st, end_time = :et,
                       slot_minutes = :slot, buffer_minutes = :buf, min_lead_minutes = :lead, reminder_minutes = :rem,
                       self_visit_enabled = :sve, self_visit_requires_approval = :sva, self_start_time = :sst,
                       self_end_time = :set, self_vacant_only = :svo, self_qualified_only = :sqo,

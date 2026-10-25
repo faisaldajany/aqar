@@ -24,6 +24,9 @@ jobs:
         run: |
           set -o pipefail
           mvn -B -ntp verify 2>&1 | tee mvn.log
+      - name: Test summary
+        if: success()
+        run: grep -E '^\[(INFO|WARNING)\] Tests run:' mvn.log | tail -1 | sed 's/^/::notice::/'
       # Surfaces compile errors and test failures as annotations, readable without downloading logs.
       - name: Report failures
         if: failure()

@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health", "/dev/**").permitAll()
+                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health", "/dev/**", "/admin/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(bearerTokenResolver())
@@ -46,7 +46,7 @@ public class SecurityConfig {
     BearerTokenResolver bearerTokenResolver() {
         return request -> {
             String path = request.getRequestURI();
-            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/")) {
+            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/")) {
                 return null;
             }
             String header = request.getHeader("Authorization");

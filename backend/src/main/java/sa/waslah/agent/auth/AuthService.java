@@ -41,7 +41,7 @@ public class AuthService {
         // The office row is under RLS, so it is inserted as that office.
         TenantContext.run(officeId, () -> tx.executeWithoutResult(status -> {
             jdbc.sql("insert into offices (id, name, fal_license) values (?, ?, ?)")
-                    .params(officeId, s.officeName().trim(), s.falLicense().replaceAll("\\D", ""))
+                    .params(officeId, s.officeName().trim(), sa.waslah.agent.office.OfficeSettingsController.falDigits(s.falLicense()))
                     .update();
             jdbc.sql("""
                     insert into users (id, office_id, email, password_hash, full_name, role)

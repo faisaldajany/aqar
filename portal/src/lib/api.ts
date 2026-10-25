@@ -169,3 +169,29 @@ export type Stats = {
 };
 export const TEMP_LABELS: Record<string, [string, string]> = { HOT: ["جاد", "p-bad"], WARM: ["مهتم", "p-warn"], COLD: ["استكشاف", "p-idle"] };
 export const PURPOSE_LABELS: Record<string, string> = { SALE: "شراء", BUY: "شراء", RENT: "إيجار" };
+
+export type Plan = { id: "BASIC" | "GROWTH"; name: string; monthlySar: number; annualSar: number; includedReplies: number; marketers: number; overageHalalas: number };
+export type Billing = {
+  status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"; plan: Plan["id"]; cycle: "MONTHLY" | "ANNUAL";
+  trialEndsAt: string; trialDaysLeft: number; paidUntil: string | null; serving: boolean; vatPercent: number;
+  provider: string; mockPayments: boolean; plans: Plan[];
+};
+export type Invoice = {
+  id: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP"; plan: string | null; cycle: string | null;
+  description: string; subtotalHalalas: number; vatHalalas: number; totalHalalas: number; status: "DUE" | "PAID" | "VOID";
+  payUrl: string | null; createdAt: string; paidAt: string | null;
+};
+export type OfficeSettings = {
+  name: string; falLicense: string; falStatus: "PENDING_REVIEW" | "VERIFIED" | "REJECTED"; falNote: string | null;
+  ownerPhone: string | null; reportEnabled: boolean; reportHour: number;
+};
+export type Onboarding = {
+  steps: { key: string; label: string; href: string; done: boolean }[]; done: number; total: number;
+  subscription: Billing["status"]; trialDaysLeft: number; serving: boolean; falStatus: OfficeSettings["falStatus"];
+};
+export type DailyReportRow = { date: string; body: string; sentTo: string | null; sentAt: string | null; error: string | null };
+export const sar = (halalas: number) => (halalas / 100).toLocaleString("en-US", { minimumFractionDigits: halalas % 100 ? 2 : 0, maximumFractionDigits: 2 });
+export const SUB_LABELS: Record<Billing["status"], [string, string]> = {
+  TRIAL: ["تجربة مجانية", "p-acc"], ACTIVE: ["فعّال", "p-ok"], PAST_DUE: ["بانتظار التجديد", "p-warn"],
+  EXPIRED: ["متوقف", "p-bad"], CANCELLED: ["ملغى", "p-idle"],
+};

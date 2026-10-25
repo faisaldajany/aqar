@@ -169,6 +169,17 @@ class AgentFlowTest extends IntegrationTest {
         assertThat(lastSentText()).isNull();
     }
 
+    @Test
+    void expiredSubscriptionStopsTheAgentAndAlertsTheOffice() throws Exception {
+        TenantContext.run(office, () -> jdbc.sql("update offices set subscription_status = 'EXPIRED'").update());
+        ((ScriptedLlmClient) llm).thenText("هلا بك");
+        inbound("wamid.exp1", "السلام عليكم");
+        String alert = await(() -> TenantContext.call(office, () -> jdbc.sql(
+                "select kind from office_alerts where kind = 'AGENT_STOPPED'").query(String.class).optional().orElse(null)));
+        assertThat(alert).isEqualTo("AGENT_STOPPED");
+        assertThat(lastSentText()).isNull();
+    }
+
     private void inbound(String wamid, String text) throws Exception {
         String body = envelope("""
                 "contacts":[{"profile":{"name":"أبو عبدالله"},"wa_id":"%s"}],

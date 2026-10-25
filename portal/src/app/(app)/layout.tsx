@@ -14,6 +14,8 @@ const NAV = [
   { href: "/listings", label: "العقارات" },
   { href: "/marketers", label: "المسوّقون" },
   { href: "/whatsapp", label: "ربط واتساب" },
+  { href: "/billing", label: "الاشتراك" },
+  { href: "/settings", label: "الإعدادات" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

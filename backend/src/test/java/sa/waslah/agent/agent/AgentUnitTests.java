@@ -111,6 +111,34 @@ class AgentUnitTests {
             assertThat(ReplyGuard.check("ترخيص 7200418836", Set.of("7200418836")).ok()).isTrue();
             assertThat(ReplyGuard.check("جوالي 0551234567 والسعر 1950000", Set.of()).ok()).isTrue();
         }
+
+        @Test
+        void correctsAvailabilityClaimsWithoutSearch() {
+            assertThat(ReplyGuard.correction("نعم متوفرة لدينا محلات تجارية للإيجار", Set.of(), false))
+                    .isEqualTo(ReplyGuard.MUST_SEARCH);
+            assertThat(ReplyGuard.correction("عندنا فيلا في النرجس", Set.of(AgentTools.SEARCH), false)).isNull();
+            assertThat(ReplyGuard.correction("ما عندي معلومات عن المطاعم، أقدر أساعدك بالعقار", Set.of(), false)).isNull();
+        }
+
+        @Test
+        void correctsHandoffPromisesButNotOffers() {
+            assertThat(ReplyGuard.correction("سأقوم بتحويلك فوراً للمسوّق.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_HANDOFF);
+            assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), false)).isNull();
+            assertThat(ReplyGuard.correction("بحوّلك للأستاذ خالد ويتواصل معك.", Set.of(), true)).isNull();
+        }
+
+        @Test
+        void brainRepairsThenReplies() {
+            ScriptedLlmClient llm = new ScriptedLlmClient()
+                    .thenText("سأقوم بتحويلك للمسوّق.")
+                    .thenCall("handoff_to_marketer", "{\"reason\":\"NEGOTIATION\",\"summary\":\"x\"}")
+                    .thenText("بحوّلك للمسوّق ويتواصل معك.");
+            FakeTools tools = new FakeTools();
+            AgentBrain.Outcome out = new AgentBrain(llm, JSON).respond("sys", List.of(new Llm.UserText("كم آخر سعر؟")), tools, Set.of());
+            assertThat(out.fallback()).isFalse();
+            assertThat(tools.called).containsExactly("handoff_to_marketer");
+            assertThat(llm.requests().get(1).turns().toString()).contains("تنبيه داخلي");
+        }
     }
 
     @Nested

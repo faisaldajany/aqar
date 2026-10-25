@@ -86,7 +86,7 @@ class AgentFlowTest extends IntegrationTest {
 
     @Test
     void replyWithAnUnknownLicenseIsBlockedAndHandedOff() throws Exception {
-        ((ScriptedLlmClient) llm).thenText("عندنا فيلا ممتازة ترخيصها 7299999999");
+        ((ScriptedLlmClient) llm).thenText("فيلا ممتازة ترخيصها 7299999999");
         inbound("wamid.b1", "عندكم فلل؟");
 
         assertThat(await(() -> lastSentText())).isEqualTo(AgentPrompt.FALLBACK_REPLY);

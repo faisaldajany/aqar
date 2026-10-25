@@ -20,7 +20,8 @@ import sa.waslah.agent.agent.llm.Llm;
 public class AgentBrain {
 
     private static final Logger log = LoggerFactory.getLogger(AgentBrain.class);
-    static final int MAX_STEPS = 6;
+    static final int MAX_STEPS = 8;
+    static final int MAX_REPAIRS = 2;
 
     public record ToolCallLog(String name, JsonNode args, JsonNode result) {
     }
@@ -49,6 +50,7 @@ public class AgentBrain {
         List<ToolCallLog> calls = new ArrayList<>();
         Llm.Usage usage = Llm.Usage.NONE;
         String failure;
+        int repairs = 0;
 
         try {
             for (int step = 0; step < MAX_STEPS; step++) {
@@ -65,11 +67,22 @@ public class AgentBrain {
                     turns.add(new Llm.ToolResults(results));
                     continue;
                 }
+                // Correct the model, unseen by the customer, when its reply depends on a tool it did not call.
+                String correction = ReplyGuard.correction(r.text(), calledNames(calls), tools.handedOff());
+                if (correction != null && repairs < MAX_REPAIRS) {
+                    repairs++;
+                    turns.add(new Llm.ModelRaw(r.raw()));
+                    turns.add(new Llm.UserText(correction));
+                    continue;
+                }
                 Set<String> allowed = new HashSet<>(priorLicenses);
                 allowed.addAll(tools.licensesSeen());
                 ReplyGuard.Verdict v = ReplyGuard.check(r.text(), allowed);
-                if (v.ok()) {
+                if (v.ok() && correction == null) {
                     return new Outcome(r.text(), false, null, usage, calls, ms(start));
+                }
+                if (v.ok()) {
+                    v = new ReplyGuard.Verdict(false, "uncorrected");
                 }
                 failure = "guard:" + v.reason();
                 log.warn("Agent reply blocked ({}): {}", v.reason(), r.text());
@@ -81,6 +94,12 @@ public class AgentBrain {
             log.warn("Model call failed: {}", e.getMessage());
         }
         return fallback(tools, calls, usage, start, failure);
+    }
+
+    private static Set<String> calledNames(List<ToolCallLog> calls) {
+        Set<String> s = new HashSet<>();
+        calls.forEach(c -> s.add(c.name()));
+        return s;
     }
 
     private Outcome fallback(AgentTools tools, List<ToolCallLog> calls, Llm.Usage usage, long start, String failure) {

@@ -45,6 +45,43 @@ public final class ReplyGuard {
         return Verdict.OK;
     }
 
+    private static final Pattern AVAILABILITY = Pattern.compile(
+            "متوفر|متاح|عندنا|لدينا|موجود|ما فيه|لا يوجد|we have|available", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PROPERTY = Pattern.compile(
+            "فيل|فلل|فل[ةه]|شق[ةه]|شقق|أرض|ارض|أراضي|اراضي|دور|دوبلكس|عمار|محل|عقار|villa|apartment|land|shop",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern HANDOFF_PROMISE = Pattern.compile(
+            "أحو[ّ]?ل|احو[ّ]?ل|بحو[ّ]?ل|سأحو[ّ]?ل|سأقوم بتحويل|تحويلك|يتواصل معك|سيتواصل|بيتواصل|بيكلمك|يكلمك|transfer|connect you",
+            Pattern.CASE_INSENSITIVE);
+
+    static final String MUST_SEARCH = "تنبيه داخلي لا يراه العميل: لم تستدعِ search_listings في هذا الرد. "
+            + "لا تؤكد ولا تنفِ توفر أي عقار قبل البحث. استدعِ search_listings الآن بالمعلومات المتوفرة ثم أعد كتابة ردك.";
+    static final String MUST_HANDOFF = "تنبيه داخلي لا يراه العميل: قلت إنك ستحوّل العميل أو إن أحداً سيتواصل معه، "
+            + "لكنك لم تستدعِ handoff_to_marketer. استدعها الآن ثم أعد كتابة ردك.";
+
+    /**
+     * Returns an internal note when the reply relies on a tool the model did not call:
+     * claiming a property is (or is not) available without searching, or promising a human
+     * without handing off. Questions ("أحولك للمسوّق؟") are offers, not promises.
+     */
+    public static String correction(String reply, Set<String> toolsCalled, boolean handedOff) {
+        if (reply == null) {
+            return null;
+        }
+        if (!toolsCalled.contains(AgentTools.SEARCH) && AVAILABILITY.matcher(reply).find() && PROPERTY.matcher(reply).find()) {
+            return MUST_SEARCH;
+        }
+        if (!handedOff) {
+            for (String sentence : reply.split("(?<=[.!؟?\\n])")) {
+                String s = sentence.trim();
+                if (!s.endsWith("؟") && !s.endsWith("?") && HANDOFF_PROMISE.matcher(s).find()) {
+                    return MUST_HANDOFF;
+                }
+            }
+        }
+        return null;
+    }
+
     public static Set<String> licensesIn(String text) {
         Set<String> out = new HashSet<>();
         if (text == null) {

@@ -26,7 +26,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # In production MANAGEMENT_SERVER_PORT=8081 keeps these off the public port.
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  # Customer chats are personal data (PDPL): never attach request bodies or user details to error reports.
+  send-default-pii: false
+  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
 
 waslah:
   jwt-secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-at-least-32-bytes}
@@ -85,3 +97,8 @@ waslah:
     template-language: ${REPORT_TEMPLATE_LANG:ar}
   # Platform operator console (/admin/*): reviews FAL licenses across offices. Blank disables it.
   admin-token: ${ADMIN_TOKEN:}
+  privacy:
+    # PDPL data minimisation: chat content older than this is deleted (conversation counts are kept).
+    message-retention-days: ${MESSAGE_RETENTION_DAYS:730}
+    # Raw WhatsApp webhook payloads are only needed for debugging.
+    webhook-retention-days: ${WEBHOOK_RETENTION_DAYS:30}

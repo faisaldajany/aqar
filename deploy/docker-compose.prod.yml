@@ -1,0 +1,99 @@
+# Production stack on one VM in a Saudi region (see docs/go-live.md). Usage:
+#   cp deploy/.env.example deploy/.env   # fill in secrets
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+name: waslah
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: waslah
+      POSTGRES_USER: waslah
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD}
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waslah -d waslah"]
+      interval: 10s
+      retries: 10
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/waslah
+      DB_APP_USER: waslah_app
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      DB_OWNER_USER: waslah
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD}
+      MANAGEMENT_SERVER_PORT: "8081"
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      COOKIE_SECURE: "true"
+      DEV_TOOLS: "false"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      TOKEN_ENC_KEY: ${TOKEN_ENC_KEY:?set TOKEN_ENC_KEY}
+      WA_MODE: cloud
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_CONFIG_ID: ${META_CONFIG_ID}
+      WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN}
+      WA_REGISTRATION_PIN: ${WA_REGISTRATION_PIN}
+      AGENT_HANDOFF_TEMPLATE: ${AGENT_HANDOFF_TEMPLATE}
+      AGENT_REMINDER_TEMPLATE: ${AGENT_REMINDER_TEMPLATE}
+      AGENT_FOLLOWUP_TEMPLATE: ${AGENT_FOLLOWUP_TEMPLATE}
+      REPORT_TEMPLATE: ${REPORT_TEMPLATE}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash-lite}
+      BILLING_PROVIDER: moyasar
+      MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY}
+      PORTAL_BASE_URL: https://${DOMAIN}
+      API_BASE_URL: https://${DOMAIN}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: production
+
+  portal:
+    build:
+      context: ../portal
+      args:
+        BACKEND_URL: http://api:8080
+    restart: unless-stopped
+    depends_on: [api]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [api, portal]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on: [postgres]
+    environment:
+      PGHOST: postgres
+      PGUSER: waslah
+      PGPASSWORD: ${DB_OWNER_PASSWORD}
+      PGDATABASE: waslah
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE}
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - backups:/backups
+    entrypoint: ["bash", "/backup.sh"]
+
+volumes:
+  pgdata:
+  caddy_data:
+  backups:

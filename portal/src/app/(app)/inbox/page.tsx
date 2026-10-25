@@ -124,6 +124,7 @@ function LeadPanel({ id, onChanged }: { id: string; onChanged: () => Promise<voi
   const [d, setD] = useState<ConversationDetails | null>(null);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [pick, setPick] = useState("");
+  const [erase, setErase] = useState(false);
   const load = useCallback(() => api<ConversationDetails>(`/conversations/${id}/details`).then(setD).catch(() => undefined), [id]);
   useEffect(() => {
     void load();
@@ -182,6 +183,20 @@ function LeadPanel({ id, onChanged }: { id: string; onChanged: () => Promise<voi
           <button className="btn" disabled={!pick} onClick={assign}>حوّل</button>
         </div>
         <p className="small muted">يتوقف الوكيل في هذه المحادثة حتى تعيدها له.</p>
+      </div>
+      <div>
+        <h3>بيانات العميل</h3>
+        {!erase ? <button className="btn" onClick={() => setErase(true)}>حذف بيانات العميل بطلبه</button> : (
+          <div className="row">
+            <button className="btn" style={{ color: "var(--bad)" }} onClick={async () => {
+              await api(`/conversations/${id}/personal-data`, { method: "DELETE" });
+              setErase(false);
+              await Promise.all([load(), onChanged()]);
+            }}>تأكيد الحذف النهائي</button>
+            <button className="btn" onClick={() => setErase(false)}>إلغاء</button>
+          </div>
+        )}
+        <p className="small muted">يحذف الرسائل والاسم والطلب نهائياً (نظام حماية البيانات الشخصية). تبقى الأعداد فقط.</p>
       </div>
     </aside>
   );

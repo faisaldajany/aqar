@@ -57,9 +57,22 @@ that value on each pooled connection from `TenantContext` and clears it on retur
 | `META_APP_ID`, `META_APP_SECRET`, `META_CONFIG_ID` | Meta app and Embedded Signup configuration |
 | `WA_VERIFY_TOKEN` | Webhook subscription check |
 | `WA_GRAPH_VERSION` | Graph API version |
-| `BACKEND_URL` | Portal → API proxy target |
+| `BACKEND_URL` | Portal → API proxy target (build time) |
+| `GEMINI_API_KEY`, `LLM_MODEL` | Agent model (paid tier only) |
+| `AGENT_*_TEMPLATE`, `REPORT_TEMPLATE` | Approved WhatsApp templates for messages outside the 24-hour window |
+| `BILLING_PROVIDER`, `MOYASAR_SECRET_KEY`, `PORTAL_BASE_URL`, `API_BASE_URL`, `VAT_PERCENT` | Subscription payments |
+| `ADMIN_TOKEN` | Operator console (`/admin/*`, FAL review); blank disables it |
+| `MESSAGE_RETENTION_DAYS`, `WEBHOOK_RETENTION_DAYS` | PDPL retention |
+| `SENTRY_DSN` | Error tracking (optional) |
+
+With `BILLING_PROVIDER=mock` and `DEV_TOOLS=true`, the billing page "pays" with one click.
+
+## Deploy
+
+One VM in a Saudi region: `deploy/docker-compose.prod.yml` (Postgres, API, portal, Caddy with automatic
+TLS, nightly encrypted backups). Steps and every external account still needed: [docs/go-live.md](docs/go-live.md).
 
 ## Phases
 
-See [docs/phases.md](docs/phases.md). Meta items to confirm before going live are in
-[docs/meta-integration.md](docs/meta-integration.md).
+See [docs/phases.md](docs/phases.md). What is left before the first paying office is in
+[docs/go-live.md](docs/go-live.md); Meta API details to confirm are in [docs/meta-integration.md](docs/meta-integration.md).

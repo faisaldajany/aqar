@@ -1,0 +1,27 @@
+# TLS certificates are issued automatically for $DOMAIN.
+{$DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	# Meta and Moyasar call these directly; the operator console is token-protected.
+	handle /webhooks/* {
+		reverse_proxy api:8080
+	}
+	handle /admin/* {
+		reverse_proxy api:8080
+	}
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+	# Never expose actuator publicly (it also listens only on the internal management port).
+	handle /actuator/* {
+		respond 404
+	}
+	handle {
+		reverse_proxy portal:3000
+	}
+}

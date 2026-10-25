@@ -28,6 +28,7 @@ class WorkspaceTest extends IntegrationTest {
     @Autowired WorkspaceController workspace;
     @Autowired ConversationStore conversations;
     @Autowired JdbcClient jdbc;
+    @Autowired sa.waslah.agent.privacy.PrivacyService privacy;
 
     UUID office, conversation, marketer;
 
@@ -80,5 +81,24 @@ class WorkspaceTest extends IntegrationTest {
         Map<String, Object> s = TenantContext.call(office, () -> workspace.stats());
         assertThat(s.get("inquiriesToday")).isEqualTo(1);
         assertThat(s.get("openHandoffs")).isEqualTo(0);
+    }
+
+    @Test
+    void erasingACustomerRemovesTheirMessagesAndName() {
+        TenantContext.run(office, () -> jdbc.sql("""
+                insert into leads (conversation_id, office_id, customer_name) values (?, ?, 'أم خالد')""")
+                .params(conversation, office).update());
+        TenantContext.run(office, () -> privacy.erase(conversation));
+        assertThat(TenantContext.call(office, () -> jdbc.sql("select count(*) from messages").query(Integer.class).single())).isZero();
+        assertThat(TenantContext.call(office, () -> jdbc.sql("select count(*) from leads").query(Integer.class).single())).isZero();
+        String wa = TenantContext.call(office, () -> jdbc.sql("select wa_id from contacts").query(String.class).single());
+        assertThat(wa).startsWith("erased-");
+        assertThat(TenantContext.call(office, () -> conversations.find(conversation).orElseThrow().agentActive(Instant.now()))).isFalse();
+    }
+
+    @Test
+    void retentionDeletesOldMessagesOnly() {
+        assertThat(TenantContext.call(office, () -> privacy.purge(Instant.now()))).isZero();
+        assertThat(TenantContext.call(office, () -> privacy.purge(Instant.now().plusSeconds(731L * 86400)))).isEqualTo(1);
     }
 }

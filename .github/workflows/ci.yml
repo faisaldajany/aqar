@@ -62,3 +62,17 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build production images
+        run: |
+          docker build -t waslah-api backend
+          docker build -t waslah-portal portal
+      - name: Validate production compose file
+        run: |
+          cp deploy/.env.example deploy/.env
+          sed -i 's/^\([A-Z_]*\)=$/\1=ci-placeholder/' deploy/.env
+          docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env config -q

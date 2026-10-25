@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health", "/dev/**", "/admin/**").permitAll()
+                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(bearerTokenResolver())

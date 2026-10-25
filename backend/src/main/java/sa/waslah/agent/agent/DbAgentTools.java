@@ -80,10 +80,21 @@ class DbAgentTools implements AgentTools {
                 default -> error("unknown tool " + name);
             };
         } catch (RuntimeException e) {
-            log.warn("Tool {} failed: {}", name, e.getMessage());
+            log.warn("Tool {} failed", name, e);
+            Throwable root = e;
+            while (root.getCause() != null) root = root.getCause();
+            String detail = name + ": " + root.getClass().getSimpleName() + " " + String.valueOf(root.getMessage());
+            errors.add(detail.length() > 300 ? detail.substring(0, 300) : detail);
             return error("tool failed");
         }
     }
+
+    /** Internal errors from this run, for the run log only (never shown to the model or customer). */
+    List<String> errors() {
+        return List.copyOf(errors);
+    }
+
+    private final List<String> errors = new ArrayList<>();
 
     private JsonNode search(JsonNode a) {
         List<ListingStore.Listing> found = listings.search(new ListingStore.Query(

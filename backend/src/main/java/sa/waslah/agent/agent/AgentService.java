@@ -146,7 +146,11 @@ public class AgentService {
             o.set("args", c.args());
             o.set("result", c.result());
         }
-        recordRun(e, brain.model(), out.usage(), out.latencyMs(), calls, out.fallback() ? "fallback" : "replied", out.failure());
+        String error = out.failure();
+        if (!tools.errors().isEmpty()) {
+            error = (error == null ? "" : error + " | ") + "tool errors: " + String.join("; ", tools.errors());
+        }
+        recordRun(e, brain.model(), out.usage(), out.latencyMs(), calls, out.fallback() ? "fallback" : "replied", error);
     }
 
     private List<Msg> recent(UUID conversationId, int limit) {

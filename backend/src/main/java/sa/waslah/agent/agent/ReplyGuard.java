@@ -54,6 +54,17 @@ public final class ReplyGuard {
             "أحو[ّ]?ل|احو[ّ]?ل|بحو[ّ]?ل|سأحو[ّ]?ل|سأقوم بتحويل|تحويلك|يتواصل معك|سيتواصل|بيتواصل|بيكلمك|يكلمك|transfer|connect you",
             Pattern.CASE_INSENSITIVE);
 
+    /** The model sometimes writes a tool call as text instead of calling it; that must never reach a customer. */
+    private static final Pattern LEAKED_TOOL_SYNTAX = Pattern.compile(
+            "</?tools?>|</?call|default_api|functionCall|tool_code|search_listings|save_lead|request_viewing|handoff_to_marketer",
+            Pattern.CASE_INSENSITIVE);
+    /** "I'll look for you" without actually searching. */
+    private static final Pattern SEARCH_PROMISE = Pattern.compile(
+            "بدور لك|أدور لك|ادور لك|أبحث لك|ابحث لك|بأبحث|سأبحث|بشوف لك|أشوف لك|let me (check|look|search)",
+            Pattern.CASE_INSENSITIVE);
+
+    static final String NO_TOOL_TEXT = "تنبيه داخلي لا يراه العميل: كتبت استدعاء أداة كنص داخل الرد. "
+            + "لا تكتب أسماء الأدوات أو صيغتها أبداً؛ استدعِ الأداة استدعاءً فعلياً ثم اكتب للعميل رداً عادياً فقط.";
     static final String MUST_SEARCH = "تنبيه داخلي لا يراه العميل: لم تستدعِ search_listings في هذا الرد. "
             + "لا تؤكد ولا تنفِ توفر أي عقار قبل البحث. استدعِ search_listings الآن بالمعلومات المتوفرة ثم أعد كتابة ردك.";
     static final String MUST_HANDOFF = "تنبيه داخلي لا يراه العميل: قلت إنك ستحوّل العميل أو إن أحداً سيتواصل معه، "
@@ -68,7 +79,14 @@ public final class ReplyGuard {
         if (reply == null) {
             return null;
         }
-        if (!toolsCalled.contains(AgentTools.SEARCH) && AVAILABILITY.matcher(reply).find() && PROPERTY.matcher(reply).find()) {
+        if (LEAKED_TOOL_SYNTAX.matcher(reply).find()) {
+            return NO_TOOL_TEXT;
+        }
+        boolean searched = toolsCalled.contains(AgentTools.SEARCH);
+        if (!searched && AVAILABILITY.matcher(reply).find() && PROPERTY.matcher(reply).find()) {
+            return MUST_SEARCH;
+        }
+        if (!searched && SEARCH_PROMISE.matcher(reply).find()) {
             return MUST_SEARCH;
         }
         if (!handedOff) {

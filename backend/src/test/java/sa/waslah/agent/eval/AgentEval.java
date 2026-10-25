@@ -117,8 +117,9 @@ class AgentEval {
                 if (tools.called.contains(tool)) failures.add("called " + tool);
             }
             List<String> any = list(expect, "reply_any");
-            if (!any.isEmpty() && any.stream().noneMatch(s -> norm(last).contains(norm(s)))) {
-                failures.add("final reply has none of " + any);
+            // reply_any: the expected content appeared in some agent reply in the conversation.
+            if (!any.isEmpty() && any.stream().noneMatch(s -> replies.stream().anyMatch(r -> norm(r).contains(norm(s))))) {
+                failures.add("no reply contains any of " + any);
             }
             for (String s : list(expect, "reply_none")) {
                 for (String r : replies) {

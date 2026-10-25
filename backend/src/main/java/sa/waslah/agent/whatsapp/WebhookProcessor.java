@@ -29,6 +29,9 @@ import sa.waslah.agent.tenant.TenantContext;
  *   smb_message_echoes  messages a marketer sent from the WhatsApp Business app (coexistence);
  *                       these pause the agent in that conversation
  * Retries are safe: messages are de-duplicated on (office_id, wa_message_id).
+ * Messages are stored with the time we received them, so they sort correctly against the agent's
+ * replies (WhatsApp timestamps have one-second precision); WhatsApp's own timestamp drives the
+ * 24-hour window through last_inbound_at.
  */
 @Service
 public class WebhookProcessor {
@@ -110,7 +113,7 @@ public class WebhookProcessor {
         UUID contactId = store.upsertContact(officeId, waId, name);
         ConversationStore.ConversationRef conv = store.upsertConversation(officeId, contactId, accountId, at, true);
         Optional<UUID> messageId = store.insertMessage(officeId, conv.id(), m.path("id").asText(), "IN",
-                Sender.CUSTOMER, c.type(), c.body(), c.mediaId(), "received", at);
+                Sender.CUSTOMER, c.type(), c.body(), c.mediaId(), "received", Instant.now());
         if (messageId.isEmpty() || !conv.agentActive(Instant.now())) {
             return Optional.empty();
         }
@@ -124,7 +127,7 @@ public class WebhookProcessor {
         UUID contactId = store.upsertContact(officeId, customerWaId, null);
         ConversationStore.ConversationRef conv = store.upsertConversation(officeId, contactId, accountId, at, false);
         Optional<UUID> inserted = store.insertMessage(officeId, conv.id(), m.path("id").asText(), "OUT",
-                Sender.HUMAN, c.type(), c.body(), c.mediaId(), "sent", at);
+                Sender.HUMAN, c.type(), c.body(), c.mediaId(), "sent", Instant.now());
         // Only a genuinely new app-sent message pauses the agent; our own API sends are already stored.
         if (inserted.isPresent()) {
             store.pauseAgent(conv.id(), ConversationStore.humanPauseUntil(Instant.now(), props.agent().humanPauseHours()));

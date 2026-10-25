@@ -158,7 +158,7 @@ class AgentUnitTests {
             assertThat(body.path("contents").get(1).path("parts").get(0).path("thoughtSignature").asText()).isEqualTo("abc");
             assertThat(body.path("contents").get(2).path("parts").get(0).path("functionResponse").path("name").asText())
                     .isEqualTo("search_listings");
-            assertThat(body.path("tools").get(0).path("functionDeclarations")).hasSize(5);
+            assertThat(body.path("tools").get(0).path("functionDeclarations")).hasSize(7);
             assertThat(body.path("generationConfig").path("thinkingConfig").path("thinkingLevel").asText()).isEqualTo("low");
         }
 

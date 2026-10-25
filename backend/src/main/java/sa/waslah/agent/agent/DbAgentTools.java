@@ -51,7 +51,10 @@ class DbAgentTools implements AgentTools {
 
     DbAgentTools(UUID officeId, UUID conversationId, String customerLabel, ObjectMapper json, JdbcClient jdbc,
                  ListingStore listings, MarketerStore marketers, ConversationStore conversations,
-                 MarketerAlert alert, int pauseHours, CardSender cards) {
+                 MarketerAlert alert, int pauseHours, CardSender cards,
+                 sa.waslah.agent.booking.BookingService bookings, sa.waslah.agent.booking.BookingStore bookingStore) {
+        this.bookings = bookings;
+        this.bookingStore = bookingStore;
         this.officeId = officeId;
         this.conversationId = conversationId;
         this.customerLabel = customerLabel;
@@ -66,6 +69,8 @@ class DbAgentTools implements AgentTools {
     }
 
     private final CardSender cards;
+    private final sa.waslah.agent.booking.BookingService bookings;
+    private final sa.waslah.agent.booking.BookingStore bookingStore;
 
     @Override
     public List<String> licensesSeen() {
@@ -83,7 +88,9 @@ class DbAgentTools implements AgentTools {
             return switch (name) {
                 case SEARCH -> search(args);
                 case SAVE_LEAD -> saveLead(args);
-                case REQUEST_VIEWING -> requestViewing(args);
+                case GET_SLOTS -> slots(args);
+                case BOOK -> book(args);
+                case CANCEL -> cancel(args);
                 case SEND_CARD -> sendCard(args);
                 case HANDOFF -> handoff(args.path("reason").asText("OTHER"), args.path("summary").asText(""), null);
                 default -> error("unknown tool " + name);
@@ -186,30 +193,79 @@ class DbAgentTools implements AgentTools {
         return cards.send(l.get());
     }
 
-    private JsonNode requestViewing(JsonNode a) {
-        UUID listingId;
+    private JsonNode slots(JsonNode a) {
+        UUID id = uuid(a, "listing_id");
+        if (id == null) return error("listing_id must be an id returned by search_listings");
+        java.time.LocalDate date = null;
         try {
-            listingId = UUID.fromString(a.path("listing_id").asText());
+            if (a.hasNonNull("date")) date = java.time.LocalDate.parse(a.path("date").asText());
+        } catch (java.time.format.DateTimeParseException ignored) {
+            // treat as no date
+        }
+        try {
+            List<sa.waslah.agent.booking.SlotEngine.Slot> free = bookings.slots(officeId, id, mode(a), date, java.time.Instant.now());
+            ObjectNode out = json.createObjectNode().put("count", free.size());
+            ArrayNode arr = out.putArray("slots");
+            free.forEach(sl -> arr.addObject().put("start", sl.start().toString()).put("label", sl.label()));
+            if (free.isEmpty()) out.put("note", "لا توجد مواعيد متاحة في هذه الفترة؛ اسأل العميل عن يوم آخر أو حوّله للمسوّق.");
+            return out;
+        } catch (sa.waslah.agent.booking.BookingService.BookingRefused e) {
+            return error(e.getMessage());
+        }
+    }
+
+    private JsonNode book(JsonNode a) {
+        UUID id = uuid(a, "listing_id");
+        if (id == null) return error("listing_id must be an id returned by search_listings");
+        java.time.Instant start;
+        try {
+            start = java.time.Instant.parse(a.path("start").asText());
+        } catch (java.time.format.DateTimeParseException e) {
+            return error("start must be the exact 'start' of a slot from get_viewing_slots");
+        }
+        String name = text(a, "customer_name");
+        try {
+            sa.waslah.agent.booking.BookingService.Booked b = bookings.book(officeId, conversationId, id, start, mode(a),
+                    name, java.time.Instant.now());
+            ObjectNode out = json.createObjectNode().put("booking_id", b.id().toString()).put("status", b.status())
+                    .put("when", b.label());
+            if ("PENDING_APPROVAL".equals(b.status())) {
+                out.put("next_step", "طلب الزيارة الذاتية أُرسل للمكتب؛ يصل العميل التأكيد وطريقة الدخول بعد موافقة المكتب.");
+            } else {
+                out.put("next_step", "وصل العميل تأكيد الموعد برسالة منفصلة؛ لا تكرر تفاصيله كاملة.");
+                out.put("marketer_first_name", b.marketerFirstName());
+            }
+            return out;
+        } catch (sa.waslah.agent.booking.BookingService.BookingRefused e) {
+            return error(e.getMessage());
+        }
+    }
+
+    private JsonNode cancel(JsonNode a) {
+        UUID id = uuid(a, "booking_id");
+        try {
+            if (id == null) {
+                var upcoming = bookingStore.forConversation(conversationId);
+                if (upcoming.size() != 1) return error(upcoming.isEmpty() ? "لا يوجد موعد قادم" : "للعميل أكثر من موعد؛ اسأله أيها");
+                id = upcoming.get(0).id();
+            }
+            bookings.cancelByCustomer(conversationId, id);
+            return json.createObjectNode().put("cancelled", true);
+        } catch (sa.waslah.agent.booking.BookingService.BookingRefused e) {
+            return error(e.getMessage());
+        }
+    }
+
+    private static UUID uuid(JsonNode a, String f) {
+        try {
+            return a.hasNonNull(f) ? UUID.fromString(a.path(f).asText()) : null;
         } catch (IllegalArgumentException e) {
-            return error("listing_id must be an id returned by search_listings");
+            return null;
         }
-        Optional<ListingStore.Listing> listing = listings.find(listingId);
-        if (listing.isEmpty() || !"ACTIVE".equals(listing.get().status())) {
-            return error("listing not available");
-        }
-        ListingStore.Listing l = listing.get();
-        String mode = "SELF_VISIT".equals(a.path("mode").asText()) && l.vacant() ? "زيارة ذاتية" : "معاينة مع مسوّق";
-        String summary = "طلب " + mode + ": " + l.title() + " في " + l.district()
-                + " (ترخيص " + l.adLicense() + ")\nالموعد المطلوب: " + a.path("preferred_time").asText("غير محدد")
-                + "\n" + leadLine();
-        Optional<MarketerStore.Marketer> m = l.marketerId() != null
-                ? marketers.find(l.marketerId()) : marketers.forDistrict(l.district());
-        insertHandoff("VIEWING_REQUEST", summary, m.map(MarketerStore.Marketer::id).orElse(null), listingId);
-        m.ifPresent(x -> alert.send(x, customerLabel, summary));
-        return json.createObjectNode()
-                .put("recorded", true)
-                .put("next_step", "المكتب يؤكد الموعد مع العميل")
-                .put("marketer_first_name", m.map(x -> x.name().split("\\s+")[0]).orElse(""));
+    }
+
+    private static String mode(JsonNode a) {
+        return "SELF_VISIT".equals(a.path("mode").asText()) ? "SELF_VISIT" : "WITH_MARKETER";
     }
 
     private JsonNode handoff(String reason, String summary, UUID listingId) {

@@ -54,12 +54,17 @@ public class AgentService {
     private final ObjectMapper json;
     private final ConcurrentHashMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final sa.waslah.agent.billing.PlanLimits plans;
+    private final sa.waslah.agent.booking.BookingService bookingService;
+    private final sa.waslah.agent.booking.BookingStore bookingStore;
     private final sa.waslah.agent.office.OfficeAlerts alerts;
 
     public AgentService(WaslahProperties props, AgentBrain brain, ConversationStore conversations, ListingStore listings,
                         MarketerStore marketers, OutboundMessageService outbound, WaAccounts accounts,
                         WhatsAppClient whatsapp, JdbcClient jdbc, ObjectMapper json,
-                        sa.waslah.agent.billing.PlanLimits plans, sa.waslah.agent.office.OfficeAlerts alerts) {
+                        sa.waslah.agent.billing.PlanLimits plans, sa.waslah.agent.office.OfficeAlerts alerts,
+                        sa.waslah.agent.booking.BookingService bookingService, sa.waslah.agent.booking.BookingStore bookingStore) {
+        this.bookingService = bookingService;
+        this.bookingStore = bookingStore;
         this.plans = plans;
         this.alerts = alerts;
         this.props = props;
@@ -152,7 +157,7 @@ public class AgentService {
 
         DbAgentTools tools = new DbAgentTools(e.officeId(), e.conversationId(), customer, json, jdbc, listings,
                 marketers, conversations, (m, label, summary) -> alertMarketer(conv.get(), m, label, summary),
-                props.agent().humanPauseHours(), listing -> sendCard(e.conversationId(), listing));
+                props.agent().humanPauseHours(), listing -> sendCard(e.conversationId(), listing), bookingService, bookingStore);
 
         AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, LocalDate.now(RIYADH)), turns, tools, prior);
         send(e.conversationId(), out.reply());

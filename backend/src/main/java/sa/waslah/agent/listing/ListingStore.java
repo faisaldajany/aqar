@@ -22,7 +22,8 @@ public class ListingStore {
                           BigDecimal price, BigDecimal areaSqm, Integer rooms, String adLicense,
                           LocalDate licenseExpiry, boolean vacant, String status, UUID marketerId,
                           Double latitude, Double longitude, String videoUrl, List<String> photoUrls,
-                          int uploadedPhotos, String description, String source, String sourceUrl) {
+                          int uploadedPhotos, String description, String source, String sourceUrl,
+                          List<String> selfVisitAccess, String accessLockNote, String accessGuard, String accessKeyPoint) {
 
         public boolean hasLocation() {
             return latitude != null && longitude != null;
@@ -48,7 +49,8 @@ public class ListingStore {
             l.id, l.title, l.district, l.property_type, l.purpose, l.price, l.area_sqm, l.rooms, l.ad_license,
             l.license_expiry, l.vacant, l.status, l.marketer_id, l.latitude, l.longitude, l.video_url, l.photo_urls,
             (select count(*) from listing_photos p where p.listing_id = l.id) as uploaded_photos,
-            l.description, l.source, l.source_url""";
+            l.description, l.source, l.source_url, l.self_visit_access, l.access_lock_note, l.access_guard,
+            l.access_key_point""";
 
     private final JdbcClient jdbc;
 
@@ -212,7 +214,28 @@ public class ListingStore {
                 rs.getInt("uploaded_photos"),
                 rs.getString("description"),
                 rs.getString("source"),
-                rs.getString("source_url"));
+                rs.getString("source_url"),
+                strings(rs.getArray("self_visit_access")),
+                rs.getString("access_lock_note"),
+                rs.getString("access_guard"),
+                rs.getString("access_key_point"));
+    }
+
+    private static List<String> strings(Array a) throws SQLException {
+        return a == null ? List.of() : Arrays.asList((String[]) a.getArray());
+    }
+
+    /** How a customer gets in on a self-visit: LOCK (smart-lock code), GUARD (guard or owner on site), KEY (pick up). */
+    public void setAccess(UUID id, List<String> methods, String lockNote, String guard, String keyPoint) {
+        jdbc.sql("""
+                update listings set self_visit_access = cast(? as text[]), access_lock_note = ?, access_guard = ?,
+                       access_key_point = ?, updated_at = now() where id = ?""")
+                .params(pgArray(methods), blank(lockNote), blank(guard), blank(keyPoint), id)
+                .update();
+    }
+
+    private static String blank(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     static String pgArray(List<String> items) {

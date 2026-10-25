@@ -56,7 +56,7 @@ public final class ReplyGuard {
 
     /** The model sometimes writes a tool call as text instead of calling it; that must never reach a customer. */
     private static final Pattern LEAKED_TOOL_SYNTAX = Pattern.compile(
-            "</?tools?>|</?call|default_api|functionCall|tool_code|search_listings|save_lead|request_viewing|handoff_to_marketer",
+            "</?tools?>|</?call|default_api|functionCall|tool_code|search_listings|save_lead|get_viewing_slots|book_viewing|cancel_viewing|send_listing_card|handoff_to_marketer",
             Pattern.CASE_INSENSITIVE);
     /** "I'll look for you" without actually searching. */
     private static final Pattern SEARCH_PROMISE = Pattern.compile(

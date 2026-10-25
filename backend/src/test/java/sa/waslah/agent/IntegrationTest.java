@@ -17,7 +17,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
                 "waslah.whatsapp.verify-token=test-verify-token",
                 "waslah.llm.provider=scripted",
                 "waslah.agent.enabled=false",
-                "waslah.agent.debounce-ms=0"
+                "waslah.agent.debounce-ms=0",
+                "waslah.booking.job-initial-delay-ms=86400000"
         })
 public abstract class IntegrationTest {
 

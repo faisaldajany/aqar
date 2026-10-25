@@ -14,7 +14,9 @@ public interface AgentTools {
 
     String SEARCH = "search_listings";
     String SAVE_LEAD = "save_lead";
-    String REQUEST_VIEWING = "request_viewing";
+    String GET_SLOTS = "get_viewing_slots";
+    String BOOK = "book_viewing";
+    String CANCEL = "cancel_viewing";
     String HANDOFF = "handoff_to_marketer";
     String SEND_CARD = "send_listing_card";
 
@@ -53,14 +55,31 @@ public interface AgentTools {
                           "payment":{"type":"string","enum":["CASH","FINANCE","INSTALLMENTS","UNKNOWN"]},
                           "timeline":{"type":"string","description":"When they need it, in the customer's words"},
                           "notes":{"type":"string"}}}"""),
-                tool(json, REQUEST_VIEWING,
-                        "The customer wants to view a specific listing returned by search. Records the request for the office to confirm.",
+                tool(json, GET_SLOTS,
+                        "Free viewing times for a listing returned by search. WITH_MARKETER = a marketer shows it; "
+                                + "SELF_VISIT = the customer visits alone (vacant listings, office rules apply). "
+                                + "Returns up to 6 slots with an exact 'start' to pass to book_viewing.",
                         """
                         {"type":"object","properties":{
                           "listing_id":{"type":"string"},
-                          "preferred_time":{"type":"string","description":"The time the customer asked for, in their words"},
-                          "mode":{"type":"string","enum":["WITH_MARKETER","SELF_VISIT"]}},
-                         "required":["listing_id","preferred_time"]}"""),
+                          "mode":{"type":"string","enum":["WITH_MARKETER","SELF_VISIT"]},
+                          "date":{"type":"string","description":"Optional day the customer asked for, YYYY-MM-DD (Riyadh)"}},
+                         "required":["listing_id","mode"]}"""),
+                tool(json, BOOK,
+                        "Book a viewing at one of the slots returned by get_viewing_slots, after the customer chose it. "
+                                + "The customer receives the office's confirmation message automatically.",
+                        """
+                        {"type":"object","properties":{
+                          "listing_id":{"type":"string"},
+                          "start":{"type":"string","description":"The exact 'start' value of the chosen slot"},
+                          "mode":{"type":"string","enum":["WITH_MARKETER","SELF_VISIT"]},
+                          "customer_name":{"type":"string"}},
+                         "required":["listing_id","start","mode"]}"""),
+                tool(json, CANCEL,
+                        "Cancel the customer's upcoming viewing when they ask to cancel or change it (then offer new slots).",
+                        """
+                        {"type":"object","properties":{
+                          "booking_id":{"type":"string","description":"Optional; the customer's only upcoming booking is used if omitted"}}}"""),
                 tool(json, SEND_CARD,
                         "Send the customer the listing's map pin and up to 3 photos on WhatsApp, and get its video/tour link. "
                                 + "Use when the customer shows interest in a specific listing, or asks for photos or the location.",

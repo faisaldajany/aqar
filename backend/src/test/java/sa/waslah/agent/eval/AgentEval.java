@@ -213,6 +213,7 @@ class AgentEval {
         final List<String> called = new ArrayList<>();
         final List<String> licenses = new ArrayList<>();
         final Map<String, String> lead = new HashMap<>();
+        final List<String> slotsIssued = new ArrayList<>();
         boolean handedOff;
 
         FixtureTools(List<Listing> listings) {
@@ -258,13 +259,34 @@ class AgentEval {
                     });
                     return JSON.createObjectNode().put("saved", true);
                 }
-                case REQUEST_VIEWING -> {
+                case GET_SLOTS -> {
                     String id = a.path("listing_id").asText();
-                    boolean exists = listings.stream().anyMatch(l -> l.id().equals(id) && !l.expiry().isBefore(LocalDate.now()));
-                    return exists
-                            ? JSON.createObjectNode().put("recorded", true).put("next_step", "المكتب يؤكد الموعد مع العميل")
-                            .put("marketer_first_name", "خالد")
-                            : JSON.createObjectNode().put("error", "listing_id must be an id returned by search_listings");
+                    Listing l = listings.stream().filter(x -> x.id().equals(id) && !x.expiry().isBefore(LocalDate.now())).findFirst().orElse(null);
+                    if (l == null) return JSON.createObjectNode().put("error", "listing not available");
+                    if ("SELF_VISIT".equals(a.path("mode").asText()) && !l.vacant()) {
+                        return JSON.createObjectNode().put("error", "العقار مسكون، فالمعاينة مع المسوّق فقط.");
+                    }
+                    ObjectNode out = JSON.createObjectNode().put("count", 3);
+                    ArrayNode arr = out.putArray("slots");
+                    java.time.ZonedDateTime base = LocalDate.now().plusDays(1).atTime(16, 0).atZone(java.time.ZoneId.of("Asia/Riyadh"));
+                    String[] labels = {"غداً 4:00 م", "غداً 5:00 م", "غداً 6:00 م"};
+                    for (int i = 0; i < 3; i++) {
+                        String st = base.plusHours(i).toInstant().toString();
+                        slotsIssued.add(st);
+                        arr.addObject().put("start", st).put("label", labels[i]);
+                    }
+                    return out;
+                }
+                case BOOK -> {
+                    if (!slotsIssued.contains(a.path("start").asText())) {
+                        return JSON.createObjectNode().put("error", "هذا الموعد غير متاح. استدعِ get_viewing_slots واعرض المواعيد المتاحة.");
+                    }
+                    boolean self = "SELF_VISIT".equals(a.path("mode").asText());
+                    return JSON.createObjectNode().put("booking_id", "B1").put("status", self ? "PENDING_APPROVAL" : "CONFIRMED")
+                            .put("next_step", self ? "طلب الزيارة الذاتية أُرسل للمكتب" : "وصل العميل تأكيد الموعد برسالة منفصلة");
+                }
+                case CANCEL -> {
+                    return JSON.createObjectNode().put("cancelled", true);
                 }
                 case SEND_CARD -> {
                     String id = a.path("listing_id").asText();

@@ -66,7 +66,11 @@ class AgentEval {
         String only = System.getenv("EVAL_ONLY");
 
         Llm.Client client = new GeminiClient(RestClient.builder(), JSON, new GeminiClient.Settings(key, model,
-                "none".equalsIgnoreCase(thinking) ? null : thinking, 0.3, 1024, Duration.ofSeconds(30), 6));
+                "none".equalsIgnoreCase(thinking) ? null : thinking, 0.3, 1024, Duration.ofSeconds(30), 3));
+        // Stop early instead of hanging when the API key is out of quota (each call would wait out its retries).
+        long deadline = System.currentTimeMillis() + Long.parseLong(env("EVAL_BUDGET_MINUTES", "14")) * 60_000;
+        int quotaHits = 0;
+        String stopped = null;
         AgentBrain brain = new AgentBrain(client, JSON);
         String system = AgentPrompt.system(office, LocalDate.now());
 
@@ -79,6 +83,9 @@ class AgentEval {
         for (Map<String, Object> sc : scenarios) {
             String id = (String) sc.get("id");
             if (only != null && !only.isBlank() && !id.startsWith(only)) continue;
+            if (stopped == null && System.currentTimeMillis() > deadline) stopped = "time budget reached";
+            if (stopped == null && quotaHits >= 3) stopped = "Gemini quota or rate limit (429) on 3 turns in a row";
+            if (stopped != null) continue;
             ran++;
             String category = (String) sc.get("category");
             Map<String, Object> expect = (Map<String, Object>) sc.getOrDefault("expect", Map.of());
@@ -105,6 +112,9 @@ class AgentEval {
                 ArrayNode calls = t.putArray("tools");
                 out.toolCalls().forEach(c -> calls.addObject().put("name", c.name()).set("args", c.args()));
                 if (out.fallback()) failures.add("fallback (" + out.failure() + ") on: " + customer);
+                boolean quota = out.fallback() && out.failure() != null
+                        && (out.failure().contains("429") || out.failure().contains("RESOURCE_EXHAUSTED"));
+                quotaHits = quota ? quotaHits + 1 : 0;
                 if (EMOJI.matcher(out.reply()).find()) failures.add("emoji in reply");
                 if (out.reply().split("\n").length > 6) failures.add("reply longer than 6 lines");
             }
@@ -156,6 +166,9 @@ class AgentEval {
 
         StringBuilder md = new StringBuilder();
         md.append("# Agent eval: ").append(model).append(" (thinking: ").append(thinking).append(")\n\n");
+        if (stopped != null) {
+            md.append("> **Stopped early: ").append(stopped).append(".** Scenarios after that were not run.\n\n");
+        }
         md.append(String.format(Locale.ROOT, "**Passed %d of %d scenarios (%.0f%%)**%n%n", passed, ran, ran == 0 ? 0 : 100.0 * passed / ran));
         md.append("| Metric | Value |\n|---|---|\n");
         md.append(String.format(Locale.ROOT, "| Customer turns | %d |%n| Latency p50 / p95 | %.1f s / %.1f s |%n", turnsTotal, p50 / 1000.0, p95 / 1000.0));
@@ -182,7 +195,7 @@ class AgentEval {
         Files.createDirectories(dir);
         Files.writeString(dir.resolve("report.md"), md.toString(), StandardCharsets.UTF_8);
         ObjectNode summary = JSON.createObjectNode().put("model", model).put("thinking", thinking)
-                .put("passed", passed).put("ran", ran).put("p50_ms", p50).put("p95_ms", p95)
+                .put("passed", passed).put("ran", ran).put("stopped", stopped).put("p50_ms", p50).put("p95_ms", p95)
                 .put("tokens_in", tokensIn).put("tokens_out", tokensOut).put("cost_per_turn_sar", perTurnSar);
         summary.set("results", results);
         Files.writeString(dir.resolve("results.json"), JSON.writeValueAsString(summary), StandardCharsets.UTF_8);

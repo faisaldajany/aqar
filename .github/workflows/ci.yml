@@ -11,20 +11,38 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
       # Unit tests plus Testcontainers integration tests against Postgres 16 (Docker is available on ubuntu runners).
-      - run: mvn -B -ntp verify
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: surefire-reports
-          path: backend/target/surefire-reports
+      - name: Build and test
+        run: |
+          set -o pipefail
+          mvn -B -ntp verify 2>&1 | tee mvn.log
+      # Surfaces compile errors and test failures as annotations, readable without downloading logs.
+      - name: Report failures
+        if: failure()
+        run: |
+          {
+            grep -E '^\[ERROR\] .*\.java:\[[0-9]+' mvn.log || true
+            grep -E '<<< (FAILURE|ERROR)!' mvn.log || true
+            grep -hE -A3 '<<< (FAILURE|ERROR)!' target/surefire-reports/*.txt 2>/dev/null | grep -vE '^\s*at |^--$' || true
+            grep -E '^\[ERROR\] (Failed to execute|Tests run:|  [A-Za-z]+Test)' mvn.log || true
+            grep -E 'Caused by:' mvn.log | sort | uniq -c | sort -rn | head -5 || true
+          } | awk '!seen[$0]++' | cut -c1-900 > report.txt
+          n=0
+          while IFS= read -r line; do
+            n=$((n+1))
+            if [ $n -le 10 ]; then echo "::error::$line"
+            elif [ $n -le 20 ]; then echo "::warning::$line"
+            elif [ $n -le 30 ]; then echo "::notice::$line"
+            fi
+          done < report.txt
 
   portal:
     runs-on: ubuntu-latest
@@ -32,8 +50,8 @@ jobs:
       run:
         working-directory: portal
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm

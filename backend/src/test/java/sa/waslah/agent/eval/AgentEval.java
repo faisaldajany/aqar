@@ -66,7 +66,7 @@ class AgentEval {
         String only = System.getenv("EVAL_ONLY");
 
         Llm.Client client = new GeminiClient(RestClient.builder(), JSON, new GeminiClient.Settings(key, model,
-                "none".equalsIgnoreCase(thinking) ? null : thinking, 0.3, 1024, Duration.ofSeconds(30)));
+                "none".equalsIgnoreCase(thinking) ? null : thinking, 0.3, 1024, Duration.ofSeconds(30), 6));
         AgentBrain brain = new AgentBrain(client, JSON);
         String system = AgentPrompt.system(office, LocalDate.now());
 

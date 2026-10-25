@@ -116,7 +116,7 @@ class AgentUnitTests {
     @Nested
     class Gemini {
         final GeminiClient client = new GeminiClient(RestClient.builder(), JSON,
-                new GeminiClient.Settings("k", "gemini-3.5-flash-lite", "low", 0.3, 512, Duration.ofSeconds(5)));
+                new GeminiClient.Settings("k", "gemini-3.5-flash-lite", "low", 0.3, 512, Duration.ofSeconds(5), 0));
 
         @Test
         void buildsRequestWithToolsAndReplaysRawModelTurn() throws Exception {

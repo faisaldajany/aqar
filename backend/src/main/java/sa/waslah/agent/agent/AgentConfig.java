@@ -26,7 +26,7 @@ public class AgentConfig {
         if (c.useGemini()) {
             log.info("Agent model: {} (thinking={})", c.model(), c.thinkingLevel());
             return new GeminiClient(builder, json, new GeminiClient.Settings(c.apiKey(), c.model(), c.thinkingLevel(),
-                    c.temperature(), c.maxOutputTokens(), Duration.ofSeconds(c.timeoutSeconds())));
+                    c.temperature(), c.maxOutputTokens(), Duration.ofSeconds(c.timeoutSeconds()), 1));
         }
         log.warn("No model API key configured: the agent answers with a fixed development reply.");
         return new ScriptedLlmClient();

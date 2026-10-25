@@ -19,8 +19,12 @@ import org.springframework.web.client.ResourceAccessException;
  */
 public class GeminiClient implements Llm.Client {
 
+    /**
+     * @param maxRetries retries on 429 (rate limit) and 500/503 (temporary). Keep it low in production,
+     *                   since a customer is waiting; the eval uses more.
+     */
     public record Settings(String apiKey, String model, String thinkingLevel, double temperature, int maxOutputTokens,
-                           Duration timeout) {
+                           Duration timeout, int maxRetries) {
     }
 
     private final RestClient http;
@@ -44,21 +48,44 @@ public class GeminiClient implements Llm.Client {
     @Override
     public Llm.Response generate(Llm.Request req) {
         ObjectNode body = buildBody(req);
-        JsonNode res;
-        try {
-            res = http.post()
-                    .uri("/models/{model}:generateContent", s.model())
-                    .header("x-goog-api-key", s.apiKey())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
-        } catch (RestClientResponseException e) {
-            throw new Llm.LlmException("Gemini " + e.getStatusCode().value() + ": " + truncate(e.getResponseBodyAsString()), e);
-        } catch (ResourceAccessException e) {
-            throw new Llm.LlmException("Gemini unreachable or timed out", e);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                JsonNode res = http.post()
+                        .uri("/models/{model}:generateContent", s.model())
+                        .header("x-goog-api-key", s.apiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .body(JsonNode.class);
+                return parse(res);
+            } catch (RestClientResponseException e) {
+                int code = e.getStatusCode().value();
+                boolean retryable = code == 429 || code == 500 || code == 503;
+                if (!retryable || attempt >= s.maxRetries()) {
+                    throw new Llm.LlmException("Gemini " + code + ": " + truncate(e.getResponseBodyAsString()), e);
+                }
+                sleep(backoff(e.getResponseBodyAsString(), attempt));
+            } catch (ResourceAccessException e) {
+                throw new Llm.LlmException("Gemini unreachable or timed out", e);
+            }
         }
-        return parse(res);
+    }
+
+    /** Uses the server's suggested retryDelay (e.g. "12s") when present, else 1s, 2s, 4s… capped at 30s. */
+    static long backoff(String errorBody, int attempt) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"retryDelay\"\\s*:\\s*\"(\\d+)(?:\\.\\d+)?s\"")
+                .matcher(errorBody == null ? "" : errorBody);
+        long ms = m.find() ? Long.parseLong(m.group(1)) * 1000 : (1000L << Math.min(attempt, 5));
+        return Math.min(ms, 30_000);
+    }
+
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new Llm.LlmException("Interrupted while waiting to retry", ie);
+        }
     }
 
     public ObjectNode buildBody(Llm.Request req) {

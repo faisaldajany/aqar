@@ -60,7 +60,7 @@ class UnitTests {
         @Test
         void roundTripsAndUsesFreshIv() {
             TokenCipher c = new TokenCipher(new WaslahProperties(null,
-                    "ZGV2LW9ubHkta2V5LWNoYW5nZS1tZS0zMi1ieXRlcyE=", false, false, null, null));
+                    "ZGV2LW9ubHkta2V5LWNoYW5nZS1tZS0zMi1ieXRlcyE=", false, false, null, null, null));
             String a = c.encrypt("EAAG-token");
             assertThat(c.decrypt(a)).isEqualTo("EAAG-token");
             assertThat(c.encrypt("EAAG-token")).isNotEqualTo(a);

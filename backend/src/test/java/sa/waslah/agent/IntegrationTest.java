@@ -14,7 +14,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
         properties = {
                 "waslah.whatsapp.mode=mock",
                 "waslah.whatsapp.app-secret=test-app-secret",
-                "waslah.whatsapp.verify-token=test-verify-token"
+                "waslah.whatsapp.verify-token=test-verify-token",
+                "waslah.llm.provider=scripted",
+                "waslah.agent.enabled=false",
+                "waslah.agent.debounce-ms=0"
         })
 public abstract class IntegrationTest {
 

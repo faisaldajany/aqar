@@ -9,7 +9,8 @@ public record WaslahProperties(
         boolean cookieSecure,
         boolean devToolsEnabled,
         WhatsApp whatsapp,
-        Agent agent) {
+        Agent agent,
+        Llm llm) {
 
     public record WhatsApp(
             String mode,
@@ -25,6 +26,26 @@ public record WaslahProperties(
         }
     }
 
-    public record Agent(int humanPauseHours) {
+    public record Agent(
+            boolean enabled,
+            int humanPauseHours,
+            long debounceMs,
+            int historyLimit,
+            String handoffTemplate,
+            String handoffTemplateLanguage) {
+    }
+
+    public record Llm(
+            String provider,
+            String apiKey,
+            String model,
+            String thinkingLevel,
+            double temperature,
+            int maxOutputTokens,
+            int timeoutSeconds) {
+
+        public boolean useGemini() {
+            return "gemini".equalsIgnoreCase(provider) && apiKey != null && !apiKey.isBlank();
+        }
     }
 }

@@ -31,7 +31,7 @@ jobs:
           {
             grep -E '^\[ERROR\] .*\.java:\[[0-9]+' mvn.log || true
             grep -E '<<< (FAILURE|ERROR)!' mvn.log || true
-            grep -hE -A3 '<<< (FAILURE|ERROR)!' target/surefire-reports/*.txt 2>/dev/null | grep -vE '^\s*at |^--$' || true
+            grep -hE -A8 '<<< (FAILURE|ERROR)!' target/surefire-reports/*.txt 2>/dev/null | grep -vE '^\s*at |^--$|^\s*$' || true
             grep -E '^\[ERROR\] (Failed to execute|Tests run:|  [A-Za-z]+Test)' mvn.log || true
             grep -E 'Caused by:' mvn.log | sort | uniq -c | sort -rn | head -5 || true
           } | awk '!seen[$0]++' | cut -c1-900 > report.txt

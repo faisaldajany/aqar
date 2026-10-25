@@ -72,7 +72,9 @@ class AgentFlowTest extends IntegrationTest {
         inbound("wamid.a1", "ابغى فيلا في النرجس بحدود مليونين كاش");
 
         String sent = await(() -> lastSentText());
-        assertThat(sent).contains(license);
+        assertThat(sent).as(() -> "agent run: " + TenantContext.call(office, () -> jdbc.sql(
+                "select outcome || ' | ' || coalesce(error, '') || ' | ' || tool_calls::text from agent_runs")
+                .query(String.class).list())).contains(license);
         // The model's second call saw the listing returned by the real search.
         Llm.Request third = ((ScriptedLlmClient) llm).requests().get(2);
         assertThat(third.turns().toString()).contains(license);

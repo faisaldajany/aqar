@@ -1,0 +1,66 @@
+name: Agent eval
+
+# Plays evals/scenarios.yaml against the real model and publishes the report to the eval-results branch.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Gemini model
+        default: gemini-3.5-flash-lite
+      thinking:
+        description: Thinking level (low, medium, high, or none)
+        default: low
+      only:
+        description: Run only scenario ids starting with this (blank = all)
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - backend/src/main/java/sa/waslah/agent/agent/**
+      - backend/src/test/resources/evals/**
+      - backend/src/test/java/sa/waslah/agent/eval/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Run scenarios
+        working-directory: backend
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LLM_MODEL: ${{ inputs.model || 'gemini-3.5-flash-lite' }}
+          LLM_THINKING_LEVEL: ${{ inputs.thinking || 'low' }}
+          EVAL_ONLY: ${{ inputs.only }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then echo "::error::Add the GEMINI_API_KEY repository secret"; exit 1; fi
+          mvn -B -ntp test -Dtest=AgentEval -Dexcluded.groups=none -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | tee eval.log
+          line=$(grep -o 'EVAL_SUMMARY.*' eval.log | tail -1)
+          [ -n "$line" ] && echo "::notice::$line" || { echo "::error::Eval did not produce a summary"; grep -E 'ERROR|Exception' eval.log | head -5 | sed 's/^/::error::/'; exit 1; }
+      - name: Publish report to eval-results branch
+        if: always()
+        run: |
+          [ -f backend/target/eval/report.md ] || exit 0
+          stamp="$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}"
+          mkdir -p /tmp/out && cp backend/target/eval/report.md backend/target/eval/results.json /tmp/out/
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          if git fetch origin eval-results 2>/dev/null; then git checkout -B eval-results origin/eval-results; else git checkout --orphan eval-results && git rm -rqf .; fi
+          mkdir -p "runs/$stamp" latest
+          cp /tmp/out/* "runs/$stamp/" && cp /tmp/out/* latest/
+          git add runs latest
+          git commit -qm "Eval $stamp ($LLM_MODEL)" && git push -q origin eval-results
+        env:
+          LLM_MODEL: ${{ inputs.model || 'gemini-3.5-flash-lite' }}

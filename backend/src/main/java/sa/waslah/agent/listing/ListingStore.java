@@ -34,7 +34,7 @@ public class ListingStore {
     }
 
     public List<Listing> search(Query q) {
-        return jdbc.sql("select " + COLUMNS + """
+        return jdbc.sql("select " + COLUMNS + " " + """
                  from listings
                  where status = 'ACTIVE' and license_expiry >= current_date
                    and (cast(:purpose as text) is null or purpose = :purpose)

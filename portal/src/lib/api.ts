@@ -148,3 +148,24 @@ export function riyadhDay(iso: string): string {
 export function riyadhTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("ar-SA", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
 }
+
+export type Lead = {
+  customerName?: string | null; purpose?: string | null; propertyType?: string | null; districts?: string | null;
+  budgetMin?: number | null; budgetMax?: number | null; payment?: string | null; timeline?: string | null; notes?: string | null;
+  temperature?: "HOT" | "WARM" | "COLD";
+};
+export type Handoff = {
+  id: string; conversationId: string; reason: string; summary: string; status: "OPEN" | "CLAIMED" | "CLOSED";
+  createdAt: string; marketer: string | null; customer: string;
+};
+export type ConversationDetails = {
+  waId: string; agentActive: boolean; lead: Lead;
+  bookings: { id: string; mode: string; startsAt: string; status: string; listing: string }[];
+  handoffs: Handoff[];
+};
+export type Stats = {
+  inquiriesToday: number; inquiriesWeek: number; qualifiedWeek: number; bookingsToday: number; bookedWeek: number;
+  openHandoffs: number; afterHoursWeek: number; medianReplyMs: number | null;
+};
+export const TEMP_LABELS: Record<string, [string, string]> = { HOT: ["جاد", "p-bad"], WARM: ["مهتم", "p-warn"], COLD: ["استكشاف", "p-idle"] };
+export const PURPOSE_LABELS: Record<string, string> = { SALE: "شراء", BUY: "شراء", RENT: "إيجار" };

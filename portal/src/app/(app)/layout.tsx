@@ -9,6 +9,7 @@ import { SessionContext } from "./session";
 const NAV = [
   { href: "/dashboard", label: "الرئيسية" },
   { href: "/inbox", label: "المحادثات" },
+  { href: "/handoffs", label: "التحويلات" },
   { href: "/bookings", label: "المواعيد" },
   { href: "/listings", label: "العقارات" },
   { href: "/marketers", label: "المسوّقون" },

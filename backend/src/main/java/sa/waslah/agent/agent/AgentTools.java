@@ -33,7 +33,7 @@ public interface AgentTools {
                                 + "Only listings returned here may be mentioned to the customer.",
                         """
                         {"type":"object","properties":{
-                          "purpose":{"type":"string","enum":["SALE","RENT"],"description":"SALE for buying, RENT for renting"},
+                          "purpose":{"type":"string","enum":["SALE","RENT"],"description":"SALE for buying, RENT for renting. Omit unless the customer said which; never assume."},
                           "property_type":{"type":"string","description":"e.g. فيلا، شقة، أرض، دور، عمارة، محل"},
                           "district":{"type":"string","description":"Riyadh district in Arabic, e.g. النرجس"},
                           "max_price":{"type":"number","description":"Maximum price in SAR (annual rent for RENT)"},

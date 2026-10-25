@@ -95,6 +95,15 @@ public class AgentService {
             Thread.currentThread().interrupt();
         } catch (RuntimeException ex) {
             log.error("Agent failed for conversation {}", e.conversationId(), ex);
+            try {
+                Throwable root = ex;
+                while (root.getCause() != null) root = root.getCause();
+                String msg = root.getClass().getSimpleName() + ": " + root.getMessage();
+                TenantContext.run(e.officeId(), () -> recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(),
+                        "error", msg.length() > 500 ? msg.substring(0, 500) : msg));
+            } catch (RuntimeException ignored) {
+                // nothing more to do
+            }
         }
     }
 

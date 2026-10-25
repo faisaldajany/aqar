@@ -155,8 +155,16 @@ class AgentFlowTest extends IntegrationTest {
         ((MockWhatsAppClient) whatsapp).reset();
         inbound("wamid.cap2", "مرحبا مرة ثانية");
 
-        String alert = await(() -> TenantContext.call(office, () -> jdbc.sql(
-                "select kind from office_alerts where kind = 'REPLY_CAP'").query(String.class).optional().orElse(null)));
+        String alert;
+        try {
+            alert = await(() -> TenantContext.call(office, () -> jdbc.sql(
+                    "select kind from office_alerts where kind = 'REPLY_CAP'").query(String.class).optional().orElse(null)));
+        } catch (AssertionError err) {
+            throw new AssertionError("runs: " + TenantContext.call(office, () -> jdbc.sql(
+                    "select outcome || ':' || coalesce(error, '') from agent_runs where outcome <> 'replied' or error is not null")
+                    .query(String.class).list()) + " total=" + TenantContext.call(office, () -> jdbc.sql(
+                    "select count(*) from agent_runs").query(Integer.class).single()) + " sent=" + lastSentText());
+        }
         assertThat(alert).isEqualTo("REPLY_CAP");
         assertThat(lastSentText()).isNull();
     }

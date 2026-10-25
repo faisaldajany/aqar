@@ -61,3 +61,61 @@ export function windowOpen(lastInboundAt: string | null): boolean {
   if (!lastInboundAt) return false;
   return Date.now() < new Date(lastInboundAt).getTime() + (24 * 60 - 5) * 60 * 1000;
 }
+
+export type Listing = {
+  id: string;
+  title: string;
+  district: string;
+  propertyType: string;
+  purpose: "SALE" | "RENT";
+  price: number;
+  areaSqm: number | null;
+  rooms: number | null;
+  adLicense: string;
+  licenseExpiry: string;
+  vacant: boolean;
+  status: "ACTIVE" | "HIDDEN" | "SOLD";
+  marketerId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  videoUrl: string | null;
+  photoUrls: string[];
+  uploadedPhotos: number;
+  description: string | null;
+  source: string;
+  sourceUrl: string | null;
+};
+
+export type ListingForm = Omit<Listing, "id" | "status" | "uploadedPhotos" | "source"> & { source?: string };
+
+export type ImportField = { field: string; label: string; required: boolean; column: number | null };
+export type ImportRow = {
+  row: number; title: string | null; district: string | null; purpose: string | null; price: string | null;
+  license: string | null; expiry: string | null; status: "READY" | "WARNING" | "INVALID"; errors: string[]; warnings: string[];
+};
+export type ImportPreview = {
+  batchId: string; fileName: string; headers: string[]; fields: ImportField[];
+  total: number; ready: number; withWarnings: number; invalid: number; rows: ImportRow[];
+};
+export type ImportCommitted = { created: number; updated: number; skipped: number; skippedRows: ImportRow[] };
+export type AqarDraft = { listing: ListingForm; warnings: string[]; missing: string[] };
+export type Alert = { id: string; kind: string; subjectId: string | null; message: string; read: boolean; createdAt: string };
+export type Usage = { plan: string; planName: string; replies: number; included: number; percent: number; overageReplies: number; overageSar: number; marketersLimit: number };
+export type Marketer = { id: string; name: string; waPhone: string; districts: string[]; active: boolean };
+
+export function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function daysUntil(date: string): number {
+  return Math.round((new Date(date + "T00:00:00").getTime() - new Date(today() + "T00:00:00").getTime()) / 86400000);
+}
+
+export const fmt = (n: number | null | undefined) => (n == null ? "" : Number(n).toLocaleString("en-US"));
+
+/** Google Maps link or "lat, lng" → coordinates. */
+export function parseLocation(s: string): { lat: number; lng: number } | null {
+  const t = s.trim();
+  const m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll)=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)/) || t.match(/^(-?\d{1,2}\.\d+)\s*[,،]\s*(-?\d{1,3}\.\d+)$/);
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+}

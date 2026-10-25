@@ -16,6 +16,11 @@ spring:
     password: ${DB_OWNER_PASSWORD:waslah}
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      # Spreadsheets up to 5 MB, listing photos up to 5 MB each.
+      max-file-size: 6MB
+      max-request-size: 8MB
 
 management:
   endpoints:
@@ -49,6 +54,11 @@ waslah:
     # Leave blank until the template is approved; handoffs still show in the portal.
     handoff-template: ${AGENT_HANDOFF_TEMPLATE:}
     handoff-template-language: ${AGENT_HANDOFF_TEMPLATE_LANG:ar}
+    # Abuse protection: agent replies per customer per day before the chat goes to the office.
+    daily-reply-cap: ${AGENT_DAILY_REPLY_CAP:50}
+    # Approved templates for messages sent outside the 24-hour window (viewing reminder, post-visit follow-up).
+    reminder-template: ${AGENT_REMINDER_TEMPLATE:}
+    follow-up-template: ${AGENT_FOLLOWUP_TEMPLATE:}
   llm:
     # gemini = real model (needs GEMINI_API_KEY); scripted = offline stand-in for dev and tests.
     provider: ${LLM_PROVIDER:gemini}

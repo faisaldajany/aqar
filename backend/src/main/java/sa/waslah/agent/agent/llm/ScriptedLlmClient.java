@@ -32,9 +32,32 @@ public class ScriptedLlmClient implements Llm.Client {
         return this;
     }
 
+    private final Deque<com.fasterxml.jackson.databind.JsonNode> extractions = new ArrayDeque<>();
+
+    public synchronized ScriptedLlmClient thenExtract(String json) {
+        try {
+            extractions.add(new com.fasterxml.jackson.databind.ObjectMapper().readTree(json));
+        } catch (Exception e) {
+            throw new IllegalArgumentException(e);
+        }
+        return this;
+    }
+
+    @Override
+    public synchronized com.fasterxml.jackson.databind.JsonNode extractJson(String instruction, String input,
+                                                                         com.fasterxml.jackson.databind.node.ObjectNode schema) {
+        seen.add(new Llm.Request(instruction, List.of(new Llm.UserText(input)), List.of()));
+        var next = extractions.poll();
+        if (next == null) {
+            throw new Llm.LlmException("No scripted extraction queued");
+        }
+        return next;
+    }
+
     public synchronized void reset() {
         queue.clear();
         seen.clear();
+        extractions.clear();
     }
 
     public synchronized List<Llm.Request> requests() {

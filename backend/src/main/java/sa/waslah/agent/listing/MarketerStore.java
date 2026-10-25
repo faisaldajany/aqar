@@ -46,6 +46,10 @@ public class MarketerStore {
         return active().stream().findFirst();
     }
 
+    public void deactivate(UUID id) {
+        jdbc.sql("update marketers set active = false where id = ?").param(id).update();
+    }
+
     public UUID insert(UUID officeId, String name, String waPhone, List<String> districts) {
         UUID id = UUID.randomUUID();
         jdbc.sql("insert into marketers (id, office_id, name, wa_phone, districts) values (?, ?, ?, ?, ?::text[])")

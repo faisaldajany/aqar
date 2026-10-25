@@ -246,7 +246,8 @@ class AgentEval {
                         arr.addObject().put("id", l.id()).put("title", l.title()).put("district", l.district())
                                 .put("property_type", l.type()).put("purpose", l.purpose()).put("price_sar", l.price())
                                 .put("area_sqm", l.area()).put("rooms", l.rooms()).put("ad_license", l.license())
-                                .put("license_expiry", l.expiry().toString()).put("occupied", !l.vacant());
+                                .put("license_expiry", l.expiry().toString()).put("occupied", !l.vacant())
+                                .put("has_location", true).put("photos", 3).put("has_video", false);
                     }
                     if (hits.isEmpty()) out.put("note", "لا توجد عقارات مطابقة حالياً");
                     return out;
@@ -264,6 +265,13 @@ class AgentEval {
                             ? JSON.createObjectNode().put("recorded", true).put("next_step", "المكتب يؤكد الموعد مع العميل")
                             .put("marketer_first_name", "خالد")
                             : JSON.createObjectNode().put("error", "listing_id must be an id returned by search_listings");
+                }
+                case SEND_CARD -> {
+                    String id = a.path("listing_id").asText();
+                    boolean exists = listings.stream().anyMatch(l -> l.id().equals(id) && !l.expiry().isBefore(LocalDate.now()));
+                    return exists
+                            ? JSON.createObjectNode().put("sent_location", true).put("photos_sent", 3)
+                            : JSON.createObjectNode().put("error", "listing not available");
                 }
                 case HANDOFF -> {
                     handedOff = true;

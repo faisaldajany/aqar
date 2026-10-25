@@ -70,4 +70,28 @@ public class OutboundMessageService {
             return id;
         });
     }
+
+    /** Sends a non-text message (map pin or image) from the agent, inside the 24-hour window. */
+    public UUID sendMedia(UUID conversationId, String type, String description,
+                          java.util.function.BiFunction<WhatsAppClient.Credentials, String, String> send) {
+        Instant now = clock.instant();
+        ConversationStore.ConversationRef conv = store.find(conversationId)
+                .orElseThrow(() -> ApiException.notFound("no_conversation", "المحادثة غير موجودة."));
+        if (!window.isOpen(conv.lastInboundAt(), now)) {
+            throw ApiException.conflict("window_closed", "انتهت نافذة 24 ساعة.");
+        }
+        WaAccounts.Account account = accounts.byId(conv.waAccountId())
+                .orElseThrow(() -> ApiException.conflict("no_whatsapp", "رقم واتساب غير مربوط."));
+        String wamid = send.apply(accounts.credentials(account), conv.waId());
+        return tx.execute(s -> {
+            UUID id = store.insertMessage(account.officeId(), conversationId, wamid, "OUT", Sender.AGENT, type,
+                    description, null, "sent", now).orElseThrow();
+            store.touchOutbound(conversationId, now);
+            return id;
+        });
+    }
+
+    public WhatsAppClient client() {
+        return client;
+    }
 }

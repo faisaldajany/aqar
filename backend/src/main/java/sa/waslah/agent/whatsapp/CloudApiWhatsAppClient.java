@@ -63,6 +63,59 @@ public class CloudApiWhatsAppClient implements WhatsAppClient {
         }
     }
 
+    @Override
+    public String sendLocation(Credentials from, String toWaId, double latitude, double longitude, String name, String address) {
+        Map<String, Object> loc = new LinkedHashMap<>();
+        loc.put("latitude", latitude);
+        loc.put("longitude", longitude);
+        if (name != null) loc.put("name", name);
+        if (address != null) loc.put("address", address);
+        return post(from, Map.of("messaging_product", "whatsapp", "to", toWaId, "type", "location", "location", loc));
+    }
+
+    @Override
+    public String sendImageLink(Credentials from, String toWaId, String url, String caption) {
+        Map<String, Object> img = new LinkedHashMap<>();
+        img.put("link", url);
+        if (caption != null) img.put("caption", caption);
+        return post(from, Map.of("messaging_product", "whatsapp", "to", toWaId, "type", "image", "image", img));
+    }
+
+    @Override
+    public String uploadMedia(Credentials from, byte[] bytes, String contentType) {
+        org.springframework.util.LinkedMultiValueMap<String, Object> form = new org.springframework.util.LinkedMultiValueMap<>();
+        form.add("messaging_product", "whatsapp");
+        form.add("type", contentType);
+        org.springframework.http.HttpHeaders partHeaders = new org.springframework.http.HttpHeaders();
+        partHeaders.setContentType(MediaType.parseMediaType(contentType));
+        form.add("file", new org.springframework.http.HttpEntity<>(new org.springframework.core.io.ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return "photo." + (contentType.endsWith("png") ? "png" : contentType.endsWith("webp") ? "webp" : "jpg");
+            }
+        }, partHeaders));
+        try {
+            JsonNode res = http.post().uri("/{id}/media", from.phoneNumberId())
+                    .headers(h -> h.setBearerAuth(from.accessToken()))
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(form)
+                    .retrieve().body(JsonNode.class);
+            String id = res == null ? "" : res.path("id").asText("");
+            if (id.isBlank()) throw ApiException.badGateway("wa_media_failed", "تعذّر رفع الصورة إلى واتساب.");
+            return id;
+        } catch (RestClientResponseException e) {
+            throw ApiException.badGateway("wa_media_failed", "رفض واتساب الصورة: " + e.getStatusCode().value());
+        }
+    }
+
+    @Override
+    public String sendImageId(Credentials from, String toWaId, String mediaId, String caption) {
+        Map<String, Object> img = new LinkedHashMap<>();
+        img.put("id", mediaId);
+        if (caption != null) img.put("caption", caption);
+        return post(from, Map.of("messaging_product", "whatsapp", "to", toWaId, "type", "image", "image", img));
+    }
+
     private String post(Credentials from, Map<String, Object> payload) {
         try {
             JsonNode res = http.post().uri("/{id}/messages", from.phoneNumberId())

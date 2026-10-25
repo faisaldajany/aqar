@@ -31,6 +31,26 @@ public class MockWhatsAppClient implements WhatsAppClient {
         // nothing to do
     }
 
+    @Override
+    public String sendLocation(Credentials from, String toWaId, double latitude, double longitude, String name, String address) {
+        return record(from, toWaId, "location", latitude + "," + longitude + " " + name);
+    }
+
+    @Override
+    public String sendImageLink(Credentials from, String toWaId, String url, String caption) {
+        return record(from, toWaId, "image", url);
+    }
+
+    @Override
+    public String uploadMedia(Credentials from, byte[] bytes, String contentType) {
+        return "media.mock." + UUID.randomUUID();
+    }
+
+    @Override
+    public String sendImageId(Credentials from, String toWaId, String mediaId, String caption) {
+        return record(from, toWaId, "image", mediaId);
+    }
+
     public List<Sent> sent() {
         return List.copyOf(sent);
     }

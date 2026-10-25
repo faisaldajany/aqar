@@ -122,6 +122,45 @@ class AgentFlowTest extends IntegrationTest {
         assertThat(marketer).isEqualTo("خالد العتيبي");
     }
 
+    @Test
+    void listingCardSendsPinAndPhotos() throws Exception {
+        UUID id = TenantContext.call(office, () -> listings.upsert(office, new sa.waslah.agent.listing.ListingInput(
+                "فيلا مودرن", "الياسمين", "فيلا", "SALE", new java.math.BigDecimal("2350000"), null, 6, "7200433019",
+                LocalDate.now().plusMonths(6), true, null, 24.8233, 46.6402, "https://youtu.be/tour", List.of(
+                "https://img.example/1.jpg", "https://img.example/2.jpg"), null, "MANUAL", null)).id());
+        ((ScriptedLlmClient) llm)
+                .thenCall("search_listings", "{\"district\":\"الياسمين\"}")
+                .thenCall("send_listing_card", "{\"listing_id\":\"" + id + "\"}")
+                .thenText("أرسلت لك الموقع والصور، وهذا رابط الجولة: https://youtu.be/tour");
+        inbound("wamid.card1", "ابي أشوف صور فيلا الياسمين وموقعها");
+
+        await(() -> lastSentText());
+        List<String> kinds = ((MockWhatsAppClient) whatsapp).sent().stream()
+                .filter(s -> s.phoneNumberId().equals(phoneNumberId)).map(MockWhatsAppClient.Sent::kind).toList();
+        assertThat(kinds).containsExactly("location", "image", "image", "text");
+    }
+
+    @Test
+    void dailyCapSilencesTheAgentAndAlertsTheOffice() throws Exception {
+        ((ScriptedLlmClient) llm).thenText("هلا بك");
+        inbound("wamid.cap1", "السلام عليكم");
+        await(() -> lastSentText());
+        TenantContext.run(office, () -> {
+            UUID conv = jdbc.sql("select id from conversations").query(UUID.class).single();
+            for (int i = 0; i < 49; i++) {
+                jdbc.sql("insert into agent_runs (office_id, conversation_id, model, outcome) values (?, ?, 'x', 'replied')")
+                        .params(office, conv).update();
+            }
+        });
+        ((MockWhatsAppClient) whatsapp).reset();
+        inbound("wamid.cap2", "مرحبا مرة ثانية");
+
+        String alert = await(() -> TenantContext.call(office, () -> jdbc.sql(
+                "select kind from office_alerts where kind = 'REPLY_CAP'").query(String.class).optional().orElse(null)));
+        assertThat(alert).isEqualTo("REPLY_CAP");
+        assertThat(lastSentText()).isNull();
+    }
+
     private void inbound(String wamid, String text) throws Exception {
         String body = envelope("""
                 "contacts":[{"profile":{"name":"أبو عبدالله"},"wa_id":"%s"}],

@@ -32,7 +32,10 @@ public record WaslahProperties(
             long debounceMs,
             int historyLimit,
             String handoffTemplate,
-            String handoffTemplateLanguage) {
+            String handoffTemplateLanguage,
+            int dailyReplyCap,
+            String reminderTemplate,
+            String followUpTemplate) {
     }
 
     public record Llm(

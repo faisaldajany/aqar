@@ -16,6 +16,7 @@ public interface AgentTools {
     String SAVE_LEAD = "save_lead";
     String REQUEST_VIEWING = "request_viewing";
     String HANDOFF = "handoff_to_marketer";
+    String SEND_CARD = "send_listing_card";
 
     /** Executes one tool call and returns a JSON object for the model. Never throws for bad input. */
     JsonNode call(String name, JsonNode args);
@@ -60,6 +61,13 @@ public interface AgentTools {
                           "preferred_time":{"type":"string","description":"The time the customer asked for, in their words"},
                           "mode":{"type":"string","enum":["WITH_MARKETER","SELF_VISIT"]}},
                          "required":["listing_id","preferred_time"]}"""),
+                tool(json, SEND_CARD,
+                        "Send the customer the listing's map pin and up to 3 photos on WhatsApp, and get its video/tour link. "
+                                + "Use when the customer shows interest in a specific listing, or asks for photos or the location.",
+                        """
+                        {"type":"object","properties":{
+                          "listing_id":{"type":"string","description":"An id returned by search_listings"}},
+                         "required":["listing_id"]}"""),
                 tool(json, HANDOFF,
                         "Hand the conversation to a human marketer. Use for price negotiation, discounts, payment plans, contracts, "
                                 + "legal or financing questions, complaints, anything you cannot answer from the tools, "

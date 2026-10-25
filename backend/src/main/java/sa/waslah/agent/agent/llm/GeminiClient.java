@@ -71,6 +71,44 @@ public class GeminiClient implements Llm.Client {
         }
     }
 
+    @Override
+    public JsonNode extractJson(String instruction, String input, ObjectNode schema) {
+        ObjectNode body = json.createObjectNode();
+        body.putObject("systemInstruction").putArray("parts").addObject().put("text", instruction);
+        body.putArray("contents").addObject().put("role", "user").putArray("parts").addObject().put("text", input);
+        ObjectNode gen = body.putObject("generationConfig");
+        gen.put("temperature", 0.0);
+        gen.put("maxOutputTokens", 2048);
+        gen.put("responseMimeType", "application/json");
+        gen.set("responseSchema", schema);
+        if (s.thinkingLevel() != null && !s.thinkingLevel().isBlank()) {
+            gen.putObject("thinkingConfig").put("thinkingLevel", s.thinkingLevel());
+        }
+        for (int attempt = 0; ; attempt++) {
+            try {
+                JsonNode res = http.post()
+                        .uri("/models/{model}:generateContent", s.model())
+                        .header("x-goog-api-key", s.apiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .body(JsonNode.class);
+                String text = parse(res).text();
+                return json.readTree(text);
+            } catch (RestClientResponseException e) {
+                int code = e.getStatusCode().value();
+                if (!(code == 429 || code == 500 || code == 503) || attempt >= s.maxRetries()) {
+                    throw new Llm.LlmException("Gemini " + code + ": " + truncate(e.getResponseBodyAsString()), e);
+                }
+                sleep(backoff(e.getResponseBodyAsString(), attempt));
+            } catch (ResourceAccessException e) {
+                throw new Llm.LlmException("Gemini unreachable or timed out", e);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new Llm.LlmException("Gemini returned invalid JSON", e);
+            }
+        }
+    }
+
     /** Uses the server's suggested retryDelay (e.g. "12s") when present, else 1s, 2s, 4s… capped at 30s. */
     static long backoff(String errorBody, int attempt) {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"retryDelay\"\\s*:\\s*\"(\\d+)(?:\\.\\d+)?s\"")

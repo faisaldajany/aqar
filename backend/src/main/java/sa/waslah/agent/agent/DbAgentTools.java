@@ -30,6 +30,11 @@ class DbAgentTools implements AgentTools {
         void send(MarketerStore.Marketer marketer, String customerLabel, String summary);
     }
 
+    /** Sends a listing's pin and photos to the customer. Implemented by AgentService. */
+    interface CardSender {
+        JsonNode send(ListingStore.Listing listing);
+    }
+
     private final UUID officeId;
     private final UUID conversationId;
     private final String customerLabel;
@@ -46,7 +51,7 @@ class DbAgentTools implements AgentTools {
 
     DbAgentTools(UUID officeId, UUID conversationId, String customerLabel, ObjectMapper json, JdbcClient jdbc,
                  ListingStore listings, MarketerStore marketers, ConversationStore conversations,
-                 MarketerAlert alert, int pauseHours) {
+                 MarketerAlert alert, int pauseHours, CardSender cards) {
         this.officeId = officeId;
         this.conversationId = conversationId;
         this.customerLabel = customerLabel;
@@ -57,7 +62,10 @@ class DbAgentTools implements AgentTools {
         this.conversations = conversations;
         this.alert = alert;
         this.pauseHours = pauseHours;
+        this.cards = cards;
     }
+
+    private final CardSender cards;
 
     @Override
     public List<String> licensesSeen() {
@@ -76,6 +84,7 @@ class DbAgentTools implements AgentTools {
                 case SEARCH -> search(args);
                 case SAVE_LEAD -> saveLead(args);
                 case REQUEST_VIEWING -> requestViewing(args);
+                case SEND_CARD -> sendCard(args);
                 case HANDOFF -> handoff(args.path("reason").asText("OTHER"), args.path("summary").asText(""), null);
                 default -> error("unknown tool " + name);
             };
@@ -117,6 +126,9 @@ class DbAgentTools implements AgentTools {
             o.put("ad_license", l.adLicense());
             o.put("license_expiry", l.licenseExpiry().toString());
             o.put("occupied", !l.vacant());
+            o.put("has_location", l.hasLocation());
+            o.put("photos", l.uploadedPhotos() + l.photoUrls().size());
+            o.put("has_video", l.videoUrl() != null);
         }
         if (found.isEmpty()) {
             out.put("note", "لا توجد عقارات مطابقة حالياً");
@@ -157,6 +169,21 @@ class DbAgentTools implements AgentTools {
         if (lead.payment == null) missing.add("payment");
         if (lead.timeline == null) missing.add("timeline");
         return out;
+    }
+
+    private JsonNode sendCard(JsonNode a) {
+        UUID id;
+        try {
+            id = UUID.fromString(a.path("listing_id").asText());
+        } catch (IllegalArgumentException e) {
+            return error("listing_id must be an id returned by search_listings");
+        }
+        Optional<ListingStore.Listing> l = listings.find(id);
+        if (l.isEmpty() || !"ACTIVE".equals(l.get().status()) || !l.get().licenseValid(java.time.LocalDate.now())) {
+            return error("listing not available");
+        }
+        licenses.add(l.get().adLicense());
+        return cards.send(l.get());
     }
 
     private JsonNode requestViewing(JsonNode a) {

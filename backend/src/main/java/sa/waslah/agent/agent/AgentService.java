@@ -53,10 +53,15 @@ public class AgentService {
     private final JdbcClient jdbc;
     private final ObjectMapper json;
     private final ConcurrentHashMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+    private final sa.waslah.agent.billing.PlanLimits plans;
+    private final sa.waslah.agent.office.OfficeAlerts alerts;
 
     public AgentService(WaslahProperties props, AgentBrain brain, ConversationStore conversations, ListingStore listings,
                         MarketerStore marketers, OutboundMessageService outbound, WaAccounts accounts,
-                        WhatsAppClient whatsapp, JdbcClient jdbc, ObjectMapper json) {
+                        WhatsAppClient whatsapp, JdbcClient jdbc, ObjectMapper json,
+                        sa.waslah.agent.billing.PlanLimits plans, sa.waslah.agent.office.OfficeAlerts alerts) {
+        this.plans = plans;
+        this.alerts = alerts;
         this.props = props;
         this.brain = brain;
         this.conversations = conversations;
@@ -115,6 +120,10 @@ public class AgentService {
             return;
         }
 
+        if (limited(e, history)) {
+            return;
+        }
+
         if ("audio".equals(latestInbound.type())) {
             send(e.conversationId(), AgentPrompt.VOICE_NOTE_REPLY);
             recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(), "voice_note", null);
@@ -134,7 +143,7 @@ public class AgentService {
 
         DbAgentTools tools = new DbAgentTools(e.officeId(), e.conversationId(), customer, json, jdbc, listings,
                 marketers, conversations, (m, label, summary) -> alertMarketer(conv.get(), m, label, summary),
-                props.agent().humanPauseHours());
+                props.agent().humanPauseHours(), listing -> sendCard(e.conversationId(), listing));
 
         AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, LocalDate.now(RIYADH)), turns, tools, prior);
         send(e.conversationId(), out.reply());
@@ -151,6 +160,88 @@ public class AgentService {
             error = (error == null ? "" : error + " | ") + "tool errors: " + String.join("; ", tools.errors());
         }
         recordRun(e, brain.model(), out.usage(), out.latencyMs(), calls, out.fallback() ? "fallback" : "replied", error);
+        usageAlerts(e.officeId());
+    }
+
+    /**
+     * Abuse protection: at most N agent replies per customer per day, and silence for a customer
+     * repeating the same message. The first time a limit is hit, the office gets the chat.
+     */
+    private boolean limited(InboundMessageEvent e, List<Msg> history) {
+        int cap = props.agent().dailyReplyCap();
+        if (cap > 0 && plans.repliesTodayInConversation(e.conversationId()) >= cap) {
+            String key = "cap-" + e.conversationId() + "-" + LocalDate.now(RIYADH);
+            if (alerts.raise(e.officeId(), "REPLY_CAP", e.conversationId(),
+                    "عميل تجاوز " + cap + " رداً آلياً اليوم؛ توقف الوكيل في محادثته حتى الغد.", key)) {
+                handoffQuietly(e, "تجاوز العميل الحد اليومي للردود الآلية (" + cap + "). راجع المحادثة.");
+                recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(), "capped", null);
+            }
+            return true;
+        }
+        List<String> lastInbound = new ArrayList<>();
+        for (int i = history.size() - 1; i >= 0 && lastInbound.size() < 5; i--) {
+            if ("IN".equals(history.get(i).direction())) lastInbound.add(String.valueOf(history.get(i).body()).trim());
+        }
+        if (lastInbound.size() == 5 && lastInbound.stream().distinct().count() == 1) {
+            recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(), "spam", null);
+            return true;
+        }
+        return false;
+    }
+
+    private void handoffQuietly(InboundMessageEvent e, String summary) {
+        jdbc.sql("insert into handoffs (office_id, conversation_id, reason, summary) values (?, ?, 'OTHER', ?)")
+                .params(e.officeId(), e.conversationId(), summary).update();
+        conversations.pauseAgent(e.conversationId(), ConversationStore.humanPauseUntil(Instant.now(), 24));
+    }
+
+    private void usageAlerts(UUID officeId) {
+        try {
+            sa.waslah.agent.billing.PlanLimits.Usage u = plans.usageThisMonth();
+            String month = u.periodStart().toString().substring(0, 7);
+            if (u.percent() >= 100) {
+                alerts.raise(officeId, "USAGE", null, "استهلكت كل الردود المشمولة في باقتك هذا الشهر (" + u.includedReplies()
+                        + "). الردود الإضافية تُحتسب بـ" + u.plan().overagePerReplySar.movePointRight(2).stripTrailingZeros().toPlainString()
+                        + " هللة للرد.", "usage-100-" + month);
+            } else if (u.percent() >= 80) {
+                alerts.raise(officeId, "USAGE", null, "استهلكت 80% من الردود المشمولة في باقتك هذا الشهر.", "usage-80-" + month);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Usage alert failed: {}", ex.getMessage());
+        }
+    }
+
+    /** Sends a listing's map pin and up to 3 photos; returns what was sent for the model. */
+    private com.fasterxml.jackson.databind.JsonNode sendCard(UUID conversationId, ListingStore.Listing l) {
+        com.fasterxml.jackson.databind.node.ObjectNode out = json.createObjectNode();
+        try {
+            boolean pin = false;
+            if (l.hasLocation()) {
+                outbound.sendMedia(conversationId, "location", l.title() + " · " + l.district(),
+                        (cred, to) -> outbound.client().sendLocation(cred, to, l.latitude(), l.longitude(), l.title(), "حي " + l.district()));
+                pin = true;
+            }
+            int photos = 0;
+            for (ListingStore.Photo p : listings.photos(l.id(), 3)) {
+                outbound.sendMedia(conversationId, "image", l.title(), (cred, to) ->
+                        outbound.client().sendImageId(cred, to, outbound.client().uploadMedia(cred, p.bytes(), p.contentType()), null));
+                photos++;
+            }
+            for (String url : l.photoUrls()) {
+                if (photos >= 3) break;
+                outbound.sendMedia(conversationId, "image", l.title(), (cred, to) -> outbound.client().sendImageLink(cred, to, url, null));
+                photos++;
+            }
+            out.put("sent_location", pin);
+            out.put("photos_sent", photos);
+            if (l.videoUrl() != null) out.put("video_url", l.videoUrl());
+            if (!pin && photos == 0 && l.videoUrl() == null) {
+                out.put("note", "لا توجد صور أو موقع لهذا العقار بعد؛ اعرض على العميل أن يرسلها المسوّق.");
+            }
+        } catch (ApiException ex) {
+            out.put("error", "تعذّر إرسال تفاصيل العقار");
+        }
+        return out;
     }
 
     private List<Msg> recent(UUID conversationId, int limit) {

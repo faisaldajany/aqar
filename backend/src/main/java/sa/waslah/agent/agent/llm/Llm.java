@@ -61,6 +61,11 @@ public final class Llm {
         Response generate(Request request);
 
         String model();
+
+        /** Structured extraction: returns a JSON object matching {@code schema}. */
+        default JsonNode extractJson(String instruction, String input, ObjectNode schema) {
+            throw new LlmException("Structured extraction is not supported by " + model());
+        }
     }
 
     public static class LlmException extends RuntimeException {

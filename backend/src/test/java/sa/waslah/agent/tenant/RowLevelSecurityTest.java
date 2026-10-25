@@ -46,6 +46,7 @@ class RowLevelSecurityTest extends IntegrationTest {
         UUID b = signup("d").officeId();
         assertThatThrownBy(() -> TenantContext.run(b, () -> tx.executeWithoutResult(s ->
                 jdbc.sql("insert into contacts (office_id, wa_id) values (?, 'x')").param(a).update())))
+                .rootCause()
                 .hasMessageContaining("row-level security");
     }
 

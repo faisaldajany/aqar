@@ -1,0 +1,79 @@
+{
+  "model" : "gemini-3.5-flash-lite",
+  "thinking" : "low",
+  "passed" : 1,
+  "ran" : 4,
+  "stopped" : "Gemini quota or rate limit (429) on 3 turns in a row",
+  "p50_ms" : 90442,
+  "p95_ms" : 91806,
+  "tokens_in" : 1987,
+  "tokens_out" : 34,
+  "cost_per_turn_sar" : 6.3853125E-4,
+  "results" : [ {
+    "id" : "greet-01",
+    "category" : "greeting",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "السلام عليكم",
+      "agent" : "وعليكم السلام، هلا فيك! معك المساعد الآلي لمكتب الأفق العقاري بالرياض. تبي عقار للإيجار ولا للبيع؟",
+      "latency_ms" : 91806,
+      "tools" : [ ]
+    } ],
+    "tools_called" : [ ]
+  }, {
+    "id" : "greet-02",
+    "category" : "greeting",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: مساء الخير، انت موظف ولا روبوت؟", "no reply contains any of [آلي, مساعد]", "first reply does not say it is an automated assistant" ],
+    "transcript" : [ {
+      "customer" : "مساء الخير، انت موظف ولا روبوت؟",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90403,
+      "tools" : [ {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "handoff_to_marketer" ]
+  }, {
+    "id" : "greet-03",
+    "category" : "greeting",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: هلا", "first reply does not say it is an automated assistant" ],
+    "transcript" : [ {
+      "customer" : "هلا",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90384,
+      "tools" : [ {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "handoff_to_marketer" ]
+  }, {
+    "id" : "qual-01",
+    "category" : "qualification",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: ابغى بيت", "called handoff_to_marketer" ],
+    "transcript" : [ {
+      "customer" : "ابغى بيت",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90442,
+      "tools" : [ {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "handoff_to_marketer" ]
+  } ]
+}

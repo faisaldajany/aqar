@@ -1,0 +1,189 @@
+{
+  "model" : "gemini-3.5-flash-lite",
+  "thinking" : "low",
+  "passed" : 5,
+  "ran" : 8,
+  "stopped" : "Gemini quota or rate limit (429) on 3 turns in a row",
+  "p50_ms" : 1934,
+  "p95_ms" : 151382,
+  "tokens_in" : 33367,
+  "tokens_out" : 893,
+  "cost_per_turn_sar" : 0.004590975,
+  "results" : [ {
+    "id" : "greet-01",
+    "category" : "greeting",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "السلام عليكم",
+      "agent" : "هلا وعليكم السلام، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض. \n\nكيف أقدر أساعدك اليوم؟",
+      "latency_ms" : 1205,
+      "tools" : [ ]
+    } ],
+    "tools_called" : [ ]
+  }, {
+    "id" : "greet-02",
+    "category" : "greeting",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "مساء الخير، انت موظف ولا روبوت؟",
+      "agent" : "هلا ومرحباً، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية. \nحياك الله، وش تبي تبحث عنه اليوم؟",
+      "latency_ms" : 747,
+      "tools" : [ ]
+    } ],
+    "tools_called" : [ ]
+  }, {
+    "id" : "greet-03",
+    "category" : "greeting",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "هلا",
+      "agent" : "هلا بك، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية. \nوش العقار اللي تدوّر عليه وتبينا نساعدك فيه؟",
+      "latency_ms" : 1145,
+      "tools" : [ ]
+    } ],
+    "tools_called" : [ ]
+  }, {
+    "id" : "qual-01",
+    "category" : "qualification",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "ابغى بيت",
+      "agent" : "هلا بك، معك المساعد الآلي لمكتب الأفق العقاري.\nأبشر، تبي بيت شراء أو إيجار؟ وبأي حي ودك؟",
+      "latency_ms" : 831,
+      "tools" : [ ]
+    } ],
+    "tools_called" : [ ]
+  }, {
+    "id" : "qual-02",
+    "category" : "qualification",
+    "pass" : true,
+    "failures" : [ ],
+    "transcript" : [ {
+      "customer" : "ابي فيلا للشراء بالنرجس",
+      "agent" : "هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري.\nلقيت لك هذي الفلل للشراء في حي النرجس:\n\n1. فيلا درج داخلي، المساحة 375 م، السعر 1,950,000 ريال، 5 غرف. ترخيص: 7200418836 (ينتهي في 2027-06-30).\n2. فيلا دوبلكس، المساحة 312 م، السعر 1,780,000 ريال، 4 غرف. ترخيص: 7200395120 (ينتهي في 2027-05-31).\n\nأي وحدة تعجبك تبينا نعاينها؟",
+      "latency_ms" : 33260,
+      "tools" : [ {
+        "name" : "search_listings",
+        "args" : {
+          "purpose" : "SALE",
+          "property_type" : "فيلا",
+          "district" : "النرجس"
+        }
+      }, {
+        "name" : "save_lead",
+        "args" : {
+          "property_type" : "فيلا",
+          "purpose" : "SALE",
+          "districts" : "النرجس"
+        }
+      } ]
+    }, {
+      "customer" : "ميزانيتي مليونين كاش",
+      "agent" : "ممتاز، ميزانيتك تغطي الخيارات اللي عرضناها. \n\nتبي نحجز موعد لمعاينة وحدة منها؟",
+      "latency_ms" : 1259,
+      "tools" : [ {
+        "name" : "save_lead",
+        "args" : {
+          "purpose" : "SALE",
+          "payment" : "CASH",
+          "property_type" : "فيلا",
+          "districts" : "النرجس",
+          "budget_max" : 2000000
+        }
+      }, {
+        "name" : "search_listings",
+        "args" : {
+          "district" : "النرجس",
+          "max_price" : 2000000,
+          "purpose" : "SALE",
+          "property_type" : "فيلا"
+        }
+      } ]
+    } ],
+    "tools_called" : [ "search_listings", "save_lead", "save_lead", "search_listings" ]
+  }, {
+    "id" : "qual-03",
+    "category" : "qualification",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: بالملقا، وميزانيتي 70 ألف بالسنة" ],
+    "transcript" : [ {
+      "customer" : "دوري على شقة إيجار",
+      "agent" : "أبشر، لقيت لك هالشقات للإيجار:\n- شقة غرفتين في القيروان، المساحة 120 م²، السعر 48000 ريال سنوياً، ترخيص رقم 7200429955 ينتهي في 2027-01-18.\n- شقة 3 غرف في الملقا، المساحة 160 م²، السعر 65000 ريال سنوياً، ترخيص رقم 7200402271 ينتهي في 2027-04-30.\n\nأي وحدة منهم تفضل؟",
+      "latency_ms" : 1934,
+      "tools" : [ {
+        "name" : "search_listings",
+        "args" : {
+          "property_type" : "شقة",
+          "purpose" : "RENT"
+        }
+      } ]
+    }, {
+      "customer" : "بالملقا، وميزانيتي 70 ألف بالسنة",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 151382,
+      "tools" : [ {
+        "name" : "search_listings",
+        "args" : {
+          "purpose" : "RENT",
+          "max_price" : 70000,
+          "property_type" : "شقة"
+        }
+      }, {
+        "name" : "save_lead",
+        "args" : {
+          "purpose" : "RENT",
+          "budget_max" : 70000,
+          "districts" : "الملقا",
+          "property_type" : "شقة"
+        }
+      }, {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "search_listings", "search_listings", "save_lead", "handoff_to_marketer" ]
+  }, {
+    "id" : "qual-04",
+    "category" : "qualification",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: عندي تمويل من البنك وأبغى فيلا شمال الرياض حدود مليون وتسعمية", "did not call save_lead", "lead.payment = null, expected FINANCE" ],
+    "transcript" : [ {
+      "customer" : "عندي تمويل من البنك وأبغى فيلا شمال الرياض حدود مليون وتسعمية",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90497,
+      "tools" : [ {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "handoff_to_marketer" ]
+  }, {
+    "id" : "qual-05",
+    "category" : "qualification",
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: اسمي أبو فهد، ابغى شقة تمليك في حطين خلال ثلاث شهور", "did not call save_lead", "lead.purpose = null, expected SALE" ],
+    "transcript" : [ {
+      "customer" : "اسمي أبو فهد، ابغى شقة تمليك في حطين خلال ثلاث شهور",
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90526,
+      "tools" : [ {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
+        }
+      } ]
+    } ],
+    "tools_called" : [ "handoff_to_marketer" ]
+  } ]
+}

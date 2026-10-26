@@ -1,14 +1,14 @@
 {
   "model" : "gemini-3.5-flash-lite",
   "thinking" : "low",
-  "passed" : 15,
-  "ran" : 20,
+  "passed" : 5,
+  "ran" : 8,
   "stopped" : "Gemini quota or rate limit (429) on 3 turns in a row",
-  "p50_ms" : 2670,
-  "p95_ms" : 181837,
-  "tokens_in" : 129773,
-  "tokens_out" : 3769,
-  "cost_per_turn_sar" : 0.006974192307692308,
+  "p50_ms" : 1934,
+  "p95_ms" : 151382,
+  "tokens_in" : 33367,
+  "tokens_out" : 893,
+  "cost_per_turn_sar" : 0.004590975,
   "results" : [ {
     "id" : "greet-01",
     "category" : "greeting",
@@ -16,8 +16,8 @@
     "failures" : [ ],
     "transcript" : [ {
       "customer" : "السلام عليكم",
-      "agent" : "وعليكم السلام ورحمة الله وبركاته، أنا المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض، حياك الله.\nكيف أقدر أساعدك اليوم؟",
-      "latency_ms" : 1345,
+      "agent" : "هلا وعليكم السلام، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض. \n\nكيف أقدر أساعدك اليوم؟",
+      "latency_ms" : 1205,
       "tools" : [ ]
     } ],
     "tools_called" : [ ]
@@ -28,8 +28,8 @@
     "failures" : [ ],
     "transcript" : [ {
       "customer" : "مساء الخير، انت موظف ولا روبوت؟",
-      "agent" : "هلا ومحبي العميل الكريم، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض.\nكيف أقدر أخدمك اليوم في عقاراتنا؟",
-      "latency_ms" : 771,
+      "agent" : "هلا ومرحباً، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية. \nحياك الله، وش تبي تبحث عنه اليوم؟",
+      "latency_ms" : 747,
       "tools" : [ ]
     } ],
     "tools_called" : [ ]
@@ -40,8 +40,8 @@
     "failures" : [ ],
     "transcript" : [ {
       "customer" : "هلا",
-      "agent" : "هلا فيك، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض.\nتبي تبحث عن عقار للإيجار أو للبيع؟",
-      "latency_ms" : 1745,
+      "agent" : "هلا بك، معك المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية. \nوش العقار اللي تدوّر عليه وتبينا نساعدك فيه؟",
+      "latency_ms" : 1145,
       "tools" : [ ]
     } ],
     "tools_called" : [ ]
@@ -52,55 +52,55 @@
     "failures" : [ ],
     "transcript" : [ {
       "customer" : "ابغى بيت",
-      "agent" : "هلا بك، معك المساعد الآلي لمكتب الأفق العقاري. حياك الله!\nوش نوع العقار أو الحي اللي تبيه؟",
-      "latency_ms" : 672,
+      "agent" : "هلا بك، معك المساعد الآلي لمكتب الأفق العقاري.\nأبشر، تبي بيت شراء أو إيجار؟ وبأي حي ودك؟",
+      "latency_ms" : 831,
       "tools" : [ ]
     } ],
     "tools_called" : [ ]
   }, {
     "id" : "qual-02",
     "category" : "qualification",
-    "pass" : false,
-    "failures" : [ "reply longer than 8 lines", "reply longer than 8 lines" ],
+    "pass" : true,
+    "failures" : [ ],
     "transcript" : [ {
       "customer" : "ابي فيلا للشراء بالنرجس",
-      "agent" : "هلا بك، أنا المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض. أبشر، لقيت لك هذي الفلل في حي النرجس:\n\n1. فيلا درج داخلي، 5 غرف، مساحة 375 م²، السعر 1,950,000 ريال.\nترخيص إعلان: 7200418836 (ينتهي في 2027-06-30)\n\n2. فيلا دوبلكس، 4 غرف، مساحة 312 م²، السعر 1,780,000 ريال.\nترخيص إعلان: 7200395120 (ينتهي في 2027-05-31)\n\nتبي نحدد موعد معاينة لأحدهما؟",
-      "latency_ms" : 2670,
+      "agent" : "هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري.\nلقيت لك هذي الفلل للشراء في حي النرجس:\n\n1. فيلا درج داخلي، المساحة 375 م، السعر 1,950,000 ريال، 5 غرف. ترخيص: 7200418836 (ينتهي في 2027-06-30).\n2. فيلا دوبلكس، المساحة 312 م، السعر 1,780,000 ريال، 4 غرف. ترخيص: 7200395120 (ينتهي في 2027-05-31).\n\nأي وحدة تعجبك تبينا نعاينها؟",
+      "latency_ms" : 33260,
       "tools" : [ {
         "name" : "search_listings",
         "args" : {
-          "property_type" : "فيلا",
           "purpose" : "SALE",
+          "property_type" : "فيلا",
           "district" : "النرجس"
         }
       }, {
         "name" : "save_lead",
         "args" : {
+          "property_type" : "فيلا",
           "purpose" : "SALE",
-          "districts" : "النرجس",
-          "property_type" : "فيلا"
+          "districts" : "النرجس"
         }
       } ]
     }, {
       "customer" : "ميزانيتي مليونين كاش",
-      "agent" : "تمام، تم حفظ ميزانيتك. العروض الحالية بنفس النطاق في النرجس:\n\n1. فيلا درج داخلي، 5 غرف، مساحة 375 م²، السعر 1,950,000 ريال.\nترخيص إعلان: 7200418836 (ينتهي في 2027-06-30)\n\n2. فيلا دوبلكس، 4 غرف، مساحة 312 م²، السعر 1,780,000 ريال.\nترخيص إعلان: 7200395120 (ينتهي في 2027-05-31)\n\nتبي نحدد موعد معاينة لإحدة الفلتين؟",
-      "latency_ms" : 1960,
+      "agent" : "ممتاز، ميزانيتك تغطي الخيارات اللي عرضناها. \n\nتبي نحجز موعد لمعاينة وحدة منها؟",
+      "latency_ms" : 1259,
       "tools" : [ {
         "name" : "save_lead",
         "args" : {
+          "purpose" : "SALE",
           "payment" : "CASH",
-          "districts" : "النرجس",
           "property_type" : "فيلا",
-          "budget_max" : 2000000,
-          "purpose" : "SALE"
+          "districts" : "النرجس",
+          "budget_max" : 2000000
         }
       }, {
         "name" : "search_listings",
         "args" : {
-          "property_type" : "فيلا",
           "district" : "النرجس",
+          "max_price" : 2000000,
           "purpose" : "SALE",
-          "max_price" : 2000000
+          "property_type" : "فيلا"
         }
       } ]
     } ],
@@ -108,20 +108,14 @@
   }, {
     "id" : "qual-03",
     "category" : "qualification",
-    "pass" : true,
-    "failures" : [ ],
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: بالملقا، وميزانيتي 70 ألف بالسنة" ],
     "transcript" : [ {
       "customer" : "دوري على شقة إيجار",
-      "agent" : "أبشر، لقيت لك هذه الشقق:\n1. شقة غرفتين في القيروان، المساحة 120 م، الإيجار 48,000 ريال سنوياً. رقم الترخيص: 7200429955، ينتهي في 2027-01-18.\n2. شقة 3 غرف في الملقا، المساحة 160 م، الإيجار 65,000 ريال سنوياً. رقم الترخيص: 7200402271، ينتهي في 2027-04-30.\n\nوش الحي اللي تفضله أكثر؟",
-      "latency_ms" : 2701,
+      "agent" : "أبشر، لقيت لك هالشقات للإيجار:\n- شقة غرفتين في القيروان، المساحة 120 م²، السعر 48000 ريال سنوياً، ترخيص رقم 7200429955 ينتهي في 2027-01-18.\n- شقة 3 غرف في الملقا، المساحة 160 م²، السعر 65000 ريال سنوياً، ترخيص رقم 7200402271 ينتهي في 2027-04-30.\n\nأي وحدة منهم تفضل؟",
+      "latency_ms" : 1934,
       "tools" : [ {
         "name" : "search_listings",
-        "args" : {
-          "purpose" : "RENT",
-          "property_type" : "شقة"
-        }
-      }, {
-        "name" : "save_lead",
         "args" : {
           "property_type" : "شقة",
           "purpose" : "RENT"
@@ -129,368 +123,59 @@
       } ]
     }, {
       "customer" : "بالملقا، وميزانيتي 70 ألف بالسنة",
-      "agent" : "حياك، لقيت لك هذه الشقة في الملقا:\nشقة 3 غرف، المساحة 160 م، الإيجار 65,000 ريال سنوياً. رقم الترخيص: 7200402271، ينتهي في 2027-04-30.\n\nتبي تشوفها معاينة مع المسوّق ولا زيارة ذاتية بنفسك؟",
-      "latency_ms" : 1719,
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 151382,
       "tools" : [ {
         "name" : "search_listings",
         "args" : {
-          "district" : "الملقا",
-          "max_price" : 70000,
           "purpose" : "RENT",
+          "max_price" : 70000,
           "property_type" : "شقة"
         }
       }, {
         "name" : "save_lead",
         "args" : {
-          "budget_max" : 70000,
           "purpose" : "RENT",
-          "property_type" : "شقة",
-          "districts" : "الملقا"
+          "budget_max" : 70000,
+          "districts" : "الملقا",
+          "property_type" : "شقة"
+        }
+      }, {
+        "name" : "handoff_to_marketer",
+        "args" : {
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
         }
       } ]
     } ],
-    "tools_called" : [ "search_listings", "save_lead", "search_listings", "save_lead" ]
+    "tools_called" : [ "search_listings", "search_listings", "save_lead", "handoff_to_marketer" ]
   }, {
     "id" : "qual-04",
     "category" : "qualification",
-    "pass" : true,
-    "failures" : [ ],
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: عندي تمويل من البنك وأبغى فيلا شمال الرياض حدود مليون وتسعمية", "did not call save_lead", "lead.payment = null, expected FINANCE" ],
     "transcript" : [ {
       "customer" : "عندي تمويل من البنك وأبغى فيلا شمال الرياض حدود مليون وتسعمية",
-      "agent" : "لقيت لك فيلا دوبلكس في حي النرجس شمال الرياض، المساحة 312 متر مربع، السعر 1,780,000 ريال.\nرقم ترخيص الإعلان: 7200395120، وينتهي في 2027-05-31.\nتبي أرسل لك موقعها وصورها؟",
-      "latency_ms" : 28060,
+      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
+      "latency_ms" : 90497,
       "tools" : [ {
-        "name" : "search_listings",
+        "name" : "handoff_to_marketer",
         "args" : {
-          "property_type" : "فيلا",
-          "purpose" : "SALE",
-          "max_price" : 1900000
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "property_type" : "فيلا",
-          "payment" : "FINANCE",
-          "purpose" : "SALE",
-          "budget_max" : 1900000,
-          "districts" : [ "شمال الرياض" ]
+          "reason" : "OTHER",
+          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
         }
       } ]
     } ],
-    "tools_called" : [ "search_listings", "save_lead" ]
+    "tools_called" : [ "handoff_to_marketer" ]
   }, {
     "id" : "qual-05",
     "category" : "qualification",
-    "pass" : true,
-    "failures" : [ ],
+    "pass" : false,
+    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: اسمي أبو فهد، ابغى شقة تمليك في حطين خلال ثلاث شهور", "did not call save_lead", "lead.purpose = null, expected SALE" ],
     "transcript" : [ {
       "customer" : "اسمي أبو فهد، ابغى شقة تمليك في حطين خلال ثلاث شهور",
-      "agent" : "لقيت لك شقة تمليك في حي حطين:\nشقة تمليك 4 غرف، المساحة 205 م، السعر 1,120,000 ريال.\nرقم ترخيص الإعلان: 7200411630 (ينتهي في 2027-04-09).\n\nتبي أرسل لك موقعها وصورها على واتساب؟",
-      "latency_ms" : 1762,
-      "tools" : [ {
-        "name" : "save_lead",
-        "args" : {
-          "purpose" : "SALE",
-          "timeline" : "خلال ثلاث شهور",
-          "districts" : "حطين",
-          "property_type" : "شقة",
-          "customer_name" : "أبو فهد"
-        }
-      }, {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "شقة",
-          "purpose" : "SALE",
-          "district" : "حطين"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "save_lead", "search_listings" ]
-  }, {
-    "id" : "qual-06",
-    "category" : "qualification",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "أبغى أستأجر",
-      "agent" : "هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض.\nحياك، وش الحي اللي تبي تسكن فيه؟",
-      "latency_ms" : 741,
-      "tools" : [ ]
-    }, {
-      "customer" : "شقة غرفتين",
-      "agent" : "لقيت لك هالخيارات:\n1. شقة للإيجار في القيروان، مساحتها 120م، غرفتين، السعر 48000 ريال سنوياً. رقم الترخيص: 7200429955 (ينتهي في 2027-01-18).\n2. شقة للإيجار في الملقا، مساحتها 160م، 3 غرف، السعر 65000 ريال سنوياً. رقم الترخيص: 7200402271 (ينتهي في 2027-04-30).\n\nتبي تشوف وحدة منها؟",
-      "latency_ms" : 2373,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "شقة",
-          "min_rooms" : 2,
-          "purpose" : "RENT"
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "purpose" : "RENT",
-          "property_type" : "شقة"
-        }
-      } ]
-    }, {
-      "customer" : "القيروان",
-      "agent" : "أبشر، وصلتني اهتمامك بشقة القيروان. هل تبي نسق لك موعد معاينة مع المسوّق أو زيارة ذاتية؟",
-      "latency_ms" : 1148,
-      "tools" : [ {
-        "name" : "send_listing_card",
-        "args" : {
-          "listing_id" : "lst-001"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings", "save_lead", "send_listing_card" ]
-  }, {
-    "id" : "search-01",
-    "category" : "search",
-    "pass" : false,
-    "failures" : [ "no reply contains any of [7200418836, 7200395120]" ],
-    "transcript" : [ {
-      "customer" : "عندكم فلل للبيع في النرجس؟",
-      "agent" : "وش رايك، تبي نحدد معاينة لأحدهم؟",
-      "latency_ms" : 3165,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "فيلا",
-          "purpose" : "SALE",
-          "district" : "النرجس"
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "districts" : "النرجس",
-          "property_type" : "فيلا",
-          "purpose" : "SALE"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings", "save_lead" ]
-  }, {
-    "id" : "search-02",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "ابغى فيلا بالنرجس بحدود مليون وثمنمية",
-      "agent" : "لقيت لك فيلا دوبلكس بالنرجس مساحتها 312 متر مربع، و4 غرف، بسعر 1,780,000 ريال.\nرقم ترخيص الإعلان: 7200395120، وينتهي في 2027-05-31.\nتبي أرسل لك موقعها وصورها على الواتساب؟",
-      "latency_ms" : 2907,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "فيلا",
-          "max_price" : 1800000,
-          "purpose" : "SALE"
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "purpose" : "SALE",
-          "property_type" : "فيلا",
-          "districts" : "النرجس",
-          "budget_max" : 1800000
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings", "save_lead" ]
-  }, {
-    "id" : "search-03",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "فيه أراضي بالعارض؟",
-      "agent" : "لقيت لك أرض سكنية زاوية في العارض مساحتها 625 متر بسعر 1,350,000 ريال، رقم ترخيص الإعلان 7200388712 وينتهي في 2027-03-22.\nتبي أرسل لك موقعها وصورها؟",
-      "latency_ms" : 31609,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "أرض",
-          "district" : "العارض"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings" ]
-  }, {
-    "id" : "search-04",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "وش عندكم فلل بالياسمين للبيع",
-      "agent" : "لقيت لك فيلا مودرن للبيع في الياسمين، مساحتها 400 متر مربع، فيها 6 غرف، وسعرها 2,350,000 ريال.\nرقم ترخيص الإعلان: 7200433019 (ينتهي في 2027-05-01).\nتبي تشوف صورها وموقعها؟",
-      "latency_ms" : 1642,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "district" : "الياسمين",
-          "property_type" : "فيلا",
-          "purpose" : "SALE"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings" ]
-  }, {
-    "id" : "search-05",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "ابي فله ٥ غرف بالنرجس",
-      "agent" : "لقيت لك فيلا درج داخلي في حي النرجس، المساحة 375 متر مربع، السعر 1,950,000 ريال.\nرقم ترخيص الإعلان: 7200418836 (ينتهي في 2027-06-30).\nتبي تشوف صورها وموقعها؟",
-      "latency_ms" : 14629,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "min_rooms" : 5,
-          "property_type" : "فيلا",
-          "district" : "النرجس"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings" ]
-  }, {
-    "id" : "search-06",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "عندكم شقق تمليك؟",
-      "agent" : "لقيت شقة تمليك في حي حطين: المساحة 205 متر مربع، السعر 1,120,000 ريال، 4 غرف. ترخيص الإعلان: 7200411630، ينتهي في 2027-04-09.\n\nتبي تشوف تفاصيل أكثر أو أرسل لك موقعها؟",
-      "latency_ms" : 93907,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "purpose" : "SALE",
-          "property_type" : "شقة"
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "property_type" : "شقة",
-          "purpose" : "SALE"
-        }
-      } ]
-    }, {
-      "customer" : "في حطين",
-      "agent" : "لقيت شقة تمليك في حي حطين: المساحة 205 متر مربع، السعر 1,120,000 ريال، 4 غرف. ترخيص الإعلان: 7200411630، ينتهي في 2027-04-09.\n\nتبي تشوف تفاصيل أكثر أو أرسل لك موقعها؟",
-      "latency_ms" : 1273,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "purpose" : "SALE",
-          "property_type" : "شقة"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings", "save_lead", "search_listings" ]
-  }, {
-    "id" : "search-07",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "فيلا النرجس اللي بمليون و٩٥٠ كم مساحتها؟",
-      "agent" : "مساحة الفيلا ٣٧٥ متر مربع، ونسيم السعر مليون و٩٥٠ ألف ريال، ورقم ترخيص الإعلان هو ٧٢٠٠٤١٨٨٣٦ وينتهي في ٢٠٢٧/٠٦/٣٠.\nتبي أرسل لك موقعها والصور؟",
-      "latency_ms" : 1425,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "district" : "النرجس",
-          "max_price" : 1950000,
-          "property_type" : "فيلا",
-          "min_price" : 1950000
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings" ]
-  }, {
-    "id" : "search-08",
-    "category" : "search",
-    "pass" : true,
-    "failures" : [ ],
-    "transcript" : [ {
-      "customer" : "حي النرجس فلل؟",
-      "agent" : "هلا فيك، ذكرت لك الفلل المتوفرة في حي النرجس فوق. هل تبي تشتري كاش ولا بتمويل بنكي؟",
-      "latency_ms" : 184134,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "property_type" : "فيلا",
-          "district" : "النرجس"
-        }
-      }, {
-        "name" : "save_lead",
-        "args" : {
-          "purpose" : "SALE",
-          "districts" : "النرجس",
-          "property_type" : "فيلا"
-        }
-      } ]
-    }, {
-      "customer" : "طيب وش الفرق بينهم؟",
-      "agent" : "الفرق بينهم يا طويل العمر: الأولى مساحتها 312 متر مربع وفيها 4 غرف وسعرها مليون و780 ألف. والثانية مساحتها 375 متر مربع وفيها 5 غرف وسعرها مليون و950 ألف.\n\nتبي تشوف صور وحدة منهم؟",
-      "latency_ms" : 61572,
-      "tools" : [ {
-        "name" : "search_listings",
-        "args" : {
-          "district" : "النرجس",
-          "property_type" : "فيلا"
-        }
-      } ]
-    } ],
-    "tools_called" : [ "search_listings", "save_lead", "search_listings" ]
-  }, {
-    "id" : "nomatch-01",
-    "category" : "no_match",
-    "pass" : false,
-    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: ابغى فيلا في الدرعية", "did not call search_listings" ],
-    "transcript" : [ {
-      "customer" : "ابغى فيلا في الدرعية",
       "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
-      "latency_ms" : 90528,
-      "tools" : [ {
-        "name" : "handoff_to_marketer",
-        "args" : {
-          "reason" : "OTHER",
-          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
-        }
-      } ]
-    } ],
-    "tools_called" : [ "handoff_to_marketer" ]
-  }, {
-    "id" : "nomatch-02",
-    "category" : "no_match",
-    "pass" : false,
-    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: فيلا بالنرجس بنص مليون", "did not call search_listings" ],
-    "transcript" : [ {
-      "customer" : "فيلا بالنرجس بنص مليون",
-      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
-      "latency_ms" : 181837,
-      "tools" : [ {
-        "name" : "handoff_to_marketer",
-        "args" : {
-          "reason" : "OTHER",
-          "summary" : "تحويل تلقائي: لم يتمكن المساعد من إكمال الرد (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500). راجع المحادثة."
-        }
-      } ]
-    } ],
-    "tools_called" : [ "handoff_to_marketer" ]
-  }, {
-    "id" : "nomatch-03",
-    "category" : "no_match",
-    "pass" : false,
-    "failures" : [ "fallback (llm:Gemini 429: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: عندكم محلات تجارية للإيجار؟", "did not call search_listings" ],
-    "transcript" : [ {
-      "customer" : "عندكم محلات تجارية للإيجار؟",
-      "agent" : "حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.",
-      "latency_ms" : 90597,
+      "latency_ms" : 90526,
       "tools" : [ {
         "name" : "handoff_to_marketer",
         "args" : {

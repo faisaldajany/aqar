@@ -69,13 +69,13 @@ public class OfficeSettingsController {
         Subscription.State sub = subscription.state();
         List<Map<String, Object>> steps = new ArrayList<>();
         steps.add(step("whatsapp", "اربط رقم واتساب المكتب", "/whatsapp", exists("select 1 from wa_accounts")));
-        steps.add(step("listings", "أضف عقاراتك (ملف Excel أو رابط عقار)", "/listings", exists("select 1 from listings")));
+        steps.add(step("listings", "أضف عقاراتك", "/listings", exists("select 1 from listings")));
         steps.add(step("marketers", "أضف المسوّقين وأحياءهم", "/marketers", exists("select 1 from marketers where active")));
-        steps.add(step("booking", "راجع ساعات المعاينة ورسالة التأكيد", "/booking-settings",
+        steps.add(step("booking", "راجع ساعات المعاينة", "/booking-settings",
                 exists("select 1 from booking_settings where reviewed_at is not null")));
-        steps.add(step("report", "أضف جوالك ليصلك التقرير اليومي", "/settings", exists("select 1 from offices where owner_phone is not null")));
-        steps.add(step("test", "جرّب: أرسل رسالة لرقم المكتب من جوال آخر", "/inbox", exists("select 1 from conversations")));
-        steps.add(step("subscribe", "فعّل الاشتراك قبل نهاية التجربة", "/billing", "ACTIVE".equals(sub.status())));
+        steps.add(step("report", "أضف جوالك للتقرير اليومي", "/settings", exists("select 1 from offices where owner_phone is not null")));
+        steps.add(step("test", "جرّب الوكيل بمحادثة تجريبية", "/try", exists("select 1 from conversations")));
+        steps.add(step("subscribe", "فعّل الاشتراك", "/billing", "ACTIVE".equals(sub.status())));
         long done = steps.stream().filter(m -> Boolean.TRUE.equals(m.get("done"))).count();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("steps", steps);

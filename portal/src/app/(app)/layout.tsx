@@ -5,17 +5,20 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type Me } from "@/lib/api";
 import { SessionContext } from "./session";
+import { Icon } from "@/components/Icon";
+import { SaduMark } from "@/components/Sadu";
 
-const NAV = [
-  { href: "/dashboard", label: "الرئيسية" },
-  { href: "/inbox", label: "المحادثات" },
-  { href: "/handoffs", label: "التحويلات" },
-  { href: "/bookings", label: "المواعيد" },
-  { href: "/listings", label: "العقارات" },
-  { href: "/marketers", label: "المسوّقون" },
-  { href: "/whatsapp", label: "ربط واتساب" },
-  { href: "/billing", label: "الاشتراك" },
-  { href: "/settings", label: "الإعدادات" },
+const NAV: { href: string; label: string; icon: string; group: "work" | "setup" }[] = [
+  { href: "/dashboard", label: "الرئيسية", icon: "home", group: "work" },
+  { href: "/inbox", label: "المحادثات", icon: "chat", group: "work" },
+  { href: "/handoffs", label: "التحويلات", icon: "handoff", group: "work" },
+  { href: "/bookings", label: "المواعيد", icon: "calendar", group: "work" },
+  { href: "/try", label: "جرّب الوكيل", icon: "try", group: "work" },
+  { href: "/listings", label: "العقارات", icon: "building", group: "setup" },
+  { href: "/marketers", label: "المسوّقون", icon: "people", group: "setup" },
+  { href: "/whatsapp", label: "ربط واتساب", icon: "phone", group: "setup" },
+  { href: "/billing", label: "الاشتراك", icon: "card", group: "setup" },
+  { href: "/settings", label: "الإعدادات", icon: "gear", group: "setup" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -50,15 +53,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SessionContext.Provider value={{ me, refresh }}>
       <div className="shell">
         <aside className="side">
-          <div className="brand">حداء</div>
-          <div className="small"><b>{me.office.name}</b><br /><span className="muted">فال <span className="mono">{me.office.falLicense}</span></span></div>
+          <Link href="/dashboard" className="brand"><SaduMark />حداء</Link>
+          <div className="office">
+            <b>{me.office.name}</b>
+            {me.whatsapp.connected && me.whatsapp.verifiedName === "مكتب تجريبي"
+              ? <span className="pill p-warn">واتساب تجريبي</span>
+              : me.whatsapp.connected ? <span className="pill p-ok">واتساب مربوط</span> : <span className="pill p-idle">واتساب غير مربوط</span>}
+          </div>
           <nav aria-label="أقسام البوابة">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}>{n.label}</Link>
+            {NAV.filter((n) => n.group === "work").map((n) => (
+              <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}><Icon name={n.icon} />{n.label}</Link>
+            ))}
+            <span className="navsep" role="separator" />
+            {NAV.filter((n) => n.group === "setup").map((n) => (
+              <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}><Icon name={n.icon} />{n.label}</Link>
             ))}
           </nav>
-          <Link href="/contact" className="small" style={{ marginTop: "auto" }}>الدعم والتواصل</Link>
-          <button className="btn" onClick={logout}>تسجيل الخروج</button>
+          <div className="sidefoot">
+            <Link href="/contact"><Icon name="help" />الدعم</Link>
+            <button type="button" onClick={logout}><Icon name="out" />خروج</button>
+          </div>
         </aside>
         <main className="main"><div className="view">{children}</div></main>
       </div>

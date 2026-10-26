@@ -9,6 +9,7 @@ PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
 REGION="${REGION:-me-central2}"                 # Dammam
 SCHEDULER_REGION="${SCHEDULER_REGION:-$REGION}" # if Cloud Scheduler is not offered in me-central2, use europe-west1
 DOMAIN="${DOMAIN:-app.hidaaco.com}"
+SITE_DOMAINS="${SITE_DOMAINS:-hidaaco.com,www.hidaaco.com}"  # home page hosts, served by the portal
 DB_INSTANCE="${DB_INSTANCE:-hidaa-db}"
 DB_TIER="${DB_TIER:-db-f1-micro}"
 REPO="hidaa"
@@ -137,6 +138,15 @@ exists gcloud compute target-https-proxies describe hidaa-https --global || \
 exists gcloud compute forwarding-rules describe hidaa-443 --global || \
   gcloud compute forwarding-rules create hidaa-443 --global --load-balancing-scheme=EXTERNAL_MANAGED \
     --address=hidaa-ip --target-https-proxy=hidaa-https --ports=443
+# The marketing site (hidaaco.com, www) is the portal's home page, through the same rules and a second certificate.
+if [ -n "$SITE_DOMAINS" ]; then
+  exists gcloud compute ssl-certificates describe hidaa-site-cert --global || \
+    gcloud compute ssl-certificates create hidaa-site-cert --global --domains="$SITE_DOMAINS"
+  gcloud compute target-https-proxies update hidaa-https --global --ssl-certificates=hidaa-cert,hidaa-site-cert >/dev/null
+  if ! gcloud compute url-maps describe hidaa-lb --global --format=json | grep -q "\"${SITE_DOMAINS%%,*}\""; then
+    gcloud compute url-maps add-host-rule hidaa-lb --global --hosts="$SITE_DOMAINS" --path-matcher-name=routes
+  fi
+fi
 # http:// -> https://
 if ! exists gcloud compute url-maps describe hidaa-redirect --global; then
   gcloud compute url-maps import hidaa-redirect --global --quiet --source /dev/stdin <<YAML
@@ -178,6 +188,8 @@ cat <<EOF
 Load balancer IP: $IP
 
 Now, at your domain registrar, add:   A   app   $IP
+                                     A   @     $IP   (hidaaco.com home page)
+                                     A   www   $IP
 The HTTPS certificate is issued automatically 15-60 minutes after the record is visible.
 Check:  gcloud compute ssl-certificates describe hidaa-cert --global --format='value(managed.status)'
 Then open https://$DOMAIN/signup

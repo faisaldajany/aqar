@@ -43,7 +43,7 @@ function Inbox() {
     return () => clearInterval(t);
   }, [active, loadThread]);
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [messages.length]);
+  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
 
   const conv = list.find((c) => c.id === active);
   const needle = q.trim();

@@ -1,63 +1,63 @@
 # Agent eval: gemini-3.5-flash-lite (thinking: low)
 
-> **Stopped early: Gemini quota or rate limit (429) on 3 turns in a row.** Scenarios after that were not run.
-
-**Passed 1 of 4 scenarios (25%)**
+**Passed 46 of 49 scenarios (94%)**
 
 | Metric | Value |
 |---|---|
-| Customer turns | 4 |
-| Latency p50 / p95 | 90.4 s / 91.8 s |
-| Tokens in / out | 1,987 / 34 |
-| Est. cost per customer turn | 0.001 SAR (at $0.30 / $2.50 per 1M) |
+| Customer turns | 64 |
+| Latency p50 / p95 | 1.6 s / 50.7 s |
+| Tokens in / out | 312,347 / 9,519 |
+| Est. cost per customer turn | 0.007 SAR (at $0.30 / $2.50 per 1M) |
 
 | Category | Pass | Fail |
 |---|---|---|
-| greeting | 1 | 2 |
-| qualification | 0 | 1 |
+| greeting | 3 | 0 |
+| qualification | 6 | 0 |
+| search | 7 | 1 |
+| no_match | 4 | 0 |
+| expired | 2 | 0 |
+| negotiation | 5 | 0 |
+| human | 2 | 1 |
+| viewing | 7 | 0 |
+| listing_card | 1 | 1 |
+| out_of_scope | 5 | 0 |
+| dialect | 4 | 0 |
 
 ## Failures
 
-### greet-02
+### search-07
 
-- fallback (llm:Gemini 429: {
-  "error": {
-    "code": 429,
-    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: مساء الخير، انت موظف ولا روبوت؟
-- no reply contains any of [آلي, مساعد]
-- first reply does not say it is an automated assistant
+- no reply contains any of [375]
 
-> **العميل:** مساء الخير، انت موظف ولا روبوت؟
+> **العميل:** فيلا النرجس اللي بمليون و٩٥٠ كم مساحتها؟
 >
-> _tools: handoff_to_marketer_
+> _tools: search_listings_
 >
-> **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
+> **الوكيل:** هلا بك، أنا المساعد الآلي لمكتب الأفق العقاري. مساحة الفيلا ٣٧٥ متر مربع، وسعرها مليون و٩٥٠ ألف ريال. رقم ترخيص الإعلان ٧٢٠٠٤١٨٨٣٦ وتاريخ انتهائه في ٣٠/٠٦/٢٠٢٧. تبي تشوف صورها أو موقعها؟
 
-### greet-03
+### human-03
 
-- fallback (llm:Gemini 429: {
-  "error": {
-    "code": 429,
-    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: هلا
-- first reply does not say it is an automated assistant
+- did not call handoff_to_marketer
 
-> **العميل:** هلا
+> **العميل:** رحت المعاينة أمس وما أحد فتح لي الباب، وش هالتعامل
 >
-> _tools: handoff_to_marketer_
+> **الوكيل:** هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري. أعتذر منك جداً على اللي صار وحقك علينا، وش رايك ألغي لك الموعد القديم وأحجز لك موعد ثاني يرضيك؟
+
+### card-02
+
+- fallback (guard:empty) on: عندكم أراضي بالعارض؟
+- did not call send_listing_card
+
+> **العميل:** عندكم أراضي بالعارض؟
 >
-> **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
-
-### qual-01
-
-- fallback (llm:Gemini 429: {
-  "error": {
-    "code": 429,
-    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: ابغى بيت
-- called handoff_to_marketer
-
-> **العميل:** ابغى بيت
->
-> _tools: handoff_to_marketer_
+> _tools: search_listings, save_lead, handoff_to_marketer_
 >
 > **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
+
+> **العميل:** وين موقعها بالضبط؟
+>
+> _tools: search_listings, save_lead_
+>
+> **الوكيل:** هلا بك، متوفر أرض سكنية زاوية في العارض مساحتها 625 متر بسعر 1,350,000 ريال، رقم ترخيص الإعلان 7200388712 وينتهي في 2027-03-22.
+> تبي أرسل لك موقعها وصورها؟
 

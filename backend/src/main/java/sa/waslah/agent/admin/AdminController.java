@@ -22,7 +22,7 @@ import sa.waslah.agent.office.OfficeAlerts;
 import sa.waslah.agent.tenant.TenantContext;
 
 /**
- * Operator console for the Waslah team (not offices): every office at a glance and the FAL license review.
+ * Operator console for the Hidaa team (not offices): every office at a glance and the FAL license review.
  * Protected by a shared token header; disabled when waslah.admin-token is blank.
  */
 @RestController

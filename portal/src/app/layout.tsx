@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "بوابة وصلة",
+  title: "بوابة حداء",
   description: "بوابة مكاتب العقار لإدارة وكيل واتساب",
 };
 

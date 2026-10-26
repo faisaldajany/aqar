@@ -1,4 +1,8 @@
-# Waslah Agent
+# Hidaa (حداء) Agent
+
+https://hidaaco.com · portal at https://app.hidaaco.com
+
+The code keeps its original internal name (`sa.waslah` package, `waslah_app` database role); only user-facing text uses Hidaa.
 
 WhatsApp AI agent for Saudi real-estate brokerage offices, with a self-serve office portal.
 

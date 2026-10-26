@@ -50,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SessionContext.Provider value={{ me, refresh }}>
       <div className="shell">
         <aside className="side">
-          <div className="brand">وصلة</div>
+          <div className="brand">حداء</div>
           <div className="small"><b>{me.office.name}</b><br /><span className="muted">فال <span className="mono">{me.office.falLicense}</span></span></div>
           <nav aria-label="أقسام البوابة">
             {NAV.map((n) => (

@@ -2,7 +2,7 @@
 
 Everything in the code is built and tested (CI: unit + integration tests on a real Postgres, portal
 typecheck/build, production Docker images). What remains needs accounts, approvals or decisions that
-only Waslah can make. Each item says what blocks on it and where it plugs in.
+only Hidaa can make. Each item says what blocks on it and where it plugs in.
 
 Legend: **[blocker]** the product cannot take paying offices without it · **[launch]** needed for a
 good launch · **[later]** can follow the first paying offices.
@@ -11,11 +11,11 @@ good launch · **[later]** can follow the first paying offices.
 
 Owner: Faisal. Details and API points to verify: [meta-integration.md](meta-integration.md).
 
-- [ ] Meta Business portfolio for Waslah with **business verification** done (needs CR, website, privacy policy URL).
+- [ ] Meta Business portfolio for Hidaa with **business verification** done (needs CR, website, privacy policy URL).
 - [ ] Meta app with WhatsApp, registered as **Tech Provider**; App Review for `whatsapp_business_management`
       and `whatsapp_business_messaging`.
 - [ ] Embedded Signup configuration with **WhatsApp Business app onboarding (coexistence)** → `META_CONFIG_ID`.
-- [ ] Webhook: `https://<DOMAIN>/webhooks/whatsapp`, verify token `WA_VERIFY_TOKEN`, fields `messages`,
+- [ ] Webhook: `https://app.hidaaco.com/webhooks/whatsapp`, verify token `WA_VERIFY_TOKEN`, fields `messages`,
       `smb_message_echoes`, `smb_app_state_sync`.
 - [ ] Run one real office number end-to-end on staging (`WA_MODE=cloud`) and tick the 7 "confirm" items in meta-integration.md.
 - [ ] **Message templates** (category Utility, language `ar`). Until approved, the matching message is
@@ -65,7 +65,8 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 - [ ] Pick a provider with a Saudi region (e.g. Google Cloud Dammam, Oracle Cloud Jeddah/Riyadh,
       Alibaba Cloud Riyadh, STC Cloud). One VM (2 vCPU, 4 GB) is enough for the first ~50 offices.
-- [ ] DNS `A` record for `DOMAIN` (e.g. `app.waslah.sa`) → VM. Caddy issues TLS automatically.
+- [ ] Email on hidaaco.com (e.g. support@, billing@) — Meta verification and Moyasar both ask for a domain email.
+- [ ] DNS `A` record for `DOMAIN` (`app.hidaaco.com`; point `hidaaco.com` at the website) → VM. Caddy issues TLS automatically.
 - [ ] Deploy:
       ```bash
       cp deploy/.env.example deploy/.env    # fill in
@@ -74,7 +75,7 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 - [ ] **Off-site backups**: the `backup` service writes an encrypted dump nightly at 02:00 to the
       `backups` volume. Add a cron on the VM to copy it to object storage in the same region, and do one
       restore drill: `gpg -d file.sql.gz.gpg | gunzip | psql`.
-- [ ] Uptime check on `https://<DOMAIN>/` and alerting on container restarts.
+- [ ] Uptime check on `https://app.hidaaco.com/` and alerting on container restarts.
 - [ ] Error tracking: create a Sentry project (EU or self-hosted per §6) and set `SENTRY_DSN`. PII is
       off by default (`send-default-pii: false`).
 - [ ] Metrics: `/actuator/prometheus` on the internal port 8081 if you run Prometheus/Grafana.
@@ -85,8 +86,8 @@ Built in: tenant isolation by row-level security; WhatsApp tokens encrypted at r
 on request (inbox → بيانات العميل → حذف); chat content deleted after `MESSAGE_RETENTION_DAYS` (730);
 raw webhook payloads deleted after `WEBHOOK_RETENTION_DAYS` (30); the agent says it is an assistant.
 
-Needs Waslah/legal:
-- [ ] Privacy policy and terms on the website (also required by Meta). Waslah is **processor** for the
+Needs Hidaa/legal:
+- [ ] Privacy policy and terms on the website (also required by Meta). Hidaa is **processor** for the
       offices' customer data; offices are controllers. Put a data-processing agreement in the terms.
 - [ ] Cross-border transfer assessment for Gemini (and Sentry if outside KSA), or move them in-region.
 - [ ] Check whether registration on SDAIA's National Data Governance Platform applies.
@@ -97,16 +98,16 @@ Needs Waslah/legal:
 - [ ] **FAL review**: new offices show "قيد التحقق". Check each number against REGA's broker register
       and record the result:
       ```bash
-      curl -H "X-Admin-Token: $ADMIN_TOKEN" https://<DOMAIN>/admin/offices
+      curl -H "X-Admin-Token: $ADMIN_TOKEN" https://app.hidaaco.com/admin/offices
       curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
-        -d '{"status":"VERIFIED"}' https://<DOMAIN>/admin/offices/<office-id>/fal
+        -d '{"status":"VERIFIED"}' https://app.hidaaco.com/admin/offices/<office-id>/fal
       ```
       (REJECTED with a `note` alerts the office.) No public REGA API was found; if one becomes
       available, automate it in `AdminController`.
 - [ ] Aqar: a listings feed partnership (portal's "اطلب ربط عقار" requests are stored in
       `aqar_feed_requests`). Until then offices use Excel/CSV or paste a listing link.
-- [ ] Onboarding website: pricing updated to 499 / 1,000 SAR, no setup fee. Point its sign-up button to `https://<DOMAIN>/signup`.
-- [ ] Support channel (a Waslah WhatsApp number) shown in the portal footer.
+- [ ] Onboarding website: pricing updated to 499 / 1,000 SAR, no setup fee. Point its sign-up button to `https://app.hidaaco.com/signup`.
+- [ ] Support channel (a Hidaa WhatsApp number) shown in the portal footer.
 
 ## 8. Deliberately not built yet (per the pricing doc)
 

@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 /**
- * Plans from the pricing doc (باقات ومزايا وكيل واتساب العقاري — وصلة).
+ * Plans from the pricing doc (باقات ومزايا وكيل واتساب العقاري — حداء).
  * Replies over the allowance are not blocked; they are billed per reply.
  */
 @Component

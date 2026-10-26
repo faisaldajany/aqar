@@ -2,7 +2,7 @@
 
 ## Prerequisites (owner: Faisal)
 
-1. Meta Business portfolio for Waslah, **business verification** completed.
+1. Meta Business portfolio for Hidaa, **business verification** completed.
 2. A Meta app with the WhatsApp product, registered as a **Tech Provider**, so other businesses can
    onboard their numbers through Embedded Signup.
 3. An **Embedded Signup configuration** (gives `META_CONFIG_ID`) with WhatsApp Business app

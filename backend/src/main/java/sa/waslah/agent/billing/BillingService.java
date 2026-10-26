@@ -63,7 +63,7 @@ public class BillingService {
         if (open.isPresent() && open.get().payUrl() != null) return open.get();
 
         BigDecimal price = "ANNUAL".equals(cycle) ? plan.annualSar : plan.monthlySar;
-        String desc = "اشتراك وصلة — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)");
+        String desc = "اشتراك حداء — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)");
         return create(officeId, "SUBSCRIPTION", plan.name(), cycle, desc, null, null, halalas(price), true);
     }
 

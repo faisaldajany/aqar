@@ -30,7 +30,7 @@ public interface PageFetcher {
         public String fetch(URI uri) {
             try {
                 byte[] body = http.get().uri(uri)
-                        .header("User-Agent", "Mozilla/5.0 (compatible; WaslahListingImport/1.0)")
+                        .header("User-Agent", "Mozilla/5.0 (compatible; HidaaListingImport/1.0; +https://hidaaco.com)")
                         .header("Accept-Language", "ar,en;q=0.8")
                         .retrieve().body(byte[].class);
                 if (body == null || body.length == 0) {

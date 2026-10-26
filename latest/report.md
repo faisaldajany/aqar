@@ -1,87 +1,107 @@
 # Agent eval: gemini-3.5-flash-lite (thinking: low)
 
-**Passed 44 of 49 scenarios (90%)**
+> **Stopped early: Gemini quota or rate limit (429) on 3 turns in a row.** Scenarios after that were not run.
+
+**Passed 15 of 20 scenarios (75%)**
 
 | Metric | Value |
 |---|---|
-| Customer turns | 64 |
-| Latency p50 / p95 | 1.7 s / 49.5 s |
-| Tokens in / out | 338,398 / 9,178 |
+| Customer turns | 26 |
+| Latency p50 / p95 | 2.7 s / 181.8 s |
+| Tokens in / out | 129,773 / 3,769 |
 | Est. cost per customer turn | 0.007 SAR (at $0.30 / $2.50 per 1M) |
 
 | Category | Pass | Fail |
 |---|---|---|
 | greeting | 3 | 0 |
 | qualification | 5 | 1 |
-| search | 8 | 0 |
-| no_match | 4 | 0 |
-| expired | 2 | 0 |
-| negotiation | 3 | 2 |
-| human | 3 | 0 |
-| viewing | 5 | 2 |
-| listing_card | 2 | 0 |
-| out_of_scope | 5 | 0 |
-| dialect | 4 | 0 |
+| search | 7 | 1 |
+| no_match | 0 | 3 |
 
 ## Failures
 
-### qual-04
+### qual-02
 
-- did not call save_lead
-- lead.payment = null, expected FINANCE
+- reply longer than 8 lines
+- reply longer than 8 lines
 
-> **العميل:** عندي تمويل من البنك وأبغى فيلا شمال الرياض حدود مليون وتسعمية
+> **العميل:** ابي فيلا للشراء بالنرجس
 >
-> _tools: handoff_to_marketer_
+> _tools: search_listings, save_lead_
 >
-> **الوكيل:** أبشر، راح يحولك النظام الآن على الزميل خالد عشان يفيدك بخصوص التمويل والعقارات المناسبة لميزانيتك.
+> **الوكيل:** هلا بك، أنا المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية في الرياض. أبشر، لقيت لك هذي الفلل في حي النرجس:
+> 
+> 1. فيلا درج داخلي، 5 غرف، مساحة 375 م²، السعر 1,950,000 ريال.
+> ترخيص إعلان: 7200418836 (ينتهي في 2027-06-30)
+> 
+> 2. فيلا دوبلكس، 4 غرف، مساحة 312 م²، السعر 1,780,000 ريال.
+> ترخيص إعلان: 7200395120 (ينتهي في 2027-05-31)
+> 
+> تبي نحدد موعد معاينة لأحدهما؟
 
-### nego-03
+> **العميل:** ميزانيتي مليونين كاش
+>
+> _tools: save_lead, search_listings_
+>
+> **الوكيل:** تمام، تم حفظ ميزانيتك. العروض الحالية بنفس النطاق في النرجس:
+> 
+> 1. فيلا درج داخلي، 5 غرف، مساحة 375 م²، السعر 1,950,000 ريال.
+> ترخيص إعلان: 7200418836 (ينتهي في 2027-06-30)
+> 
+> 2. فيلا دوبلكس، 4 غرف، مساحة 312 م²، السعر 1,780,000 ريال.
+> ترخيص إعلان: 7200395120 (ينتهي في 2027-05-31)
+> 
+> تبي نحدد موعد معاينة لإحدة الفلتين؟
+
+### search-01
+
+- no reply contains any of [7200418836, 7200395120]
+
+> **العميل:** عندكم فلل للبيع في النرجس؟
+>
+> _tools: search_listings, save_lead_
+>
+> **الوكيل:** وش رايك، تبي نحدد معاينة لأحدهم؟
+
+### nomatch-01
 
 - fallback (llm:Gemini 429: {
   "error": {
     "code": 429,
-    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 15,) on: ممكن أدفع إيجار شقة الملقا على أربع دفعات؟
+    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: ابغى فيلا في الدرعية
+- did not call search_listings
 
-> **العميل:** ممكن أدفع إيجار شقة الملقا على أربع دفعات؟
+> **العميل:** ابغى فيلا في الدرعية
 >
 > _tools: handoff_to_marketer_
 >
 > **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
 
-### nego-05
+### nomatch-02
 
-- did not call handoff_to_marketer
+- fallback (llm:Gemini 429: {
+  "error": {
+    "code": 429,
+    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: فيلا بالنرجس بنص مليون
+- did not call search_listings
 
-> **العميل:** البنك يعطيني تمويل كم بالضبط إذا راتبي ١٥ ألف؟
+> **العميل:** فيلا بالنرجس بنص مليون
 >
-> **الوكيل:** هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري للوساطة العقارية. بخصوص تمويل البنك ما نقدر نفيدك فيه، والأفضل تسأل البنك نفسه. تحب نحولك على المسوّق يوضح لك تفاصيل ثانية؟
-
-### view-03
-
-- reply longer than 6 lines
-
-> **العميل:** ابي أعاين شقة حطين مع المسوق
+> _tools: handoff_to_marketer_
 >
-> _tools: search_listings, save_lead, get_viewing_slots_
->
-> **الوكيل:** هلا فيك، أنا المساعد الآلي لمكتب الأفق العقاري.
-> لقيت شقة في حطين (4 غرف، مساحة 205 م، بسعر 1,120,000 ريال، ترخيص: 7200411630، ينتهي في 2027-04-09).
-> المواعيد المتاحة للمعاينة مع المسوق:
-> - غداً 4:00 م
-> - غداً 5:00 م
-> - غداً 6:00 م
-> أي موعد يناسبك؟
+> **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
 
-### book-03
+### nomatch-03
 
-- no reply contains any of [مسكون, مع المسو, المسوّق]
+- fallback (llm:Gemini 429: {
+  "error": {
+    "code": 429,
+    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 500) on: عندكم محلات تجارية للإيجار؟
+- did not call search_listings
 
-> **العميل:** ابي أشوف شقة حطين بنفسي بدون مسوق
+> **العميل:** عندكم محلات تجارية للإيجار؟
 >
-> _tools: search_listings, save_lead_
+> _tools: handoff_to_marketer_
 >
-> **الوكيل:** فيه شقة تمليك 4 غرف في حي حطين، المساحة 205 متر مربع، والسعر 1120000 ريال.
-> رقم ترخيص الإعلان: 7200411630 وتاريخ انتهائه 2027-04-09.
-> تبي أرسل لك موقعها وصورها؟
+> **الوكيل:** حيّاك الله، بحوّلك للمسوّق يتأكد لك من التفاصيل ويرد عليك بأقرب وقت.
 

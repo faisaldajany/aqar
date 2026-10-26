@@ -123,7 +123,13 @@ class AgentUnitTests {
         @Test
         void correctsHandoffPromisesButNotOffers() {
             assertThat(ReplyGuard.correction("سأقوم بتحويلك فوراً للمسوّق.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_HANDOFF);
-            assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), false)).isNull();
+            assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), false)).isEqualTo(ReplyGuard.OFFER_HANDOFF);
+            assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), true)).isNull();
+            assertThat(ReplyGuard.correction("هذا عند المسوّق، وأنا محوّلك له الآن.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_HANDOFF);
+            assertThat(ReplyGuard.correction("أبشر، جاري إلغاء الموعد.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_CANCEL);
+            assertThat(ReplyGuard.correction("تم إلغاء موعدك.", Set.of(AgentTools.CANCEL), false)).isNull();
+            assertThat(ReplyGuard.correction("بحثت لك ولا توجد حالياً فلل بهذا السعر", Set.of(), false)).isEqualTo(ReplyGuard.MUST_SEARCH);
+            assertThat(ReplyGuard.correction("هل حاب أسجل طلبك عشان يتواصل معك المسوق؟", Set.of(AgentTools.SEARCH), false)).isNull();
             assertThat(ReplyGuard.correction("بحوّلك للأستاذ خالد ويتواصل معك.", Set.of(), true)).isNull();
         }
 

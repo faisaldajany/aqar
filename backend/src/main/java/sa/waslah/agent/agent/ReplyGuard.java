@@ -46,12 +46,12 @@ public final class ReplyGuard {
     }
 
     private static final Pattern AVAILABILITY = Pattern.compile(
-            "متوفر|متاح|عندنا|لدينا|موجود|ما فيه|لا يوجد|we have|available", Pattern.CASE_INSENSITIVE);
+            "متوفر|متاح|عندنا|لدينا|موجود|ما فيه|مافي|لا يوجد|لا توجد|توجد|we have|available", Pattern.CASE_INSENSITIVE);
     private static final Pattern PROPERTY = Pattern.compile(
             "فيل|فلل|فل[ةه]|شق[ةه]|شقق|أرض|ارض|أراضي|اراضي|دور|دوبلكس|عمار|محل|عقار|villa|apartment|land|shop",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern HANDOFF_PROMISE = Pattern.compile(
-            "أحو[ّ]?ل|احو[ّ]?ل|بحو[ّ]?ل|سأحو[ّ]?ل|سأقوم بتحويل|تحويلك|يتواصل معك|سيتواصل|بيتواصل|بيكلمك|يكلمك|transfer|connect you",
+            "أحو[ّ]?ل|احو[ّ]?ل|بحو[ّ]?ل|سأحو[ّ]?ل|محو[ّ]?لك|يحو[ّ]?لك|سأقوم بتحويل|تحويلك|يتواصل معك|سيتواصل|بيتواصل|بيكلمك|يكلمك|transfer|connect you",
             Pattern.CASE_INSENSITIVE);
 
     /** The model sometimes writes a tool call as text instead of calling it; that must never reach a customer. */
@@ -60,8 +60,21 @@ public final class ReplyGuard {
             Pattern.CASE_INSENSITIVE);
     /** "I'll look for you" without actually searching. */
     private static final Pattern SEARCH_PROMISE = Pattern.compile(
-            "بدور لك|أدور لك|ادور لك|أبحث لك|ابحث لك|بأبحث|سأبحث|بشوف لك|أشوف لك|let me (check|look|search)",
+            "بدور لك|أدور لك|ادور لك|أبحث لك|ابحث لك|بأبحث|سأبحث|ببحث|بحثت|جاري البحث|بشوف لك|أشوف لك|let me (check|look|search)",
             Pattern.CASE_INSENSITIVE);
+
+    /** "Shall I transfer you?" — the rules say to transfer without asking in the cases that need it. */
+    private static final Pattern HANDOFF_OFFER = Pattern.compile(
+            "أحو[ّ]?لك|احو[ّ]?لك|أحو[ّ]?له لك|احو[ّ]?له لك|يحو[ّ]?لك|محو[ّ]?لك");
+    /** Claims a cancellation happened. */
+    private static final Pattern CANCEL_CLAIM = Pattern.compile(
+            "ألغيت|الغيت|ألغينا|الغينا|تم إلغاء|تم الغاء|جاري إلغاء|جاري الغاء|cancelled|canceled", Pattern.CASE_INSENSITIVE);
+
+    static final String OFFER_HANDOFF = "تنبيه داخلي لا يراه العميل: سألت العميل إن كان يريد التحويل للمسوّق. "
+            + "إن كان طلبه تفاوضاً أو خصماً أو دفعات أو تمويلاً أو شكوى أو طلب التحدث مع شخص، فاستدعِ handoff_to_marketer الآن "
+            + "ثم أعد كتابة ردك دون سؤال. وإلا فأعد كتابة ردك دون عرض التحويل وأكمل خدمته بنفسك بالأدوات.";
+    static final String MUST_CANCEL = "تنبيه داخلي لا يراه العميل: قلت إن الموعد أُلغي لكنك لم تستدعِ cancel_viewing. "
+            + "استدعها الآن بمعرّف الموعد ثم أعد كتابة ردك.";
 
     static final String NO_TOOL_TEXT = "تنبيه داخلي لا يراه العميل: كتبت استدعاء أداة كنص داخل الرد. "
             + "لا تكتب أسماء الأدوات أو صيغتها أبداً؛ استدعِ الأداة استدعاءً فعلياً ثم اكتب للعميل رداً عادياً فقط.";
@@ -93,6 +106,12 @@ public final class ReplyGuard {
         if (!searched && SEARCH_PROMISE.matcher(reply).find()) {
             return MUST_SEARCH;
         }
+        if (CANCEL_CLAIM.matcher(reply).find() && !toolsCalled.contains(AgentTools.CANCEL)) {
+            return MUST_CANCEL;
+        }
+        if (!handedOff && hasQuestionOffer(reply)) {
+            return OFFER_HANDOFF;
+        }
         if (!handedOff) {
             for (String sentence : reply.split("(?<=[.!؟?\\n])")) {
                 String s = sentence.trim();
@@ -102,6 +121,14 @@ public final class ReplyGuard {
             }
         }
         return null;
+    }
+
+    private static boolean hasQuestionOffer(String reply) {
+        for (String sentence : reply.split("(?<=[.!؟?\\n])")) {
+            String s = sentence.trim();
+            if ((s.endsWith("؟") || s.endsWith("?")) && HANDOFF_OFFER.matcher(s).find()) return true;
+        }
+        return false;
     }
 
     public static Set<String> licensesIn(String text) {

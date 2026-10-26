@@ -11,9 +11,9 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
-RUN adduser -S -u 10001 waslah
-COPY --from=build --chown=waslah /src/.next/standalone ./
-COPY --from=build --chown=waslah /src/.next/static ./.next/static
+RUN addgroup -S -g 10001 waslah && adduser -S -u 10001 -G waslah waslah
+COPY --from=build --chown=waslah:waslah /src/.next/standalone ./
+COPY --from=build --chown=waslah:waslah /src/.next/static ./.next/static
 USER waslah
 EXPOSE 3000
 CMD ["node", "server.js"]

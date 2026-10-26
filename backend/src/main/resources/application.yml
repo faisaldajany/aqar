@@ -14,6 +14,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/waslah}
     user: ${DB_OWNER_USER:waslah}
     password: ${DB_OWNER_PASSWORD:waslah}
+    # Used by db/migration/beforeMigrate.sql to create the runtime role on a fresh managed database (Cloud SQL).
+    placeholders:
+      app_password: ${DB_APP_PASSWORD:waslah_app}
   jackson:
     default-property-inclusion: non_null
   # Outgoing email (support form forwarding). Blank MAIL_HOST = messages are kept in the database only.
@@ -121,3 +124,7 @@ waslah:
     # Support form messages are forwarded here (Reply-To is the sender, so you can answer directly).
     forward-to: ${SUPPORT_FORWARD_TO:faisal@hidaaco.com}
     from: ${SUPPORT_FROM:no-reply@hidaaco.com}
+  jobs:
+    # internal = timers inside the app (single server); external = Cloud Scheduler calls /internal/jobs/* (Cloud Run).
+    scheduler: ${JOBS_SCHEDULER:internal}
+    token: ${JOBS_TOKEN:}

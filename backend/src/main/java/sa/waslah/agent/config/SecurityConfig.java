@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/public/**").permitAll()
+                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/public/**", "/internal/jobs/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(bearerTokenResolver())
@@ -46,7 +46,7 @@ public class SecurityConfig {
     BearerTokenResolver bearerTokenResolver() {
         return request -> {
             String path = request.getRequestURI();
-            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/") || path.startsWith("/api/public/")) {
+            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/") || path.startsWith("/api/public/") || path.startsWith("/internal/")) {
                 return null;
             }
             String header = request.getHeader("Authorization");

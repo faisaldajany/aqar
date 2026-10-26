@@ -73,6 +73,9 @@ With `BILLING_PROVIDER=mock` and `DEV_TOOLS=true`, the billing page "pays" with 
 
 ## Deploy
 
+Google Cloud Run with scale to zero (chosen): [docs/deploy-cloud-run.md](docs/deploy-cloud-run.md), one script: `deploy/cloudrun/setup.sh`.
+
+Alternative, 
 One VM in a Saudi region: `deploy/docker-compose.prod.yml` (Postgres, API, portal, Caddy with automatic
 TLS, nightly encrypted backups). Steps and every external account still needed: [docs/go-live.md](docs/go-live.md).
 

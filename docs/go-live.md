@@ -63,6 +63,9 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 ## 5. Hosting in Saudi Arabia — [blocker]
 
+Chosen: Google Cloud, Dammam (`me-central2`), Cloud Run with scale to zero. Step by step: [deploy-cloud-run.md](deploy-cloud-run.md).
+The single-VM option below (`deploy/docker-compose.prod.yml`) remains as an alternative.
+
 - [ ] Pick a provider with a Saudi region (e.g. Google Cloud Dammam, Oracle Cloud Jeddah/Riyadh,
       Alibaba Cloud Riyadh, STC Cloud). One VM (2 vCPU, 4 GB) is enough for the first ~50 offices.
 - [ ] Mailbox `faisal@hidaaco.com` (support form messages are forwarded there) and an SMTP sender for

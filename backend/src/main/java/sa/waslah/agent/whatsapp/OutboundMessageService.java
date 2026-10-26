@@ -51,6 +51,9 @@ public class OutboundMessageService {
             throw ApiException.conflict("window_closed",
                     "مضى أكثر من 24 ساعة على آخر رسالة من العميل، ولا يسمح واتساب إلا برسالة قالب معتمد.");
         }
+        if (ConversationStore.SANDBOX.equals(conv.waId())) {
+            return storeSandbox(conversationId, "text", text.trim(), sender, now);
+        }
         if (conv.waAccountId() == null) {
             throw ApiException.conflict("no_whatsapp", "لا يوجد رقم واتساب مربوط بهذه المحادثة.");
         }
@@ -80,12 +83,26 @@ public class OutboundMessageService {
         if (!window.isOpen(conv.lastInboundAt(), now)) {
             throw ApiException.conflict("window_closed", "انتهت نافذة 24 ساعة.");
         }
+        if (ConversationStore.SANDBOX.equals(conv.waId())) {
+            return storeSandbox(conversationId, type, description, Sender.AGENT, now);
+        }
         WaAccounts.Account account = accounts.byId(conv.waAccountId())
                 .orElseThrow(() -> ApiException.conflict("no_whatsapp", "رقم واتساب غير مربوط."));
         String wamid = send.apply(accounts.credentials(account), conv.waId());
         return tx.execute(s -> {
             UUID id = store.insertMessage(account.officeId(), conversationId, wamid, "OUT", Sender.AGENT, type,
                     description, null, "sent", now).orElseThrow();
+            store.touchOutbound(conversationId, now);
+            return id;
+        });
+    }
+
+    /** The office's test chat: store the reply as if sent; nothing goes to WhatsApp. */
+    private UUID storeSandbox(UUID conversationId, String type, String body, Sender sender, Instant now) {
+        UUID office = sa.waslah.agent.tenant.TenantContext.require();
+        return tx.execute(s -> {
+            UUID id = store.insertMessage(office, conversationId, "sandbox-" + UUID.randomUUID(), "OUT", sender, type,
+                    body, null, "sent", now).orElseThrow();
             store.touchOutbound(conversationId, now);
             return id;
         });

@@ -32,6 +32,9 @@ public class ConversationStore {
     }
 
     /** Far-future pause used when an office takes over a conversation from the portal. */
+    /** WhatsApp id of the office's own test chat ("جرّب الوكيل"): replies are stored, never sent to WhatsApp. */
+    public static final String SANDBOX = "sandbox";
+
     public static final Instant TAKEN_OVER = Instant.parse("2999-01-01T00:00:00Z");
 
     private final JdbcClient jdbc;

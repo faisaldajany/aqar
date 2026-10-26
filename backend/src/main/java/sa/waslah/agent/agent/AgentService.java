@@ -322,7 +322,8 @@ public class AgentService {
 
     private void alertMarketer(ConversationStore.ConversationRef conv, MarketerStore.Marketer m, String customer, String summary) {
         String template = props.agent().handoffTemplate();
-        if (template == null || template.isBlank() || conv.waAccountId() == null) {
+        if (template == null || template.isBlank() || conv.waAccountId() == null
+                || ConversationStore.SANDBOX.equals(conv.waId())) {
             return;
         }
         try {

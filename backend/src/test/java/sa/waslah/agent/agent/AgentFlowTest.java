@@ -38,6 +38,7 @@ class AgentFlowTest extends IntegrationTest {
     @Autowired Llm.Client llm;
     @Autowired WhatsAppClient whatsapp;
     @Autowired JdbcClient jdbc;
+    @Autowired sa.waslah.agent.conversation.SandboxController sandbox;
 
     UUID office;
     String phoneNumberId;
@@ -178,6 +179,22 @@ class AgentFlowTest extends IntegrationTest {
                 "select kind from office_alerts where kind = 'AGENT_STOPPED'").query(String.class).optional().orElse(null)));
         assertThat(alert).isEqualTo("AGENT_STOPPED");
         assertThat(lastSentText()).isNull();
+    }
+
+    @Test
+    void sandboxChatGetsAgentRepliesWithoutWhatsApp() throws Exception {
+        ((ScriptedLlmClient) llm).thenText("هلا بك، أنا المساعد الآلي للمكتب. وش تدور؟");
+        TenantContext.run(office, () -> sandbox.send(new sa.waslah.agent.conversation.SandboxController.Send("السلام عليكم")));
+        String reply = await(() -> TenantContext.call(office, () -> jdbc.sql("""
+                select m.body from messages m join conversations c on c.id = m.conversation_id
+                join contacts k on k.id = c.contact_id where k.wa_id = 'sandbox' and m.sender = 'AGENT'""")
+                .query(String.class).optional().orElse(null)));
+        assertThat(reply).contains("المساعد الآلي");
+        assertThat(((MockWhatsAppClient) whatsapp).sent()).as("nothing sent to WhatsApp").isEmpty();
+
+        TenantContext.run(office, () -> sandbox.reset());
+        assertThat(TenantContext.call(office, () -> jdbc.sql(
+                "select count(*) from contacts where wa_id = 'sandbox'").query(Integer.class).single())).isZero();
     }
 
     private void inbound(String wamid, String text) throws Exception {

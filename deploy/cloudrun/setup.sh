@@ -17,8 +17,20 @@ PORTAL="hidaa-portal"
 SA="hidaa-run"
 
 [ -n "$PROJECT_ID" ] || { echo "Set the project first: gcloud config set project <id>"; exit 1; }
+if ! gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
+  echo "Project '$PROJECT_ID' not found for $(gcloud config get-value account 2>/dev/null)."
+  echo "Use the project ID (not the display name). Your projects:"
+  gcloud projects list --format='table(projectId,name)'
+  exit 1
+fi
+if [ "$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingEnabled)' 2>/dev/null)" != "True" ]; then
+  echo "Billing is not enabled on $PROJECT_ID. Link it:"
+  echo "  gcloud billing accounts list"
+  echo "  gcloud billing projects link $PROJECT_ID --billing-account=<ACCOUNT_ID>"
+  exit 1
+fi
 echo "Project $PROJECT_ID · region $REGION · domain $DOMAIN"
-gcloud config set project "$PROJECT_ID" >/dev/null
+gcloud config set project "$PROJECT_ID" --quiet >/dev/null 2>&1
 IMG="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
 SA_EMAIL="$SA@$PROJECT_ID.iam.gserviceaccount.com"
 

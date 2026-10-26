@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { MessageBody } from "@/components/MessageBody";
 import { api, ApiError, fmt, PURPOSE_LABELS, riyadhDay, riyadhTime, TEMP_LABELS, timeAr, windowOpen, type Conversation, type ConversationDetails, type Marketer, type Message } from "@/lib/api";
 
 const WHO: Record<Message["sender"], string> = { CUSTOMER: "العميل", AGENT: "الوكيل", HUMAN: "المكتب", SYSTEM: "النظام" };
@@ -97,7 +98,7 @@ function Inbox() {
                 {messages.map((m) => (
                   <div key={m.id} className={`msg m-${m.sender}`}>
                     <span className="who">{WHO[m.sender]}</span>
-                    {m.body ?? (m.type === "audio" ? "رسالة صوتية" : `[${m.type}]`)}
+                    <MessageBody m={m} />
                     <time>{timeAr(m.createdAt)}</time>
                   </div>
                 ))}

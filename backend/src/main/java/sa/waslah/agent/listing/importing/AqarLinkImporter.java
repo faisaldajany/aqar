@@ -39,7 +39,15 @@ public class AqarLinkImporter {
 
     static final Set<String> HOSTS = Set.of("sa.aqar.fm", "aqar.fm", "www.aqar.fm");
     private static final Pattern LICENSE = Pattern.compile("(?<!\\d)7\\d{9}(?!\\d)");
-    private static final int MAX_TEXT = 12_000;
+    private static final int MAX_TEXT = 30_000;
+    /** Labels that sit next to the ad license on Aqar pages, in visible text or the page's embedded data. */
+    private static final Pattern LICENSE_LABEL = Pattern.compile(
+            "ترخيص|رخصة الإعلان|رخصة الاعلان|license|advertis|rega", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXPIRY_LABEL = Pattern.compile("انتهاء|ينتهي|expir|end_date|endDate", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DATE = Pattern.compile(
+            "(\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/]\\d{4})");
+    private static final Pattern IMAGE = Pattern.compile(
+            "https://[^\"'\\s<>()]+?\\.(?:jpe?g|png|webp)(?:\\?[^\"'\\s<>()]*)?", Pattern.CASE_INSENSITIVE);
 
     private static final String INSTRUCTION = """
             You extract one Saudi real-estate listing from the text of its web page.
@@ -73,7 +81,12 @@ public class AqarLinkImporter {
             text.append(s.data()).append('\n');
         }
         text.append(doc.body() == null ? "" : doc.body().text());
-        String pageText = ListingRowParser.westernDigits(text.toString());
+        // Aqar renders much of the listing from data embedded in scripts, so also scan the raw page.
+        String raw = ListingRowParser.westernDigits(html.replace("\\/", "/").replace("\\u002F", "/"));
+        StringBuilder near = new StringBuilder();
+        for (String snippet : around(raw, LICENSE_LABEL, 160)) near.append(snippet).append('\n');
+        for (String snippet : around(raw, EXPIRY_LABEL, 120)) near.append(snippet).append('\n');
+        String pageText = ListingRowParser.westernDigits(near + "\n" + text);
         if (pageText.length() > MAX_TEXT) pageText = pageText.substring(0, MAX_TEXT);
 
         JsonNode x;
@@ -85,19 +98,23 @@ public class AqarLinkImporter {
 
         List<String> warnings = new ArrayList<>();
         Set<String> licensesOnPage = new LinkedHashSet<>();
-        Matcher lm = LICENSE.matcher(pageText);
+        Matcher lm = LICENSE.matcher(raw);
         while (lm.find()) licensesOnPage.add(lm.group());
+        List<String> labelled = licensesNearLabel(raw);
 
         String license = ListingRowParser.digits(text(x, "ad_license"));
         if (!license.isEmpty() && !licensesOnPage.contains(license)) {
             warnings.add("رقم الترخيص المستخرج غير موجود في الصفحة، فلم يُعتمد.");
             license = "";
         }
-        if (license.isEmpty() && licensesOnPage.size() == 1) {
+        if (license.isEmpty() && labelled.size() == 1) {
+            license = labelled.get(0);
+        } else if (license.isEmpty() && licensesOnPage.size() == 1) {
             license = licensesOnPage.iterator().next();
         }
 
         LocalDate expiry = ListingRowParser.date(text(x, "license_expiry"));
+        if (expiry == null) expiry = expiryNearLabel(raw);
         if (expiry != null && expiry.isBefore(LocalDate.now(ZoneId.of("Asia/Riyadh")))) {
             warnings.add("ترخيص الإعلان منتهٍ؛ لن يعرضه الوكيل حتى التجديد.");
         }
@@ -112,11 +129,7 @@ public class AqarLinkImporter {
             lng = null;
         }
 
-        List<String> photos = new ArrayList<>();
-        for (Element m : doc.select("meta[property=og:image]")) {
-            String u = m.absUrl("content");
-            if (u.startsWith("https://") && photos.size() < 10) photos.add(u);
-        }
+        List<String> photos = photos(doc, raw);
 
         ListingInput in = new ListingInput(
                 emptyToNull(text(x, "title")),
@@ -133,6 +146,64 @@ public class AqarLinkImporter {
         if (in.adLicense() == null) missing.add("رقم ترخيص الإعلان");
         if (in.licenseExpiry() == null) missing.add("تاريخ انتهاء الترخيص");
         return new Draft(in, warnings, missing);
+    }
+
+    /** Listing photos: og:image first, then image files on Aqar's own hosts found anywhere in the page. */
+    static List<String> photos(Document doc, String raw) {
+        Set<String> out = new LinkedHashSet<>();
+        Set<String> seen = new java.util.HashSet<>();
+        List<String> found = new ArrayList<>();
+        for (Element m : doc.select("meta[property=og:image]")) found.add(m.absUrl("content"));
+        Matcher im = IMAGE.matcher(raw);
+        while (im.find()) found.add(im.group());
+        for (String u : found) {
+            if (!u.startsWith("https://")) continue;
+            String host;
+            try {
+                host = URI.create(u.split("\\?")[0].replace(" ", "%20")).getHost();
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+            String lower = u.toLowerCase(Locale.ROOT);
+            if (host == null || !host.contains("aqar")) continue;
+            if (lower.matches(".*(logo|icon|avatar|sprite|placeholder|banner|badge|app-?store|google-?play).*")) continue;
+            String key = u.split("\\?")[0].replaceAll("/(\\d{2,4}x\\d{2,4}|w_\\d+|thumb|small|medium|large)/", "/");
+            if (seen.add(key)) out.add(u);
+            if (out.size() >= 10) break;
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** 7xxxxxxxxx numbers that appear within a short distance after a license label. */
+    static List<String> licensesNearLabel(String raw) {
+        Set<String> out = new LinkedHashSet<>();
+        for (String snippet : around(raw, LICENSE_LABEL, 160)) {
+            Matcher m = LICENSE.matcher(snippet);
+            while (m.find()) out.add(m.group());
+        }
+        return new ArrayList<>(out);
+    }
+
+    static LocalDate expiryNearLabel(String raw) {
+        for (String snippet : around(raw, EXPIRY_LABEL, 120)) {
+            Matcher m = DATE.matcher(snippet);
+            while (m.find()) {
+                LocalDate d = ListingRowParser.date(m.group());
+                if (d != null && d.getYear() > 2020 && d.getYear() < 2100) return d;
+            }
+        }
+        return null;
+    }
+
+    /** Text following each label match, tags stripped, at most 40 snippets. */
+    static List<String> around(String raw, Pattern label, int after) {
+        List<String> out = new ArrayList<>();
+        Matcher m = label.matcher(raw);
+        while (m.find() && out.size() < 40) {
+            int end = Math.min(raw.length(), m.end() + after);
+            out.add(raw.substring(m.start(), end).replaceAll("<[^>]*>", " ").replaceAll("\\s+", " "));
+        }
+        return out;
     }
 
     static URI validate(String raw) {

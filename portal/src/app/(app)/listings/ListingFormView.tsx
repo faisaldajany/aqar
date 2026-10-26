@@ -104,7 +104,7 @@ export default function ListingFormView({ id, initial, onDone }: { id?: string; 
           <div className="grid3" style={{ marginTop: 6 }}>
             {(["LOCK", "GUARD", "KEY"] as const).map((m) => (
               <div key={m}>
-                <label className="row small"><input type="checkbox" checked={access.methods.includes(m)}
+                <label className="check"><input type="checkbox" checked={access.methods.includes(m)}
                   onChange={(e) => setAccess({ ...access, methods: e.target.checked ? [...access.methods, m] : access.methods.filter((x) => x !== m) })} />{ACCESS_LABELS[m]}</label>
                 <input type="text" aria-label={`تفاصيل ${ACCESS_LABELS[m]}`}
                   placeholder={m === "LOCK" ? "مثل: قفل على الباب الرئيسي" : m === "GUARD" ? "اسم الحارس أو المالك ورقمه" : "مكان استلام المفتاح"}

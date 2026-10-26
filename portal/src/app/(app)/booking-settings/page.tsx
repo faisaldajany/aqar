@@ -56,7 +56,7 @@ export default function BookingSettingsPage() {
           <h2>المعاينة مع مسوّق</h2>
           <div className="row">
             {DAY_NAMES.map((d, i) => (
-              <label key={d} className="row small" style={{ gap: 4 }}>
+              <label key={d} className="check">
                 <input type="checkbox" checked={s.days.includes(i)} onChange={(e) => set("days", e.target.checked ? [...s.days, i].sort() : s.days.filter((x) => x !== i))} />{d}
               </label>
             ))}
@@ -69,14 +69,14 @@ export default function BookingSettingsPage() {
             <label className="f" htmlFor="lead">أقرب موعد بعد (دقيقة)<input id="lead" type="number" min={0} step={15} value={s.minLeadMinutes} onChange={(e) => set("minLeadMinutes", Number(e.target.value))} /></label>
             <label className="f" htmlFor="rem">التذكير قبل (دقيقة)<input id="rem" type="number" min={15} step={15} value={s.reminderMinutes} onChange={(e) => set("reminderMinutes", Number(e.target.value))} /></label>
           </div>
-          <label className="row small"><input type="checkbox" checked={s.followUpEnabled} onChange={(e) => set("followUpEnabled", e.target.checked)} />سؤال العميل عن انطباعه بعد الموعد بساعة</label>
+          <label className="check"><input type="checkbox" checked={s.followUpEnabled} onChange={(e) => set("followUpEnabled", e.target.checked)} />سؤال العميل عن انطباعه بعد الموعد بساعة</label>
         </div>
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <h2>الزيارة الذاتية</h2>
-          <label className="row small"><input type="checkbox" checked={s.selfVisitEnabled} onChange={(e) => set("selfVisitEnabled", e.target.checked)} />السماح بالزيارة الذاتية</label>
-          <label className="row small"><input type="checkbox" checked={s.selfVisitRequiresApproval} onChange={(e) => set("selfVisitRequiresApproval", e.target.checked)} />كل زيارة تنتظر موافقتي (ننصح بإبقائها)</label>
-          <label className="row small"><input type="checkbox" checked={s.selfVacantOnly} onChange={(e) => set("selfVacantOnly", e.target.checked)} />للعقارات الشاغرة فقط</label>
-          <label className="row small"><input type="checkbox" checked={s.selfQualifiedOnly} onChange={(e) => set("selfQualifiedOnly", e.target.checked)} />بعد معرفة ميزانية العميل وطريقة دفعه</label>
+          <label className="check"><input type="checkbox" checked={s.selfVisitEnabled} onChange={(e) => set("selfVisitEnabled", e.target.checked)} />السماح بالزيارة الذاتية</label>
+          <label className="check"><input type="checkbox" checked={s.selfVisitRequiresApproval} onChange={(e) => set("selfVisitRequiresApproval", e.target.checked)} />كل زيارة تنتظر موافقتي (ننصح بإبقائها)</label>
+          <label className="check"><input type="checkbox" checked={s.selfVacantOnly} onChange={(e) => set("selfVacantOnly", e.target.checked)} />للعقارات الشاغرة فقط</label>
+          <label className="check"><input type="checkbox" checked={s.selfQualifiedOnly} onChange={(e) => set("selfQualifiedOnly", e.target.checked)} />بعد معرفة ميزانية العميل وطريقة دفعه</label>
           <div className="grid2">
             <label className="f" htmlFor="sst">من<input id="sst" type="time" value={s.selfStartTime} onChange={(e) => set("selfStartTime", e.target.value)} /></label>
             <label className="f" htmlFor="set">إلى<input id="set" type="time" value={s.selfEndTime} onChange={(e) => set("selfEndTime", e.target.value)} /></label>

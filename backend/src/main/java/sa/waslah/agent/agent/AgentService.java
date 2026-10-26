@@ -241,19 +241,19 @@ public class AgentService {
         try {
             boolean pin = false;
             if (l.hasLocation()) {
-                outbound.sendMedia(conversationId, "location", l.title() + " · " + l.district(),
-                        (cred, to) -> outbound.client().sendLocation(cred, to, l.latitude(), l.longitude(), l.title(), "حي " + l.district()));
+                outbound.sendMedia(conversationId, "location", "موقع " + l.title() + "، حي " + l.district(),
+                        "geo:" + l.latitude() + "," + l.longitude(), (cred, to) -> outbound.client().sendLocation(cred, to, l.latitude(), l.longitude(), l.title(), "حي " + l.district()));
                 pin = true;
             }
             int photos = 0;
             for (ListingStore.Photo p : listings.photos(l.id(), 3)) {
-                outbound.sendMedia(conversationId, "image", l.title(), (cred, to) ->
+                outbound.sendMedia(conversationId, "image", l.title(), "/api/listings/" + l.id() + "/photos/" + p.id(), (cred, to) ->
                         outbound.client().sendImageId(cred, to, outbound.client().uploadMedia(cred, p.bytes(), p.contentType()), null));
                 photos++;
             }
             for (String url : l.photoUrls()) {
                 if (photos >= 3) break;
-                outbound.sendMedia(conversationId, "image", l.title(), (cred, to) -> outbound.client().sendImageLink(cred, to, url, null));
+                outbound.sendMedia(conversationId, "image", l.title(), url, (cred, to) -> outbound.client().sendImageLink(cred, to, url, null));
                 photos++;
             }
             out.put("sent_location", pin);

@@ -48,7 +48,7 @@ export default function SettingsPage() {
         <h2>المكتب</h2>
         <div className="grid2">
           <label className="f" htmlFor="name">اسم المكتب كما يظهر للعملاء<input id="name" type="text" required value={s.name} onChange={(e) => set("name", e.target.value)} /></label>
-          <label className="f" htmlFor="fal">رقم رخصة فال <span className={`pill ${FAL[s.falStatus][1]}`}>{FAL[s.falStatus][0]}</span>
+          <label className="f" htmlFor="fal"><span className="lbl">رقم رخصة فال <span className={`pill ${FAL[s.falStatus][1]}`}>{FAL[s.falStatus][0]}</span></span>
             <input id="fal" type="text" inputMode="numeric" className="mono" required value={s.falLicense} onChange={(e) => set("falLicense", e.target.value)} /></label>
         </div>
         {s.falStatus === "REJECTED" && s.falNote && <p className="err small">{s.falNote}</p>}
@@ -60,7 +60,7 @@ export default function SettingsPage() {
             <select id="hour" value={s.reportHour} onChange={(e) => set("reportHour", Number(e.target.value))}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${String(h).padStart(2, "0")}:00`}</option>)}
             </select></label>
-          <label className="row small" style={{ alignSelf: "end" }}><input type="checkbox" checked={s.reportEnabled} onChange={(e) => set("reportEnabled", e.target.checked)} />أرسل التقرير يومياً</label>
+          <label className="check"><input type="checkbox" checked={s.reportEnabled} onChange={(e) => set("reportEnabled", e.target.checked)} />أرسل التقرير يومياً</label>
         </div>
         <div className="row">
           <button className="btn primary">حفظ</button>

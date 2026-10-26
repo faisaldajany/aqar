@@ -52,7 +52,7 @@ public class OutboundMessageService {
                     "مضى أكثر من 24 ساعة على آخر رسالة من العميل، ولا يسمح واتساب إلا برسالة قالب معتمد.");
         }
         if (ConversationStore.SANDBOX.equals(conv.waId())) {
-            return storeSandbox(conversationId, "text", text.trim(), sender, now);
+            return storeSandbox(conversationId, "text", text.trim(), null, sender, now);
         }
         if (conv.waAccountId() == null) {
             throw ApiException.conflict("no_whatsapp", "لا يوجد رقم واتساب مربوط بهذه المحادثة.");
@@ -77,6 +77,12 @@ public class OutboundMessageService {
     /** Sends a non-text message (map pin or image) from the agent, inside the 24-hour window. */
     public UUID sendMedia(UUID conversationId, String type, String description,
                           java.util.function.BiFunction<WhatsAppClient.Credentials, String, String> send) {
+        return sendMedia(conversationId, type, description, null, send);
+    }
+
+    /** @param mediaRef what the portal shows for it: an image URL or path, or "geo:lat,lng" for a location */
+    public UUID sendMedia(UUID conversationId, String type, String description, String mediaRef,
+                          java.util.function.BiFunction<WhatsAppClient.Credentials, String, String> send) {
         Instant now = clock.instant();
         ConversationStore.ConversationRef conv = store.find(conversationId)
                 .orElseThrow(() -> ApiException.notFound("no_conversation", "المحادثة غير موجودة."));
@@ -84,25 +90,25 @@ public class OutboundMessageService {
             throw ApiException.conflict("window_closed", "انتهت نافذة 24 ساعة.");
         }
         if (ConversationStore.SANDBOX.equals(conv.waId())) {
-            return storeSandbox(conversationId, type, description, Sender.AGENT, now);
+            return storeSandbox(conversationId, type, description, mediaRef, Sender.AGENT, now);
         }
         WaAccounts.Account account = accounts.byId(conv.waAccountId())
                 .orElseThrow(() -> ApiException.conflict("no_whatsapp", "رقم واتساب غير مربوط."));
         String wamid = send.apply(accounts.credentials(account), conv.waId());
         return tx.execute(s -> {
             UUID id = store.insertMessage(account.officeId(), conversationId, wamid, "OUT", Sender.AGENT, type,
-                    description, null, "sent", now).orElseThrow();
+                    description, mediaRef, "sent", now).orElseThrow();
             store.touchOutbound(conversationId, now);
             return id;
         });
     }
 
     /** The office's test chat: store the reply as if sent; nothing goes to WhatsApp. */
-    private UUID storeSandbox(UUID conversationId, String type, String body, Sender sender, Instant now) {
+    private UUID storeSandbox(UUID conversationId, String type, String body, String mediaRef, Sender sender, Instant now) {
         UUID office = sa.waslah.agent.tenant.TenantContext.require();
         return tx.execute(s -> {
             UUID id = store.insertMessage(office, conversationId, "sandbox-" + UUID.randomUUID(), "OUT", sender, type,
-                    body, null, "sent", now).orElseThrow();
+                    body, mediaRef, "sent", now).orElseThrow();
             store.touchOutbound(conversationId, now);
             return id;
         });

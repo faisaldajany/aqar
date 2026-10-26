@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { MessageBody } from "@/components/MessageBody";
 import { api, ApiError, timeAr, type Message } from "@/lib/api";
 
 const SUGGESTIONS = [
@@ -80,7 +81,7 @@ export default function TryAgentPage() {
           {messages.map((m) => (
             <div key={m.id} className={`msg m-${m.sender}`}>
               <span className="who">{m.sender === "CUSTOMER" ? "أنت (العميل)" : m.sender === "AGENT" ? "الوكيل" : "المكتب"}</span>
-              {m.body}
+              <MessageBody m={m} />
               <time>{timeAr(m.createdAt)}</time>
             </div>
           ))}

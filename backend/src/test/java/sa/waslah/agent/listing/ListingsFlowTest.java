@@ -155,6 +155,26 @@ class ListingsFlowTest extends IntegrationTest {
     }
 
     @Test
+    void aqarDraftFindsLicenseAndPhotosInEmbeddedPageData() {
+        FakePages.html = """
+                <html><head><title>شقة للبيع في حي الملقا</title>
+                <meta property="og:image" content="https://images.aqar.fm/listing/main.jpg"></head>
+                <body><div id="app"></div>
+                <script id="__NEXT_DATA__" type="application/json">{"props":{"listing":{"price":1600000,
+                "rega":{"advertisementLicenseNumber":"7100293425","licenseEndDate":"2027-04-30"},
+                "imgs":["https:\\/\\/images.aqar.fm\\/listing\\/a.jpg","https:\\/\\/images.aqar.fm\\/listing\\/b.webp?w=800"],
+                "brokerLogo":"https://images.aqar.fm/logos/office.png","falLicense":"1100012345"}}}</script>
+                </body></html>""";
+        ((ScriptedLlmClient) llm).thenExtract("{\"title\":\"شقة للبيع\",\"district\":\"الملقا\",\"property_type\":\"شقة\",\"purpose\":\"SALE\",\"price\":1600000}");
+        AqarLinkImporter.Draft d = TenantContext.call(office, () -> aqar.draft("https://sa.aqar.fm/ad/456"));
+        assertThat(d.listing().adLicense()).isEqualTo("7100293425");
+        assertThat(d.listing().licenseExpiry()).isEqualTo(java.time.LocalDate.of(2027, 4, 30));
+        assertThat(d.listing().photoUrls()).containsExactly(
+                "https://images.aqar.fm/listing/main.jpg", "https://images.aqar.fm/listing/a.jpg",
+                "https://images.aqar.fm/listing/b.webp?w=800");
+    }
+
+    @Test
     void aqarRejectsOtherSites() {
         try {
             aqar.draft("https://example.com/ad/1");

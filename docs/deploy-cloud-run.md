@@ -72,7 +72,7 @@ Put keys in Secret Manager, not plain variables.
 
 Example for one secret:
 ```bash
-printf '%s' 'sk_test_...' | gcloud secrets create moyasar-secret-key --replication-policy=user-managed --locations=me-central2 --data-file=-
+printf '%s' 'sk_test_...' | gcloud secrets create moyasar-secret-key --replication-policy=automatic --data-file=-
 gcloud run services update hidaa-api --region me-central2 \
   --update-secrets MOYASAR_SECRET_KEY=moyasar-secret-key:latest --update-env-vars BILLING_PROVIDER=moyasar
 ```
@@ -93,7 +93,7 @@ Existing resources are kept; only the images are rebuilt and redeployed. Databas
 - **CPU always allocated** on the API so an agent reply finishes after WhatsApp's webhook is acknowledged.
   Billing is per instance-second while an instance is up; it still shuts down when idle.
 - **Backups**: Cloud SQL daily backups (14 kept) and point-in-time recovery. Restore from Cloud SQL → Backups.
-- **Data location**: Cloud Run, Cloud SQL, secrets and images are in `me-central2`. The global load balancer
+- **Data location**: Cloud Run, Cloud SQL and images are in `me-central2`. Secret Manager does not offer `me-central2`, so the secrets (keys and passwords, no customer data) use automatic replication. The global load balancer
   terminates TLS at Google's nearest edge; for strict in-Kingdom termination, switch to a regional external
   load balancer in `me-central2` later (needs a proxy-only subnet and a Certificate Manager certificate).
 - **Cloud Scheduler region**: if `me-central2` is not offered, run `SCHEDULER_REGION=europe-west1 bash deploy/cloudrun/setup.sh`

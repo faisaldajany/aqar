@@ -45,7 +45,7 @@ gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregist
 step "2/9 Secrets (generated once; Gemini key asked once)"
 secret() { # name value
   if exists gcloud secrets describe "$1"; then return; fi
-  printf '%s' "$2" | gcloud secrets create "$1" --replication-policy=user-managed --locations="$REGION" --data-file=-
+  printf '%s' "$2" | gcloud secrets create "$1" --replication-policy=automatic --data-file=-
 }
 secret db-owner-password "$(rand 18)"
 secret db-app-password "$(rand 18)"

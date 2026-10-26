@@ -133,7 +133,7 @@ public class DailyReport {
         t.append("• حُوّلوا لمسوّق: ").append(handoffs).append('\n');
         t.append("• رسائل بعد الدوام ردّ عليها الوكيل: ").append(afterHours).append('\n');
         if (pending > 0) t.append("• زيارات ذاتية بانتظار موافقتك: ").append(pending).append('\n');
-        t.append("• الردود هذا الشهر: ").append(u.replies()).append(" من ").append(u.includedReplies());
+        t.append("• المحادثات هذا الشهر: ").append(u.conversations()).append(" من ").append(u.included());
         return new Report(date, t.toString(),
                 List.of(office, day, String.valueOf(inquiries), String.valueOf(qualified), String.valueOf(booked),
                         String.valueOf(tomorrow), String.valueOf(handoffs), String.valueOf(afterHours)),

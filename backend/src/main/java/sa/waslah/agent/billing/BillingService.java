@@ -90,15 +90,15 @@ public class BillingService {
     public Optional<Invoice> overage(UUID officeId, LocalDate monthStart) {
         LocalDate next = monthStart.plusMonths(1);
         PlanLimits.Usage u = plans.usageBetween(monthStart, next);
-        if (u.overageReplies() <= 0) return Optional.empty();
+        if (u.overage() <= 0) return Optional.empty();
         boolean exists = jdbc.sql("select exists(select 1 from invoices where kind = 'OVERAGE' and period_start = ?)")
                 .param(java.sql.Date.valueOf(monthStart)).query(Boolean.class).single();
         if (exists) return Optional.empty();
-        String desc = "ردود إضافية لشهر " + monthStart.toString().substring(0, 7) + ": " + u.overageReplies() + " رد × "
-                + u.plan().overagePerReplySar.multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + " هللة";
+        String desc = "محادثات إضافية لشهر " + monthStart.toString().substring(0, 7) + ": " + u.overage() + " محادثة × "
+                + u.plan().overagePerConversationSar.stripTrailingZeros().toPlainString() + " ريال";
         Invoice inv = create(officeId, "OVERAGE", u.plan().name(), null, desc, monthStart, next.minusDays(1),
                 halalas(u.overageSar()), true);
-        alerts.raise(officeId, "INVOICE_DUE", inv.id(), "فاتورة الردود الإضافية لشهر " + monthStart.toString().substring(0, 7)
+        alerts.raise(officeId, "INVOICE_DUE", inv.id(), "فاتورة المحادثات الإضافية لشهر " + monthStart.toString().substring(0, 7)
                 + " جاهزة: " + sar(inv.totalHalalas()) + " ريال شامل الضريبة.", "invoice-" + inv.id());
         return Optional.of(inv);
     }

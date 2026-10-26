@@ -58,9 +58,16 @@ public class BillingController {
         out.put("mockPayments", !props.moyasar() && app.devToolsEnabled());
         List<Map<String, Object>> list = new ArrayList<>();
         for (PlanLimits.Plan p : PlanLimits.Plan.values()) {
-            list.add(Map.of("id", p.name(), "name", p.arabicName, "monthlySar", p.monthlySar, "annualSar", p.annualSar,
-                    "includedReplies", p.includedReplies, "marketers", p.marketers,
-                    "overageHalalas", p.overagePerReplySar.movePointRight(2).intValue()));
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", p.name());
+            m.put("name", p.arabicName);
+            m.put("monthlySar", p.monthlySar);
+            m.put("annualSar", p.annualSar);
+            m.put("includedConversations", p.includedConversations);
+            m.put("marketers", p.marketers);
+            m.put("whatsappNumbers", p.whatsappNumbers);
+            m.put("overageSar", p.overagePerConversationSar);
+            list.add(m);
         }
         out.put("plans", list);
         return out;

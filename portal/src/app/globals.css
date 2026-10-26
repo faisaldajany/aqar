@@ -195,3 +195,12 @@ a.btn, a.pill, .brand { text-decoration: none; }
 .msgmedia figcaption { font-size: .82rem; color: var(--muted); }
 .msgloc { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); text-decoration: none; margin-top: 4px; }
 .msgloc:hover { border-color: var(--ink); }
+
+/* legal pages */
+.legal { max-width: 760px; margin-inline: auto; padding: 24px 16px 64px; }
+.legal header { padding-block: 8px 24px; }
+.legal header a { text-decoration: none; }
+.legal h1 { font-size: 1.9rem; margin-bottom: 4px; }
+.legal h2 { font-size: 1.15rem; margin-top: 28px; margin-bottom: 6px; }
+.legal p, .legal li { line-height: 1.95; }
+.legal ul { padding-inline-start: 20px; }

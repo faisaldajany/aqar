@@ -51,10 +51,10 @@ public class OfficeController {
                 "plan", u.plan().name(),
                 "planName", u.plan().arabicName,
                 "periodStart", u.periodStart().toString(),
-                "replies", u.replies(),
-                "included", u.includedReplies(),
+                "conversations", u.conversations(),
+                "included", u.included(),
                 "percent", u.percent(),
-                "overageReplies", u.overageReplies(),
+                "overage", u.overage(),
                 "overageSar", u.overageSar(),
                 "marketersLimit", u.plan().marketers);
     }

@@ -61,7 +61,7 @@ function BillingView() {
         <button className={`btn${cycle === "ANNUAL" ? " primary" : ""}`} role="radio" aria-checked={cycle === "ANNUAL"} onClick={() => setCycle("ANNUAL")}>سنوي (شهران مجاناً)</button>
       </div>
       {error && <p className="err" role="alert">{error}</p>}
-      <div className="grid2" style={{ marginTop: 12 }}>
+      <div className="grid3" style={{ marginTop: 12 }}>
         {b.plans.map((p) => {
           const price = cycle === "ANNUAL" ? p.annualSar : p.monthlySar;
           const current = b.plan === p.id && b.status === "ACTIVE" && b.cycle === cycle;
@@ -70,10 +70,11 @@ function BillingView() {
               <h2>{p.name}</h2>
               <p><b style={{ fontSize: 28 }}>{fmt(price)}</b> ريال {cycle === "ANNUAL" ? "سنوياً" : "شهرياً"} <span className="small muted">+ ضريبة {b.vatPercent}٪</span></p>
               <ul className="small" style={{ margin: 0, paddingInlineStart: 18 }}>
-                <li>{fmt(p.includedReplies)} رد آلي شهرياً</li>
-                <li>حتى {p.marketers} مسوّقين</li>
-                <li>الرد الإضافي {p.overageHalalas} هللة، بلا إيقاف للخدمة</li>
-                <li>بلا رسوم تأسيس</li>
+                <li>{fmt(p.includedConversations)} محادثة بالشهر</li>
+                <li>بعد الحد: {p.overageSar == null ? "يحول لك المحادثات الجديدة" : `${p.overageSar} ريال للمحادثة`}</li>
+                <li>{p.marketers === 1 ? "موظف واحد يستلم العملاء" : `حتى ${p.marketers} موظفين يستلمون العملاء`}</li>
+                <li>حجز المعاينة والتذكير، وتقرير يومي على جوالك</li>
+                <li>بلا رسوم تأسيس وبلا عقد</li>
               </ul>
               <button className="btn primary" disabled={!!busy || current} onClick={() => choose(p.id)}>
                 {current ? "باقتك الحالية" : busy === p.id ? "جارٍ فتح صفحة الدفع…" : "اشترك"}
@@ -82,6 +83,7 @@ function BillingView() {
           );
         })}
       </div>
+      <p className="small muted">المحادثة: كل عميل يرد عليه حداء خلال 24 ساعة تُحسب محادثة واحدة مهما كان عدد الرسائل.</p>
       <p className="small muted">الدفع عبر صفحة ميسّر الآمنة (مدى، فيزا، ماستركارد، Apple Pay). لا نحفظ بيانات بطاقتك.</p>
 
       <div className="card">

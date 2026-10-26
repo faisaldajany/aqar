@@ -94,7 +94,7 @@ class BillingFlowTest extends IntegrationTest {
         assertThatThrownBy(() -> TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.BASIC, "MONTHLY")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("مسوّقين");
         assertThat(TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "ANNUAL")).subtotalHalalas())
-                .isEqualTo(1_000_000);
+                .isEqualTo(999_000);
     }
 
     @Test
@@ -143,13 +143,13 @@ class BillingFlowTest extends IntegrationTest {
         TenantContext.run(office, () -> {
             UUID conv = jdbc.sql("select id from conversations").query(UUID.class).single();
             jdbc.sql("""
-                    insert into agent_runs (office_id, conversation_id, model, outcome, created_at)
-                    select ?, ?, 'x', 'replied', ? from generate_series(1, 10005)""")
+                    insert into agent_sessions (office_id, conversation_id, started_at)
+                    select ?, ?, ? from generate_series(1, 505)""")
                     .params(office, conv, java.sql.Timestamp.from(mid)).update();
         });
         BillingService.Invoice inv = TenantContext.call(office, () -> billing.overage(office, lastMonth)).orElseThrow();
-        assertThat(inv.subtotalHalalas()).isEqualTo(60);   // 5 replies × 12 halalas
-        assertThat(inv.totalHalalas()).isEqualTo(69);
+        assertThat(inv.subtotalHalalas()).isEqualTo(250);   // 5 conversations × 0.50 SAR
+        assertThat(inv.totalHalalas()).isEqualTo(288);
         assertThat(TenantContext.call(office, () -> billing.overage(office, lastMonth))).isEmpty();
         assertThat(kinds()).contains("INVOICE_DUE");
     }

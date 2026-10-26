@@ -182,6 +182,38 @@ class AgentFlowTest extends IntegrationTest {
     }
 
     @Test
+    void conversationsAreCountedOncePer24Hours() throws Exception {
+        ((ScriptedLlmClient) llm).thenText("هلا بك").thenText("أبشر");
+        inbound("wamid.c1", "السلام عليكم");
+        await(() -> lastSentText());
+        ((MockWhatsAppClient) whatsapp).reset();
+        inbound("wamid.c2", "أبي شقة");
+        await(() -> lastSentText());
+        assertThat(TenantContext.call(office, () -> jdbc.sql("select count(*) from agent_sessions").query(Integer.class).single())).isEqualTo(1);
+    }
+
+    @Test
+    void starterPlanHandsNewConversationsToTheOfficeAtItsLimit() throws Exception {
+        // 100 conversations already used this month by another customer.
+        TenantContext.run(office, () -> {
+            jdbc.sql("update offices set plan = 'STARTER'").update();
+            UUID contact = jdbc.sql("insert into contacts (office_id, wa_id) values (?, '966500000001') returning id")
+                    .param(office).query(UUID.class).single();
+            UUID other = jdbc.sql("""
+                    insert into conversations (id, office_id, contact_id, last_message_at)
+                    values (gen_random_uuid(), ?, ?, now()) returning id""").params(office, contact).query(UUID.class).single();
+            jdbc.sql("insert into agent_sessions (office_id, conversation_id) select ?, ? from generate_series(1, 100)")
+                    .params(office, other).update();
+        });
+        ((ScriptedLlmClient) llm).thenText("هلا");
+        inbound("wamid.s1", "أبي فيلا");
+        String alert = await(() -> TenantContext.call(office, () -> jdbc.sql(
+                "select kind from office_alerts where kind = 'PLAN_LIMIT'").query(String.class).optional().orElse(null)));
+        assertThat(alert).isEqualTo("PLAN_LIMIT");
+        assertThat(lastSentText()).isNull();
+    }
+
+    @Test
     void sandboxChatGetsAgentRepliesWithoutWhatsApp() throws Exception {
         ((ScriptedLlmClient) llm).thenText("هلا بك، أنا المساعد الآلي للمكتب. وش تدور؟");
         TenantContext.run(office, () -> sandbox.send(new sa.waslah.agent.conversation.SandboxController.Send("السلام عليكم")));

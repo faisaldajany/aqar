@@ -104,7 +104,7 @@ export type ImportPreview = {
 export type ImportCommitted = { created: number; updated: number; skipped: number; skippedRows: ImportRow[] };
 export type AqarDraft = { listing: ListingForm; warnings: string[]; missing: string[] };
 export type Alert = { id: string; kind: string; subjectId: string | null; message: string; read: boolean; createdAt: string };
-export type Usage = { plan: string; planName: string; replies: number; included: number; percent: number; overageReplies: number; overageSar: number; marketersLimit: number };
+export type Usage = { plan: string; planName: string; conversations: number; included: number; percent: number; overage: number; overageSar: number; marketersLimit: number };
 export type Marketer = { id: string; name: string; waPhone: string; districts: string[]; active: boolean };
 
 export function today(): string {
@@ -170,7 +170,7 @@ export type Stats = {
 export const TEMP_LABELS: Record<string, [string, string]> = { HOT: ["جاد", "p-bad"], WARM: ["مهتم", "p-warn"], COLD: ["استكشاف", "p-idle"] };
 export const PURPOSE_LABELS: Record<string, string> = { SALE: "شراء", BUY: "شراء", RENT: "إيجار" };
 
-export type Plan = { id: "BASIC" | "GROWTH"; name: string; monthlySar: number; annualSar: number; includedReplies: number; marketers: number; overageHalalas: number };
+export type Plan = { id: "STARTER" | "BASIC" | "GROWTH"; name: string; monthlySar: number; annualSar: number; includedConversations: number; marketers: number; whatsappNumbers: number; overageSar: number | null };
 export type Billing = {
   status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"; plan: Plan["id"]; cycle: "MONTHLY" | "ANNUAL";
   trialEndsAt: string; trialDaysLeft: number; paidUntil: string | null; serving: boolean; vatPercent: number;

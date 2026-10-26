@@ -37,7 +37,7 @@ export default function MarketersPage() {
   return (
     <>
       <h1>المسوّقون</h1>
-      <p className="small muted">يحوّل الوكيل العميل الجاد إلى المسوّق المسؤول عن حيّه مع ملخص. {usage && `باقتك تسمح بـ${usage.marketersLimit} مسوّقين.`}</p>
+      <p className="small muted">يحوّل الوكيل العميل الجاد إلى المسوّق المسؤول عن حيّه مع ملخص. {usage && (usage.marketersLimit === 1 ? "باقتك تسمح بمسوّق واحد." : `باقتك تسمح بـ${usage.marketersLimit} مسوّقين.`)}</p>
       <div className="tbl">
         <table>
           <thead><tr><th>الاسم</th><th>واتساب</th><th>الأحياء</th><th></th></tr></thead>

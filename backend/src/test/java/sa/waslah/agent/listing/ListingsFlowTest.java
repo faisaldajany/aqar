@@ -198,10 +198,9 @@ class ListingsFlowTest extends IntegrationTest {
     }
 
     @Test
-    void basicPlanAllowsTwoMarketers() {
+    void basicPlanAllowsOneMarketer() {
         assertThat(postStatus("/api/marketers", Map.of("name", "خالد", "waPhone", "966551840022"))).isEqualTo(HttpStatus.OK);
-        assertThat(postStatus("/api/marketers", Map.of("name", "سارة", "waPhone", "966569120477"))).isEqualTo(HttpStatus.OK);
-        assertThat(postStatus("/api/marketers", Map.of("name", "فهد", "waPhone", "966548331190"))).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(postStatus("/api/marketers", Map.of("name", "سارة", "waPhone", "966569120477"))).isEqualTo(HttpStatus.CONFLICT);
     }
 
     // ---- helpers ----

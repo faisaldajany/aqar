@@ -144,11 +144,11 @@ export default function Dashboard() {
         {usage && (
           <section className="card">
             <h2>باقة {usage.planName}</h2>
-            <p className="small">{usage.replies.toLocaleString("en-US")} من {usage.included.toLocaleString("en-US")} رد آلي هذا الشهر</p>
+            <p className="small">{usage.conversations.toLocaleString("en-US")} من {usage.included.toLocaleString("en-US")} محادثة هذا الشهر</p>
             <div className="meter" role="progressbar" aria-valuenow={usage.percent} aria-valuemin={0} aria-valuemax={100} aria-label="استهلاك الردود">
               <i style={{ width: `${Math.min(usage.percent, 100)}%` }} />
             </div>
-            {usage.overageReplies > 0 && <p className="small" style={{ color: "var(--warn)" }}>ردود إضافية: {usage.overageReplies} ({usage.overageSar} ريال)</p>}
+            {usage.overage > 0 && <p className="small" style={{ color: "var(--warn)" }}>محادثات إضافية: {usage.overage} ({usage.overageSar} ريال)</p>}
           </section>
         )}
       </div>

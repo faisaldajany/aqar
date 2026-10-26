@@ -72,7 +72,7 @@ class AgentEval {
         int quotaHits = 0;
         String stopped = null;
         AgentBrain brain = new AgentBrain(client, JSON);
-        String system = AgentPrompt.system(office, LocalDate.now());
+        String system = AgentPrompt.system(office, "1100012345", LocalDate.now());
 
         ArrayNode results = JSON.createArrayNode();
         List<Long> latencies = new ArrayList<>();

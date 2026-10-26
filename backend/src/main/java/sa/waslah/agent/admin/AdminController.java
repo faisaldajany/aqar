@@ -71,7 +71,7 @@ public class AdminController {
                             r.put("ownerEmail", rs.getString(11));
                             return r;
                         }).single();
-                m.put("repliesThisMonth", plans.usageThisMonth().replies());
+                m.put("conversationsThisMonth", plans.usageThisMonth().conversations());
                 return m;
             }));
         }

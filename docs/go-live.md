@@ -54,8 +54,10 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 ## 4. Tax and invoicing — [blocker for charging]
 
-- [ ] Confirm the pricing doc's prices exclude VAT (the code adds `VAT_PERCENT=15`; set it to 0 and
-      adjust prices if they are VAT-inclusive).
+- [ ] Plans (home page, Oct 2026): البداية 199 / الأساسي 499 / النمو 999 SAR a month for 100 / 500 / 2,000
+      conversations; 0.50 SAR per extra conversation (البداية hands new conversations to the office instead).
+      The site says prices exclude VAT and the code adds `VAT_PERCENT=15`; set it to 0 if that changes.
+- [ ] Growth plan: more than one WhatsApp number per office is not built yet (the page shows 1).
 - [ ] VAT registration and **ZATCA e-invoicing (Fatoora)**. Today the portal shows invoice records,
       not ZATCA-compliant tax invoices (no QR/UUID/cryptographic stamp, not reported to ZATCA).
       Options: issue the tax invoice from an accounting system already integrated with Fatoora
@@ -113,7 +115,7 @@ Needs Hidaa/legal:
       available, automate it in `AdminController`.
 - [ ] Aqar: a listings feed partnership (portal's "اطلب ربط عقار" requests are stored in
       `aqar_feed_requests`). Until then offices use Excel/CSV or paste a listing link.
-- [ ] Onboarding website: pricing updated to 499 / 1,000 SAR, no setup fee. Point its sign-up button to `https://app.hidaaco.com/signup`.
+- [ ] Home page placeholders to fill when ready: commercial registration / freelance document number, support WhatsApp number, demo WhatsApp number (buttons go to sign-up until then). Privacy policy and terms are drafts: have counsel review them.
 - [ ] Support channel (a Hidaa WhatsApp number) shown in the portal footer.
 
 ## 8. Deliberately not built yet (per the pricing doc)

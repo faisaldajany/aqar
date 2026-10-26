@@ -169,7 +169,8 @@ public class AgentService {
                 marketers, conversations, (m, label, summary) -> alertMarketer(conv.get(), m, label, summary),
                 props.agent().humanPauseHours(), listing -> sendCard(e.conversationId(), listing), bookingService, bookingStore);
 
-        AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, LocalDate.now(RIYADH)), turns, tools, prior);
+        String fal = jdbc.sql("select fal_license from offices").query(String.class).optional().orElse(null);
+        AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, fal, LocalDate.now(RIYADH)), turns, tools, prior);
         send(e.conversationId(), out.reply());
 
         ArrayNode calls = json.createArrayNode();
@@ -192,6 +193,15 @@ public class AgentService {
      * repeating the same message. The first time a limit is hit, the office gets the chat.
      */
     private boolean limited(InboundMessageEvent e, List<Msg> history) {
+        if (plans.mustHandOver(e.conversationId())) {
+            String month = LocalDate.now(RIYADH).toString().substring(0, 7);
+            alerts.raise(e.officeId(), "PLAN_LIMIT", null,
+                    "وصلت حد محادثات باقة البداية هذا الشهر، فصار حداء يحوّل لك المحادثات الجديدة. رقِّ الباقة ليكمل الرد عنك.",
+                    "plan-limit-" + month);
+            handoffQuietly(e, "تجاوز المكتب حد محادثات الباقة هذا الشهر، فتحولت المحادثة للمكتب.");
+            recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(), "plan_limit", null);
+            return true;
+        }
         int cap = props.agent().dailyReplyCap();
         if (cap > 0 && plans.repliesTodayInConversation(e.conversationId()) >= cap) {
             String key = "cap-" + e.conversationId() + "-" + LocalDate.now(RIYADH);
@@ -224,11 +234,13 @@ public class AgentService {
             sa.waslah.agent.billing.PlanLimits.Usage u = plans.usageThisMonth();
             String month = u.periodStart().toString().substring(0, 7);
             if (u.percent() >= 100) {
-                alerts.raise(officeId, "USAGE", null, "استهلكت كل الردود المشمولة في باقتك هذا الشهر (" + u.includedReplies()
-                        + "). الردود الإضافية تُحتسب بـ" + u.plan().overagePerReplySar.movePointRight(2).stripTrailingZeros().toPlainString()
-                        + " هللة للرد.", "usage-100-" + month);
+                String tail = u.plan().handsOverAtLimit()
+                        ? "المحادثات الجديدة تتحول لك مباشرة حتى بداية الشهر، أو رقِّ الباقة ليكمل حداء الرد."
+                        : "المحادثة الإضافية تُحتسب بـ" + u.plan().overagePerConversationSar.stripTrailingZeros().toPlainString() + " ريال.";
+                alerts.raise(officeId, "USAGE", null, "وصلت حد المحادثات في باقتك هذا الشهر (" + u.included() + "). " + tail,
+                        "usage-100-" + month);
             } else if (u.percent() >= 80) {
-                alerts.raise(officeId, "USAGE", null, "استهلكت 80% من الردود المشمولة في باقتك هذا الشهر.", "usage-80-" + month);
+                alerts.raise(officeId, "USAGE", null, "استهلكت 80% من محادثات باقتك هذا الشهر.", "usage-80-" + month);
             }
         } catch (RuntimeException ex) {
             log.warn("Usage alert failed: {}", ex.getMessage());
@@ -344,5 +356,8 @@ public class AgentService {
                 .params(e.officeId(), e.conversationId(), e.messageId(), model, usage.inputTokens(), usage.outputTokens(),
                         (int) latencyMs, calls.toString(), outcome, error)
                 .update();
+        if (List.of("replied", "fallback", "voice_note").contains(outcome)) {
+            plans.countConversation(e.officeId(), e.conversationId());
+        }
     }
 }

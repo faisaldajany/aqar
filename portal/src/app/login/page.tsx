@@ -37,7 +37,7 @@ export default function LoginPage() {
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <button className="btn primary" disabled={busy}>{busy ? "جارٍ الدخول…" : "دخول"}</button>
-        <p className="small muted">مكتب جديد؟ <Link href="/signup">سجّل مكتبك</Link></p>
+        <p className="small muted">مكتب جديد؟ <Link href="/signup">سجّل مكتبك</Link> · <Link href="/contact">تواصل معنا</Link></p>
       </form>
     </main>
   );

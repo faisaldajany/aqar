@@ -57,7 +57,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}>{n.label}</Link>
             ))}
           </nav>
-          <button className="btn" onClick={logout} style={{ marginTop: "auto" }}>تسجيل الخروج</button>
+          <Link href="/contact" className="small" style={{ marginTop: "auto" }}>الدعم والتواصل</Link>
+          <button className="btn" onClick={logout}>تسجيل الخروج</button>
         </aside>
         <main className="main"><div className="view">{children}</div></main>
       </div>

@@ -16,6 +16,17 @@ spring:
     password: ${DB_OWNER_PASSWORD:waslah}
   jackson:
     default-property-inclusion: non_null
+  # Outgoing email (support form forwarding). Blank MAIL_HOST = messages are kept in the database only.
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
   servlet:
     multipart:
       # Spreadsheets up to 5 MB, listing photos up to 5 MB each.
@@ -32,6 +43,10 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # An unreachable mail server must not mark the API unhealthy.
+    mail:
+      enabled: false
 
 sentry:
   dsn: ${SENTRY_DSN:}
@@ -102,3 +117,7 @@ waslah:
     message-retention-days: ${MESSAGE_RETENTION_DAYS:730}
     # Raw WhatsApp webhook payloads are only needed for debugging.
     webhook-retention-days: ${WEBHOOK_RETENTION_DAYS:30}
+  support:
+    # Support form messages are forwarded here (Reply-To is the sender, so you can answer directly).
+    forward-to: ${SUPPORT_FORWARD_TO:faisal@hidaaco.com}
+    from: ${SUPPORT_FROM:no-reply@hidaaco.com}

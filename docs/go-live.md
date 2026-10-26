@@ -65,7 +65,11 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 - [ ] Pick a provider with a Saudi region (e.g. Google Cloud Dammam, Oracle Cloud Jeddah/Riyadh,
       Alibaba Cloud Riyadh, STC Cloud). One VM (2 vCPU, 4 GB) is enough for the first ~50 offices.
-- [ ] Email on hidaaco.com (e.g. support@, billing@) — Meta verification and Moyasar both ask for a domain email.
+- [ ] Mailbox `faisal@hidaaco.com` (support form messages are forwarded there) and an SMTP sender for
+      `no-reply@hidaaco.com`: set `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and add the provider's SPF/DKIM
+      DNS records so the forwards don't land in spam. Until then messages are kept and listed at
+      `/admin/support`, and they are sent automatically once mail works (retried for 3 days).
+      Meta verification and Moyasar also ask for an email on the domain; `faisal@hidaaco.com` is enough.
 - [ ] DNS `A` record for `DOMAIN` (`app.hidaaco.com`; point `hidaaco.com` at the website) → VM. Caddy issues TLS automatically.
 - [ ] Deploy:
       ```bash

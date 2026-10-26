@@ -140,12 +140,12 @@ function LeadPanel({ id, onChanged }: { id: string; onChanged: () => Promise<voi
     await Promise.all([load(), onChanged()]);
   }
 
-  if (!d) return <aside className="side"><p className="small muted">…</p></aside>;
+  if (!d) return <aside className="leadside"><p className="small muted">…</p></aside>;
   const l = d.lead;
   const t = l.temperature ? TEMP_LABELS[l.temperature] : null;
   const budget = l.budgetMax ? (l.budgetMin ? `${fmt(l.budgetMin)} – ${fmt(l.budgetMax)}` : `حتى ${fmt(l.budgetMax)}`) : null;
   return (
-    <aside className="side" aria-label="بطاقة العميل">
+    <aside className="leadside" aria-label="بطاقة العميل">
       <div>
         <div className="row" style={{ justifyContent: "space-between" }}><h3>بطاقة العميل</h3>{t && <span className={`pill ${t[1]}`}>{t[0]}</span>}</div>
         {Object.keys(l).length === 0 ? <p className="small muted">يجمع الوكيل الطلب أثناء المحادثة.</p> : (

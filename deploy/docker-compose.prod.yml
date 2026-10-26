@@ -56,6 +56,12 @@ services:
       API_BASE_URL: https://${DOMAIN}
       ADMIN_TOKEN: ${ADMIN_TOKEN}
       SENTRY_DSN: ${SENTRY_DSN}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SUPPORT_FORWARD_TO: ${SUPPORT_FORWARD_TO:-faisal@hidaaco.com}
+      SUPPORT_FROM: ${SUPPORT_FROM:-no-reply@hidaaco.com}
       SENTRY_ENVIRONMENT: production
 
   portal:

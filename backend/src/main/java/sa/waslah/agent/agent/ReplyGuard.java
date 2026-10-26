@@ -75,6 +75,10 @@ public final class ReplyGuard {
      * claiming a property is (or is not) available without searching, or promising a human
      * without handing off. Questions ("أحولك للمسوّق؟") are offers, not promises.
      */
+    /** Sent to the model (never the customer) when it returned no text. */
+    public static final String EMPTY_REPLY =
+            "(تنبيه داخلي من النظام، لا تذكره للعميل) لم تكتب رداً للعميل. اكتب الآن ردك للعميل على آخر رسالة بناءً على نتائج الأدوات.";
+
     public static String correction(String reply, Set<String> toolsCalled, boolean handedOff) {
         if (reply == null) {
             return null;

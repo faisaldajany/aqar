@@ -340,7 +340,10 @@ class AgentEval {
     }
 
     static String norm(String s) {
-        return s == null ? "" : s.replace(",", "").replace("٬", "");
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (char c : s.toCharArray()) b.append(c >= '٠' && c <= '٩' ? (char) ('0' + (c - '٠')) : c);
+        return b.toString().replace(",", "").replace("٬", "");
     }
 
     static String text(JsonNode a, String f) {

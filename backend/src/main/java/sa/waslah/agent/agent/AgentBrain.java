@@ -67,6 +67,12 @@ public class AgentBrain {
                     turns.add(new Llm.ToolResults(results));
                     continue;
                 }
+                // An empty answer after tool results: ask once more for the customer-facing text.
+                if ((r.text() == null || r.text().isBlank()) && repairs < MAX_REPAIRS) {
+                    repairs++;
+                    turns.add(new Llm.UserText(ReplyGuard.EMPTY_REPLY));
+                    continue;
+                }
                 // Correct the model, unseen by the customer, when its reply depends on a tool it did not call.
                 String correction = ReplyGuard.correction(r.text(), calledNames(calls), tools.handedOff());
                 if (correction != null && repairs < MAX_REPAIRS) {

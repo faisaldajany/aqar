@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SaduMark } from "@/components/Sadu";
+import { Logo } from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { api, ApiError } from "@/lib/api";
@@ -37,7 +37,7 @@ export default function SignupPage() {
 
   return (
     <main className="auth">
-      <Link href="/" className="brand authbrand"><SaduMark size={30} />حداء</Link>
+      <Link href="/" className="brand authbrand"><Logo size={30} /></Link>
       <form className="card" onSubmit={submit}>
         <h1>سجّل مكتبك</h1>
         <p className="small muted">بعد التسجيل تربط رقم واتساب المكتب مباشرة، دون زيارة.</p>

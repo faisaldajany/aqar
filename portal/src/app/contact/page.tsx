@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SaduMark } from "@/components/Sadu";
+import { Logo } from "@/components/Logo";
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError, type Me } from "@/lib/api";
 
@@ -53,7 +53,7 @@ export default function ContactPage() {
 
   return (
     <main className="auth">
-      <Link href="/" className="brand authbrand"><SaduMark size={30} />حداء</Link>
+      <Link href="/" className="brand authbrand"><Logo size={30} /></Link>
       <form className="card" onSubmit={submit}>
         <h1>تواصل مع دعم حداء</h1>
         <p className="small muted">اكتب سؤالك أو المشكلة، ونرد عليك خلال يوم عمل.</p>

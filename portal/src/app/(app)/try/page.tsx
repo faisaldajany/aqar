@@ -84,7 +84,7 @@ export default function TryAgentPage() {
               <time>{timeAr(m.createdAt)}</time>
             </div>
           ))}
-          {waiting && <div className="msg m-AGENT typing" aria-label="الوكيل يكتب">يكتب…</div>}
+          {waiting && <div className="msg m-AGENT typing" role="status" aria-label="الوكيل يكتب"><i /><i /><i /></div>}
           <div ref={bottom} />
         </div>
         <form className="compose" onSubmit={(e: FormEvent) => { e.preventDefault(); void send(text); }}>

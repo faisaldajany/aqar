@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type Me } from "@/lib/api";
 import { SessionContext } from "./session";
 import { Icon } from "@/components/Icon";
-import { SaduMark } from "@/components/Sadu";
+import { Logo } from "@/components/Logo";
 
 const NAV: { href: string; label: string; icon: string; group: "work" | "setup" }[] = [
   { href: "/dashboard", label: "الرئيسية", icon: "home", group: "work" },
@@ -53,7 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SessionContext.Provider value={{ me, refresh }}>
       <div className="shell">
         <aside className="side">
-          <Link href="/dashboard" className="brand"><SaduMark />حداء</Link>
+          <Link href="/dashboard" className="brand"><Logo size={26} /></Link>
           <div className="office">
             <b>{me.office.name}</b>
             {me.whatsapp.connected && me.whatsapp.verifiedName === "مكتب تجريبي"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { SaduBand, SaduMark } from "@/components/Sadu";
+import { Logo, LogoMark } from "@/components/Logo";
 import s from "./home.module.css";
 
 export const metadata: Metadata = {
@@ -38,7 +38,7 @@ export default function Home() {
     <div className={s.page}>
       <header className={s.wrap}>
         <div className={s.top}>
-          <Link href="/" className={s.logo} aria-label="حداء، الصفحة الرئيسية"><SaduMark size={30} />حداء</Link>
+          <Link href="/" className={s.logo} aria-label="حداء، الصفحة الرئيسية"><Logo size={30} /></Link>
           <nav className={s.nav} aria-label="روابط الموقع">
             <span className={s.navLinks}>
               <a href="#how">كيف يعمل</a>
@@ -74,13 +74,12 @@ export default function Home() {
                     {m.text}<time>{m.at}</time>
                   </div>
                 ))}
+                <div className={`${s.msg} ${s.in} ${s.typingIn}`} aria-hidden="true"><i /><i /><i /></div>
               </div>
               <figcaption className={s.tag}>مثال توضيحي لمكتب افتراضي</figcaption>
             </figure>
           </div>
         </section>
-
-        <SaduBand height={30} className={s.band} />
 
         <section id="how" className={`${s.wrap} ${s.section}`}>
           <h2>شغّله بنفسك في نصف ساعة</h2>
@@ -161,7 +160,7 @@ export default function Home() {
 
         <section className={s.final}>
           <div className={`${s.wrap} ${s.finalIn}`}>
-            <h2>جرّب حداء على قائمة عقاراتك</h2>
+            <h2><LogoMark size={34} inverted /> جرّب حداء على قائمة عقاراتك</h2>
             <Link href="/signup" className={s.cta}>سجّل مكتبك</Link>
           </div>
         </section>

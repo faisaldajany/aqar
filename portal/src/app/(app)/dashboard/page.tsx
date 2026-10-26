@@ -68,8 +68,8 @@ export default function Dashboard() {
             <h2 id="setup-h">جهّز وكيلك</h2>
             <span className="small muted">{onb.done} من {onb.total} خطوات</span>
           </div>
-          <div className="meter" role="progressbar" aria-valuenow={onb.done} aria-valuemin={0} aria-valuemax={onb.total} aria-label="تقدّم التجهيز">
-            <i style={{ width: `${(100 * onb.done) / onb.total}%` }} />
+          <div className="dots" role="progressbar" aria-valuenow={onb.done} aria-valuemin={0} aria-valuemax={onb.total} aria-label="تقدّم التجهيز">
+            {onb.steps.map((st) => <i key={st.key} className={st.done ? "on" : st === next ? "next" : ""} />)}
           </div>
           <div className="nextstep">
             <div>
@@ -77,7 +77,7 @@ export default function Dashboard() {
               <h3>{next.label}</h3>
               <p className="small muted">{STEP_HINT[next.key]}</p>
             </div>
-            <Link href={next.href} className="btn primary">ابدأ</Link>
+            <Link href={next.href} className="btn reply">ابدأ</Link>
           </div>
           {rest.length > 0 && (
             <ul className="steplist">

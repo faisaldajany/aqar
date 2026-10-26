@@ -66,6 +66,13 @@ for role in roles/cloudsql.client roles/secretmanager.secretAccessor; do
 done
 
 step "4/9 Cloud SQL (PostgreSQL 16, takes ~10 minutes the first time)"
+# Right after the SQL Admin API is enabled, Cloud SQL can answer "project not found" for a few minutes.
+sql_ready=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if gcloud sql instances list --limit=1 >/dev/null 2>&1; then sql_ready=1; break; fi
+  echo "  Cloud SQL API not ready yet, waiting 30s ($i/10)…"; sleep 30
+done
+[ -n "$sql_ready" ] || { echo "Cloud SQL API still not ready. Wait a few minutes and re-run."; exit 1; }
 if ! exists gcloud sql instances describe "$DB_INSTANCE"; then
   gcloud sql instances create "$DB_INSTANCE" --database-version=POSTGRES_16 --edition=ENTERPRISE --tier="$DB_TIER" \
     --region="$REGION" --storage-size=10 --storage-auto-increase --availability-type=zonal \

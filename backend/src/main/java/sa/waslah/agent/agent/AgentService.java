@@ -150,6 +150,9 @@ public class AgentService {
 
         if ("audio".equals(latestInbound.type())) {
             send(e.conversationId(), AgentPrompt.VOICE_NOTE_REPLY);
+            alerts.raise(e.officeId(), "VOICE_NOTE", e.conversationId(),
+                    "عميل أرسل رسالة صوتية، وطلب منه حداء يكتب طلبه. تقدر تسمعها وترد من واتساب المكتب.",
+                    "voice-" + e.conversationId() + "-" + LocalDate.now(RIYADH));
             recordRun(e, "none", Llm.Usage.NONE, 0, json.createArrayNode(), "voice_note", null);
             return;
         }

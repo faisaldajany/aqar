@@ -125,6 +125,7 @@ class AgentUnitTests {
             assertThat(ReplyGuard.correction("سأقوم بتحويلك فوراً للمسوّق.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_HANDOFF);
             assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), false)).isEqualTo(ReplyGuard.OFFER_HANDOFF);
             assertThat(ReplyGuard.correction("تبي أحولك للمسوّق؟", Set.of(), true)).isNull();
+            assertThat(ReplyGuard.correction("تحب نحولك على المسوّق يوضح لك؟", Set.of(), false)).isEqualTo(ReplyGuard.OFFER_HANDOFF);
             assertThat(ReplyGuard.correction("هذا عند المسوّق، وأنا محوّلك له الآن.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_HANDOFF);
             assertThat(ReplyGuard.correction("أبشر، جاري إلغاء الموعد.", Set.of(), false)).isEqualTo(ReplyGuard.MUST_CANCEL);
             assertThat(ReplyGuard.correction("تم إلغاء موعدك.", Set.of(AgentTools.CANCEL), false)).isNull();

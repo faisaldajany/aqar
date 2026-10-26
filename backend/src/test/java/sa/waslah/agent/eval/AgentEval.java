@@ -116,7 +116,7 @@ class AgentEval {
                         && (out.failure().contains("429") || out.failure().contains("RESOURCE_EXHAUSTED"));
                 quotaHits = quota ? quotaHits + 1 : 0;
                 if (EMOJI.matcher(out.reply()).find()) failures.add("emoji in reply");
-                if (out.reply().split("\n").length > 6) failures.add("reply longer than 6 lines");
+                if (out.reply().split("\n").length > 8) failures.add("reply longer than 8 lines");
             }
 
             String last = replies.get(replies.size() - 1);

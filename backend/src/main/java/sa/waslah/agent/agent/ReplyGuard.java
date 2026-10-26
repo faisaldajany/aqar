@@ -65,7 +65,7 @@ public final class ReplyGuard {
 
     /** "Shall I transfer you?" — the rules say to transfer without asking in the cases that need it. */
     private static final Pattern HANDOFF_OFFER = Pattern.compile(
-            "أحو[ّ]?لك|احو[ّ]?لك|أحو[ّ]?له لك|احو[ّ]?له لك|يحو[ّ]?لك|محو[ّ]?لك");
+            "أحو[ّ]?لك|احو[ّ]?لك|نحو[ّ]?لك|أحو[ّ]?له لك|احو[ّ]?له لك|يحو[ّ]?لك|محو[ّ]?لك");
     /** Claims a cancellation happened. */
     private static final Pattern CANCEL_CLAIM = Pattern.compile(
             "ألغيت|الغيت|ألغينا|الغينا|تم إلغاء|تم الغاء|جاري إلغاء|جاري الغاء|cancelled|canceled", Pattern.CASE_INSENSITIVE);

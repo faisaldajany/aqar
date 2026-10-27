@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HOME_HTML } from "./home-html";
 import { HomeInteractions } from "./HomeInteractions";
+import { SupportCardForm } from "./SupportCardForm";
 
 export const metadata: Metadata = {
   title: "حداء — وكيل واتساب لمكاتب العقار",
@@ -26,6 +27,7 @@ export default function Home() {
       <style>{MOTION}</style>
       <div id="home" dangerouslySetInnerHTML={{ __html: HOME_HTML }} />
       <HomeInteractions />
+      <SupportCardForm />
     </>
   );
 }

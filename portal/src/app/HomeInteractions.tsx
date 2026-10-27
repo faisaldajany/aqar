@@ -48,6 +48,45 @@ export function HomeInteractions() {
       cleanups.push(() => { sale.removeEventListener("click", s); rent.removeEventListener("click", r); });
       pick("sale");
     }
+    // "Talk to the owner" form: saved and forwarded to the owner's inbox by the support endpoint.
+    const form = root.querySelector<HTMLFormElement>("#owner-form");
+    if (form) {
+      const status = form.querySelector<HTMLElement>("[data-form-status]");
+      const say = (text: string, ok: boolean) => { if (status) { status.textContent = text; status.style.color = ok ? "#1F6B52" : "#A3192D"; } };
+      const onSubmit = async (ev: Event) => {
+        ev.preventDefault();
+        const f = new FormData(form);
+        const name = String(f.get("name") ?? "").trim();
+        const contact = String(f.get("contact") ?? "").trim();
+        const message = String(f.get("message") ?? "").trim();
+        if (!name || !contact || message.length < 10) { say("اكتب اسمك وجوالك أو بريدك ورسالة من 10 أحرف على الأقل.", false); return; }
+        const isEmail = contact.includes("@");
+        const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
+        if (button) button.disabled = true;
+        say("جارٍ الإرسال…", true);
+        try {
+          const res = await fetch("/api/public/support", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name, email: isEmail ? contact : null, phone: isEmail ? null : contact,
+              topic: "سؤال عن الخدمة", message, source: "website", website: f.get("website"),
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { say(data.message ?? "تعذّر الإرسال. حاول مرة أخرى.", false); return; }
+          form.reset();
+          say("وصلتني رسالتك، وأرد عليك خلال يوم عمل.", true);
+        } catch {
+          say("تعذّر الإرسال. تحقق من الاتصال وحاول مرة أخرى.", false);
+        } finally {
+          if (button) button.disabled = false;
+        }
+      };
+      form.addEventListener("submit", onSubmit);
+      cleanups.push(() => form.removeEventListener("submit", onSubmit));
+    }
+
     return () => cleanups.forEach((c) => c());
   }, []);
   return null;

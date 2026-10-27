@@ -65,7 +65,7 @@ export default function ContactPage() {
           <select id="topic" name="topic">{topics.map((t) => <option key={t}>{t}</option>)}</select></label>
         <label className="f" htmlFor="message">الرسالة<textarea id="message" name="message" rows={5} required minLength={10} maxLength={4000} /></label>
         {/* Hidden from people; bots fill it in. */}
-        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }} />
+        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", width: 1, height: 1, margin: -1, padding: 0, border: 0, overflow: "hidden", clipPath: "inset(50%)", opacity: 0, pointerEvents: "none" }} />
         {error && <p className="err" role="alert">{error}</p>}
         <button className="btn primary" disabled={busy}>{busy ? "جارٍ الإرسال…" : "إرسال"}</button>
         <p className="small muted"><Link href={me ? "/dashboard" : "/login"}>رجوع</Link></p>

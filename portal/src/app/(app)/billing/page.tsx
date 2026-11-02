@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, fmt, riyadhDay, sar, SUB_LABELS, type Billing, type Invoice } from "@/lib/api";
 
 export default function BillingPage() {
@@ -15,6 +15,7 @@ function BillingView() {
   const [cycle, setCycle] = useState<"MONTHLY" | "ANNUAL">("MONTHLY");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     const [x, inv] = await Promise.all([api<Billing>("/billing"), api<Invoice[]>("/billing/invoices")]);
@@ -41,6 +42,35 @@ function BillingView() {
     }
   }
 
+  async function applyPromo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get("promo") ?? "").trim();
+    if (!code) return;
+    setBusy("promo");
+    setPromoMsg(null);
+    try {
+      const x = await api<Billing>("/billing/promo", { method: "POST", json: { code } });
+      setB(x);
+      setPromoMsg({ ok: true, text: `تم تطبيق الكود: ${x.applied ?? ""}` });
+    } catch (err) {
+      setPromoMsg({ ok: false, text: err instanceof ApiError ? err.message : "تعذّر تطبيق الكود." });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function removePromo() {
+    setBusy("promo");
+    setPromoMsg(null);
+    try {
+      setB(await api<Billing>("/billing/promo", { method: "DELETE" }));
+    } catch {
+      setPromoMsg({ ok: false, text: "تعذّر إزالة الكود." });
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (!b) return <p className="muted">{error || "جارٍ التحميل…"}</p>;
   const [label, cls] = SUB_LABELS[b.status];
 
@@ -54,6 +84,28 @@ function BillingView() {
           {b.status === "PAST_DUE" && <>فاتورة التجديد بانتظار الدفع. يتوقف الوكيل إن لم تُدفع خلال أيام.</>}
           {b.status === "EXPIRED" && <>الوكيل متوقف ولا يرد على العملاء. اختر باقة ليعود فوراً.</>}
         </p>
+        {b.suspended && <p className="err" role="alert">حساب المكتب موقوف من فريق حداء والوكيل لا يرد. تواصل معنا على support@hidaaco.com.</p>}
+      </div>
+
+      <div className="card">
+        {b.promo ? (
+          <div className="row">
+            <span className={`pill ${b.promo.usedUp ? "p-idle" : "p-ok"}`} dir="ltr">{b.promo.code}</span>
+            <span>{b.promo.summary}
+              {b.promo.usedUp ? " · انتهى الخصم"
+                : b.promo.remainingPeriods != null && b.promo.periodsUsed > 0 ? ` · باقي ${b.promo.remainingPeriods} من ${b.promo.durationPeriods}` : ""}
+            </span>
+            <button type="button" className="btn" disabled={busy === "promo"} onClick={removePromo}>إزالة الكود</button>
+          </div>
+        ) : (
+          <form className="row" onSubmit={applyPromo} style={{ alignItems: "flex-end" }}>
+            <label className="f" htmlFor="promo" style={{ flex: "1 1 220px" }}>عندك كود خصم؟
+              <input id="promo" name="promo" type="text" dir="ltr" maxLength={40} autoComplete="off" autoCapitalize="characters" placeholder="LAUNCH30" />
+            </label>
+            <button className="btn" disabled={busy === "promo"}>{busy === "promo" ? "جارٍ التحقق…" : "تطبيق"}</button>
+          </form>
+        )}
+        {promoMsg && <p className={promoMsg.ok ? "small" : "err"} role={promoMsg.ok ? "status" : "alert"}>{promoMsg.text}</p>}
       </div>
 
       <div className="row" role="radiogroup" aria-label="طريقة الدفع">
@@ -64,11 +116,17 @@ function BillingView() {
       <div className="grid3" style={{ marginTop: 12 }}>
         {b.plans.map((p) => {
           const price = cycle === "ANNUAL" ? p.annualSar : p.monthlySar;
+          const discounted = cycle === "ANNUAL" ? p.discountedAnnualSar : p.discountedMonthlySar;
           const current = b.plan === p.id && b.status === "ACTIVE" && b.cycle === cycle;
           return (
             <div key={p.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <h2>{p.name}</h2>
-              <p><b style={{ fontSize: 28 }}>{fmt(price)}</b> ريال {cycle === "ANNUAL" ? "سنوياً" : "شهرياً"} <span className="small muted">+ ضريبة {b.vatPercent}٪</span></p>
+              <p>
+                {discounted != null && <><s className="muted">{fmt(price)}</s>{" "}</>}
+                <b style={{ fontSize: 28 }}>{fmt(discounted != null ? Number(discounted) : price)}</b> ريال {cycle === "ANNUAL" ? "سنوياً" : "شهرياً"}{" "}
+                <span className="small muted">+ ضريبة {b.vatPercent}٪</span>
+              </p>
+              {discounted != null && b.promo && <p className="small" style={{ margin: 0 }}>بعد خصم {b.promo.code}{b.promo.durationPeriods ? ` (لأول ${b.promo.durationPeriods === 1 ? "دفعة" : b.promo.durationPeriods + " دفعات"})` : ""}</p>}
               <ul className="small" style={{ margin: 0, paddingInlineStart: 18 }}>
                 <li>{fmt(p.includedConversations)} محادثة بالشهر</li>
                 <li>بعد الحد: {p.overageSar == null ? "يحول لك المحادثات الجديدة" : `${p.overageSar} ريال للمحادثة`}</li>

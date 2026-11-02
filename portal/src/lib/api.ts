@@ -170,16 +170,25 @@ export type Stats = {
 export const TEMP_LABELS: Record<string, [string, string]> = { HOT: ["جاد", "p-bad"], WARM: ["مهتم", "p-warn"], COLD: ["استكشاف", "p-idle"] };
 export const PURPOSE_LABELS: Record<string, string> = { SALE: "شراء", BUY: "شراء", RENT: "إيجار" };
 
-export type Plan = { id: "STARTER" | "BASIC" | "GROWTH"; name: string; monthlySar: number; annualSar: number; includedConversations: number; marketers: number; whatsappNumbers: number; overageSar: number | null };
+export type Plan = {
+  id: "STARTER" | "BASIC" | "GROWTH"; name: string; monthlySar: number; annualSar: number; includedConversations: number;
+  marketers: number; whatsappNumbers: number; overageSar: number | null;
+  /** Price after the office's promo code when it applies to this plan and cycle. */
+  discountedMonthlySar: string | null; discountedAnnualSar: string | null;
+};
+export type BillingPromo = {
+  code: string; kind: "PERCENT" | "FIXED" | "TRIAL_DAYS"; summary: string; percentOff: number | null; amountOffSar: string | null;
+  durationPeriods: number | null; periodsUsed: number; remainingPeriods: number | null; usedUp: boolean;
+};
 export type Billing = {
   status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"; plan: Plan["id"]; cycle: "MONTHLY" | "ANNUAL";
   trialEndsAt: string; trialDaysLeft: number; paidUntil: string | null; serving: boolean; vatPercent: number;
-  provider: string; mockPayments: boolean; plans: Plan[];
+  provider: string; mockPayments: boolean; plans: Plan[]; suspended: boolean; promo: BillingPromo | null; applied?: string;
 };
 export type Invoice = {
-  id: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP"; plan: string | null; cycle: string | null;
+  id: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP"; plan: string | null; cycle: string | null;
   description: string; subtotalHalalas: number; vatHalalas: number; totalHalalas: number; status: "DUE" | "PAID" | "VOID";
-  payUrl: string | null; createdAt: string; paidAt: string | null;
+  payUrl: string | null; createdAt: string; paidAt: string | null; discountHalalas: number; promoCode: string | null;
 };
 export type OfficeSettings = {
   name: string; falLicense: string; falStatus: "PENDING_REVIEW" | "VERIFIED" | "REJECTED"; falNote: string | null;

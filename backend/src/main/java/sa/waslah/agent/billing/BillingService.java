@@ -26,7 +26,7 @@ public class BillingService {
     public record Invoice(UUID id, String number, String kind, String plan, String cycle, String description,
                           LocalDate periodStart, LocalDate periodEnd, long subtotalHalalas, long vatHalalas,
                           long totalHalalas, String status, String provider, String providerRef, String payUrl,
-                          Instant createdAt, Instant paidAt) {
+                          Instant createdAt, Instant paidAt, long discountHalalas, String promoCode) {
     }
 
     private final JdbcClient jdbc;
@@ -35,9 +35,11 @@ public class BillingService {
     private final Subscription subscription;
     private final PlanLimits plans;
     private final OfficeAlerts alerts;
+    private final PromoService promos;
 
     public BillingService(JdbcClient jdbc, PaymentGateway gateway, BillingProperties props, Subscription subscription,
-                          PlanLimits plans, OfficeAlerts alerts) {
+                          PlanLimits plans, OfficeAlerts alerts, PromoService promos) {
+        this.promos = promos;
         this.jdbc = jdbc;
         this.gateway = gateway;
         this.props = props;
@@ -56,15 +58,47 @@ public class BillingService {
             throw ApiException.conflict("too_many_marketers",
                     "باقة " + plan.arabicName + " تسمح بـ " + plan.marketers + " مسوّقين. عطّل بعض المسوّقين أولاً.");
         }
-        // Reuse an unpaid invoice for the same choice instead of piling up new ones.
+        BigDecimal price = "ANNUAL".equals(cycle) ? plan.annualSar : plan.monthlySar;
+        long gross = halalas(price);
+        Optional<PromoService.Applied> promo = promos.current();
+        long discount = promo.map(a -> promos.discountHalalas(a, plan, cycle, gross)).orElse(0L);
+        UUID promoId = discount > 0 ? promo.get().promo().id() : null;
+        String promoCode = discount > 0 ? promo.get().promo().code() : null;
+
+        // Reuse an unpaid invoice for the same choice (and the same discount) instead of piling up new ones.
         Optional<Invoice> open = jdbc.sql(SELECT + " where kind = 'SUBSCRIPTION' and status = 'DUE' and plan = ? and cycle = ? "
-                        + "and created_at > now() - interval '6 days' order by created_at desc limit 1")
-                .params(plan.name(), cycle).query(BillingService::map).optional();
+                        + "and discount_halalas = ? and created_at > now() - interval '6 days' order by created_at desc limit 1")
+                .params(plan.name(), cycle, discount).query(BillingService::map).optional();
         if (open.isPresent() && open.get().payUrl() != null) return open.get();
 
-        BigDecimal price = "ANNUAL".equals(cycle) ? plan.annualSar : plan.monthlySar;
-        String desc = "اشتراك حداء — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)");
-        return create(officeId, "SUBSCRIPTION", plan.name(), cycle, desc, null, null, halalas(price), true);
+        String desc = "اشتراك حداء — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)")
+                + (discount > 0 ? " — خصم " + promoCode : "");
+        long subtotal = gross - discount;
+        Invoice inv = create(officeId, "SUBSCRIPTION", plan.name(), cycle, desc, null, null, subtotal, discount, promoId,
+                promoCode, subtotal > 0);
+        // One open subscription invoice at a time: older unpaid ones are voided (paying one anyway still counts).
+        jdbc.sql("update invoices set status = 'VOID' where kind = 'SUBSCRIPTION' and status = 'DUE' and id <> ?")
+                .param(inv.id()).update();
+        if (subtotal == 0) {
+            // A 100% discount: nothing to pay, the period starts now.
+            markPaid(inv);
+            return find(inv.id()).orElseThrow();
+        }
+        return inv;
+    }
+
+    /**
+     * Free months from the Hidaa team: a zero invoice for the record, then the plan is active for that long
+     * (from the later of now, the paid-until date and the trial end).
+     */
+    public Invoice comp(UUID officeId, PlanLimits.Plan plan, int months, String reason) {
+        if (months < 1 || months > 24) throw ApiException.badRequest("bad_months", "عدد الأشهر من 1 إلى 24.");
+        String desc = "أشهر مجانية من فريق حداء — باقة " + plan.arabicName + " (" + months + (months == 1 ? " شهر)" : " أشهر)")
+                + (reason == null || reason.isBlank() ? "" : " — " + reason.trim());
+        Invoice inv = create(officeId, "COMP", plan.name(), "MONTHLY", desc, null, null, 0, 0, null, null, false);
+        jdbc.sql("update invoices set status = 'PAID', paid_at = now() where id = ?").param(inv.id()).update();
+        subscription.activateFor(plan, "MONTHLY", months, Instant.now());
+        return find(inv.id()).orElseThrow();
     }
 
     /** Called after the customer returns from the payment page, or from the provider's notification. */
@@ -72,18 +106,27 @@ public class BillingService {
         Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
         if ("PAID".equals(inv.status()) || inv.providerRef() == null) return inv;
         if (!gateway.isPaid(inv.providerRef())) return inv;
-        int changed = jdbc.sql("update invoices set status = 'PAID', paid_at = now() where id = ? and status = 'DUE'")
-                .param(invoiceId).update();
-        if (changed == 1 && "SUBSCRIPTION".equals(inv.kind())) {
-            subscription.activate(PlanLimits.Plan.valueOf(inv.plan()), inv.cycle(), Instant.now());
-        }
-        if (changed == 1 && "OVERAGE".equals(inv.kind())) {
+        boolean changed = markPaid(inv);
+        if (changed && "OVERAGE".equals(inv.kind())) {
             Subscription.State s = subscription.state();
             if ("PAST_DUE".equals(s.status()) && s.paidUntil() != null && s.paidUntil().isAfter(Instant.now())) {
                 subscription.setStatus("ACTIVE");
             }
         }
         return find(invoiceId).orElseThrow();
+    }
+
+    /** Marks a DUE (or voided, if the provider took the money anyway) invoice paid, once, and applies it. */
+    private boolean markPaid(Invoice inv) {
+        int changed = jdbc.sql("update invoices set status = 'PAID', paid_at = now() where id = ? and status in ('DUE', 'VOID')")
+                .param(inv.id()).update();
+        if (changed == 1 && "SUBSCRIPTION".equals(inv.kind())) {
+            subscription.activate(PlanLimits.Plan.valueOf(inv.plan()), inv.cycle(), Instant.now());
+            UUID promoId = jdbc.sql("select promo_code_id from invoices where id = ?").param(inv.id())
+                    .query((rs, n) -> rs.getObject(1, UUID.class)).optional().orElse(null);
+            promos.onPaid(promoId);
+        }
+        return changed == 1;
     }
 
     /** Overage for a finished month: replies over the allowance times the plan's per-reply price. Idempotent. */
@@ -97,7 +140,7 @@ public class BillingService {
         String desc = "محادثات إضافية لشهر " + monthStart.toString().substring(0, 7) + ": " + u.overage() + " محادثة × "
                 + u.plan().overagePerConversationSar.stripTrailingZeros().toPlainString() + " ريال";
         Invoice inv = create(officeId, "OVERAGE", u.plan().name(), null, desc, monthStart, next.minusDays(1),
-                halalas(u.overageSar()), true);
+                halalas(u.overageSar()), 0, null, null, true);
         alerts.raise(officeId, "INVOICE_DUE", inv.id(), "فاتورة المحادثات الإضافية لشهر " + monthStart.toString().substring(0, 7)
                 + " جاهزة: " + sar(inv.totalHalalas()) + " ريال شامل الضريبة.", "invoice-" + inv.id());
         return Optional.of(inv);
@@ -128,18 +171,18 @@ public class BillingService {
     }
 
     private Invoice create(UUID officeId, String kind, String plan, String cycle, String description, LocalDate from,
-                           LocalDate to, long subtotal, boolean withPayPage) {
+                           LocalDate to, long subtotal, long discount, UUID promoId, String promoCode, boolean withPayPage) {
         long vat = Math.round(subtotal * props.vatPercent() / 100.0);
         UUID id = UUID.randomUUID();
         String number = "W" + LocalDate.now(RIYADH).toString().replace("-", "").substring(2) + "-"
                 + id.toString().substring(0, 6).toUpperCase();
         jdbc.sql("""
                 insert into invoices (id, office_id, number, kind, plan, cycle, description, period_start, period_end,
-                                      subtotal_halalas, vat_halalas, total_halalas)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+                                      subtotal_halalas, vat_halalas, total_halalas, discount_halalas, promo_code_id, promo_code)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
                 .params(id, officeId, number, kind, plan, cycle, description,
                         from == null ? null : java.sql.Date.valueOf(from), to == null ? null : java.sql.Date.valueOf(to),
-                        subtotal, vat, subtotal + vat)
+                        subtotal, vat, subtotal + vat, discount, promoId, promoCode)
                 .update();
         if (withPayPage) {
             String success = props.portalBaseUrl() + "/billing?invoice=" + id;
@@ -171,7 +214,8 @@ public class BillingService {
 
     private static final String SELECT = """
             select id, number, kind, plan, cycle, description, period_start, period_end, subtotal_halalas, vat_halalas,
-                   total_halalas, status, provider, provider_ref, pay_url, created_at, paid_at from invoices""";
+                   total_halalas, status, provider, provider_ref, pay_url, created_at, paid_at, discount_halalas,
+                   promo_code from invoices""";
 
     private static Invoice map(java.sql.ResultSet rs, int n) throws java.sql.SQLException {
         java.sql.Date ps = rs.getDate("period_start"), pe = rs.getDate("period_end");
@@ -180,6 +224,7 @@ public class BillingService {
                 rs.getString("cycle"), rs.getString("description"), ps == null ? null : ps.toLocalDate(),
                 pe == null ? null : pe.toLocalDate(), rs.getLong("subtotal_halalas"), rs.getLong("vat_halalas"),
                 rs.getLong("total_halalas"), rs.getString("status"), rs.getString("provider"), rs.getString("provider_ref"),
-                rs.getString("pay_url"), rs.getTimestamp("created_at").toInstant(), paid == null ? null : paid.toInstant());
+                rs.getString("pay_url"), rs.getTimestamp("created_at").toInstant(), paid == null ? null : paid.toInstant(),
+                rs.getLong("discount_halalas"), rs.getString("promo_code"));
     }
 }

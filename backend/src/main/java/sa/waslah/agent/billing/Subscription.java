@@ -11,10 +11,11 @@ import org.springframework.stereotype.Component;
 public class Subscription {
 
     public record State(String status, PlanLimits.Plan plan, String cycle, Instant trialEndsAt, Instant paidUntil,
-                        String falStatus) {
+                        String falStatus, Instant suspendedAt) {
 
-        /** Whether the agent may answer customers right now. */
+        /** Whether the agent may answer customers right now. A suspended office never is. */
         public boolean serving(Instant now) {
+            if (suspendedAt != null) return false;
             return switch (status) {
                 case "TRIAL" -> trialEndsAt.isAfter(now);
                 case "ACTIVE", "PAST_DUE" -> true; // PAST_DUE is the grace period; the job moves it to EXPIRED
@@ -35,23 +36,29 @@ public class Subscription {
     }
 
     public State state() {
-        return jdbc.sql("select subscription_status, plan, billing_cycle, trial_ends_at, paid_until, fal_status from offices")
+        return jdbc.sql("""
+                        select subscription_status, plan, billing_cycle, trial_ends_at, paid_until, fal_status, suspended_at
+                        from offices""")
                 .query((rs, n) -> new State(rs.getString(1), PlanLimits.Plan.valueOf(rs.getString(2)), rs.getString(3),
-                        rs.getTimestamp(4).toInstant(), ts(rs.getTimestamp(5)), rs.getString(6)))
+                        rs.getTimestamp(4).toInstant(), ts(rs.getTimestamp(5)), rs.getString(6), ts(rs.getTimestamp(7))))
                 .single();
     }
 
     /** A paid subscription invoice: switch plan and extend the paid period from whichever is later, now or the current end. */
     public void activate(PlanLimits.Plan plan, String cycle, Instant now) {
+        activateFor(plan, cycle, "ANNUAL".equals(cycle) ? 12 : 1, now);
+    }
+
+    /** Extends the paid period by {@code months} on {@code plan}, from the later of now, the current end and the trial end. */
+    public void activateFor(PlanLimits.Plan plan, String cycle, int months, Instant now) {
         State s = state();
         Instant from = now;
         if (s.paidUntil() != null && s.paidUntil().isAfter(from)) from = s.paidUntil();
         if ("TRIAL".equals(s.status()) && s.trialEndsAt().isAfter(from)) from = s.trialEndsAt();
-        String interval = "ANNUAL".equals(cycle) ? "1 year" : "1 month";
         jdbc.sql("""
                 update offices set plan = ?, billing_cycle = ?, subscription_status = 'ACTIVE',
-                       paid_until = cast(? as timestamptz) + cast(? as interval)""")
-                .params(plan.name(), cycle, Timestamp.from(from), interval).update();
+                       paid_until = cast(? as timestamptz) + make_interval(months => ?)""")
+                .params(plan.name(), cycle, Timestamp.from(from), months).update();
     }
 
     public void setStatus(String status) {

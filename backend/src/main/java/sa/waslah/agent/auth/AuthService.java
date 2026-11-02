@@ -3,17 +3,27 @@ package sa.waslah.agent.auth;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import sa.waslah.agent.billing.PromoService;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.tenant.TenantContext;
 
 @Service
 public class AuthService {
 
-    public record Signup(String officeName, String falLicense, String fullName, String email, String password) {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
+    public record Signup(String officeName, String falLicense, String fullName, String email, String password,
+                         String promoCode) {
+
+        public Signup(String officeName, String falLicense, String fullName, String email, String password) {
+            this(officeName, falLicense, fullName, email, password, null);
+        }
     }
 
     public record SignedIn(UUID userId, UUID officeId, String role) {
@@ -22,11 +32,13 @@ public class AuthService {
     private final JdbcClient jdbc;
     private final PasswordEncoder passwords;
     private final TransactionTemplate tx;
+    private final PromoService promos;
 
-    public AuthService(JdbcClient jdbc, PasswordEncoder passwords, TransactionTemplate tx) {
+    public AuthService(JdbcClient jdbc, PasswordEncoder passwords, TransactionTemplate tx, PromoService promos) {
         this.jdbc = jdbc;
         this.passwords = passwords;
         this.tx = tx;
+        this.promos = promos;
     }
 
     public SignedIn signup(Signup s) {
@@ -35,6 +47,10 @@ public class AuthService {
                 .param(email).query(Boolean.class).single();
         if (taken) {
             throw ApiException.conflict("email_taken", "هذا البريد مسجّل مسبقاً.");
+        }
+        boolean withPromo = s.promoCode() != null && !s.promoCode().isBlank();
+        if (withPromo) {
+            promos.usable(s.promoCode()); // a wrong code is reported before the account is created
         }
         UUID officeId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -49,6 +65,13 @@ public class AuthService {
                     .params(userId, officeId, email, passwords.encode(s.password()), s.fullName().trim())
                     .update();
         }));
+        if (withPromo) {
+            try {
+                TenantContext.run(officeId, () -> promos.apply(s.promoCode()));
+            } catch (RuntimeException e) {
+                log.warn("Promo {} not applied at signup for office {}: {}", s.promoCode(), officeId, e.getMessage());
+            }
+        }
         return new SignedIn(userId, officeId, "OWNER");
     }
 

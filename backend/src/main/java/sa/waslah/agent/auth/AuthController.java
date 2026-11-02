@@ -22,7 +22,8 @@ public class AuthController {
             @NotBlank @Pattern(regexp = "^[0-9\\s-]{8,16}$") String falLicense,
             @NotBlank @Size(max = 120) String fullName,
             @NotBlank @Email String email,
-            @NotBlank @Size(min = 8, max = 128) String password) {
+            @NotBlank @Size(min = 8, max = 128) String password,
+            @Size(max = 40) String promoCode) {
     }
 
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {
@@ -39,7 +40,7 @@ public class AuthController {
     @PostMapping("/signup")
     ResponseEntity<Map<String, Object>> signup(@Valid @RequestBody SignupRequest r) {
         AuthService.SignedIn s = auth.signup(new AuthService.Signup(
-                r.officeName(), r.falLicense(), r.fullName(), r.email(), r.password()));
+                r.officeName(), r.falLicense(), r.fullName(), r.email(), r.password(), r.promoCode()));
         return withSession(s);
     }
 

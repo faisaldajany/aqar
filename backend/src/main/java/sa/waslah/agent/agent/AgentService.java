@@ -30,6 +30,7 @@ import sa.waslah.agent.listing.MarketerStore;
 import sa.waslah.agent.tenant.TenantContext;
 import sa.waslah.agent.whatsapp.OutboundMessageService;
 import sa.waslah.agent.whatsapp.WaAccounts;
+import sa.waslah.agent.whatsapp.WaTemplates;
 import sa.waslah.agent.whatsapp.WhatsAppClient;
 
 /**
@@ -58,13 +59,15 @@ public class AgentService {
     private final sa.waslah.agent.booking.BookingStore bookingStore;
     private final sa.waslah.agent.office.OfficeAlerts alerts;
     private final sa.waslah.agent.billing.Subscription subscription;
+    private final WaTemplates templates;
 
     public AgentService(WaslahProperties props, AgentBrain brain, ConversationStore conversations, ListingStore listings,
                         MarketerStore marketers, OutboundMessageService outbound, WaAccounts accounts,
                         WhatsAppClient whatsapp, JdbcClient jdbc, ObjectMapper json,
                         sa.waslah.agent.billing.PlanLimits plans, sa.waslah.agent.office.OfficeAlerts alerts,
                         sa.waslah.agent.booking.BookingService bookingService, sa.waslah.agent.booking.BookingStore bookingStore,
-                        sa.waslah.agent.billing.Subscription subscription) {
+                        sa.waslah.agent.billing.Subscription subscription, WaTemplates templates) {
+        this.templates = templates;
         this.subscription = subscription;
         this.bookingService = bookingService;
         this.bookingStore = bookingStore;
@@ -336,15 +339,16 @@ public class AgentService {
     }
 
     private void alertMarketer(ConversationStore.ConversationRef conv, MarketerStore.Marketer m, String customer, String summary) {
-        String template = props.agent().handoffTemplate();
-        if (template == null || template.isBlank() || conv.waAccountId() == null
-                || ConversationStore.SANDBOX.equals(conv.waId())) {
+        if (conv.waAccountId() == null || ConversationStore.SANDBOX.equals(conv.waId())) {
             return;
         }
         try {
+            Optional<WaTemplates.Resolved> template = templates.resolve(conv.waAccountId(), WaTemplates.Kind.HANDOFF);
+            if (template.isEmpty()) return;
             WaAccounts.Account acct = accounts.byId(conv.waAccountId()).orElseThrow();
-            whatsapp.sendTemplate(accounts.credentials(acct), m.waPhone(), template,
-                    props.agent().handoffTemplateLanguage(), List.of(customer, summary.replace('\n', ' ')));
+            // Template parameters cannot contain line breaks or runs of spaces.
+            whatsapp.sendTemplate(accounts.credentials(acct), m.waPhone(), template.get().name(), template.get().language(),
+                    List.of(customer, summary.replaceAll("\\s+", " ").trim()));
         } catch (RuntimeException ex) {
             log.warn("Could not alert marketer {}: {}", m.id(), ex.getMessage());
         }

@@ -1,4 +1,5 @@
 import type { Billing, Invoice } from "./api";
+import type { TemplateRow } from "@/components/TemplateStatus";
 
 /** Operator console (/ops) data, from /api/ops/*. */
 
@@ -21,6 +22,7 @@ export type OpsDetail = Omit<OpsOffice, "users"> & {
   promo: { code: string; summary: string; periodsUsed: number; usedUp: boolean } | null;
   usage: { conversations: number; included: number; overage: number };
   audit: OpsAudit[];
+  templates?: TemplateRow[];
 };
 
 export type OpsOverview = {
@@ -49,7 +51,7 @@ export const ACTION_LABELS: Record<string, string> = {
   LOGIN: "دخول للإدارة", FAL_VERIFIED: "توثيق فال", FAL_REJECTED: "رفض فال", TRIAL_EXTENDED: "تمديد التجربة",
   COMP_MONTHS: "أشهر مجانية", PLAN_CHANGED: "تغيير الباقة", SUSPENDED: "إيقاف المكتب", REACTIVATED: "إعادة تفعيل المكتب",
   USER_DISABLED: "إيقاف مستخدم", USER_ENABLED: "تفعيل مستخدم", RESET_LINK: "رابط كلمة مرور", PROMO_CREATED: "كود خصم جديد",
-  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود",
+  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", TEMPLATES_SYNC: "تحديث قوالب واتساب",
 };
 
 /** "2 نوفمبر 2026، 3:15 م" in Riyadh time, or "—". */

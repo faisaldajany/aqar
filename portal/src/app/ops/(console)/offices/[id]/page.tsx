@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError, fmt, sar, SUB_LABELS } from "@/lib/api";
 import { ACTION_LABELS, day, FAL_LABELS, PLAN_NAMES, when, type OpsDetail, type OpsOffice } from "@/lib/ops";
 import { useOps } from "../../context";
+import { TemplateStatus } from "@/components/TemplateStatus";
 
 type Notice = { ok: boolean; text: string } | null;
 
@@ -183,6 +184,11 @@ export default function OpsOfficePage() {
         )}
         <p className="small muted">يتوقف الوكيل عن الرد، ويُسجَّل خروج كل مستخدمي المكتب ولا يستطيعون الدخول حتى إعادة التفعيل. البيانات تبقى كما هي.</p>
       </div>
+
+      {o.whatsappConnected && (
+        <TemplateStatus rows={o.templates ?? []} busy={busy === "templates"}
+          onSync={() => void act("templates", `/ops/offices/${o.id}/templates/sync`, {}, "حُدّثت حالة القوالب.")} />
+      )}
 
       <div className="card">
         <h2>المستخدمون</h2>

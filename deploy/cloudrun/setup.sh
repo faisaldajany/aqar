@@ -6,8 +6,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
-REGION="${REGION:-me-central2}"                 # Dammam
-SCHEDULER_REGION="${SCHEDULER_REGION:-$REGION}" # if Cloud Scheduler is not offered in me-central2, use europe-west1
+REGION_ASKED="${REGION:-}"                      # empty = the region already in use, or me-central2 (Dammam) for a new setup
 DOMAIN="${DOMAIN:-app.hidaaco.com}"
 SITE_DOMAINS="${SITE_DOMAINS:-hidaaco.com,www.hidaaco.com}"  # home page hosts, served by the portal
 DB_INSTANCE="${DB_INSTANCE:-hidaa-db}"
@@ -30,6 +29,30 @@ if [ "$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingEn
   echo "  gcloud billing projects link $PROJECT_ID --billing-account=<ACCOUNT_ID>"
   exit 1
 fi
+# Re-running with another region would build a second copy of everything there, so follow the existing services.
+EXISTING_REGION="$(gcloud run services list --project "$PROJECT_ID" --format=json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    items = json.load(sys.stdin)
+except Exception:
+    items = []
+for s in items:
+    m = s.get("metadata", {})
+    if m.get("name") == "hidaa-api":
+        print(m.get("labels", {}).get("cloud.googleapis.com/location", ""))
+        break
+' 2>/dev/null || true)"
+if [ -n "$EXISTING_REGION" ]; then
+  if [ -n "$REGION_ASKED" ] && [ "$REGION_ASKED" != "$EXISTING_REGION" ]; then
+    echo "$API already runs in $EXISTING_REGION, but REGION=$REGION_ASKED was given."
+    echo "Re-run without REGION to update it there. Moving regions is a separate migration (database, images, load balancer)."
+    exit 1
+  fi
+  REGION="$EXISTING_REGION"
+else
+  REGION="${REGION_ASKED:-me-central2}"
+fi
+SCHEDULER_REGION="${SCHEDULER_REGION:-$REGION}" # if Cloud Scheduler is not offered in the region, use europe-west1
 echo "Project $PROJECT_ID · region $REGION · domain $DOMAIN"
 gcloud config set project "$PROJECT_ID" --quiet >/dev/null 2>&1
 IMG="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
@@ -138,6 +161,12 @@ exists gcloud compute target-https-proxies describe hidaa-https --global || \
 exists gcloud compute forwarding-rules describe hidaa-443 --global || \
   gcloud compute forwarding-rules create hidaa-443 --global --load-balancing-scheme=EXTERNAL_MANAGED \
     --address=hidaa-ip --target-https-proxy=hidaa-https --ports=443
+# IPv6 as well: on IPv6-only networks (common on Saudi mobile) a site with only an IPv4 address is reached
+# through the carrier's NAT64, which can time out. A real AAAA record avoids that.
+exists gcloud compute addresses describe hidaa-ip6 --global || gcloud compute addresses create hidaa-ip6 --global --ip-version=IPV6
+exists gcloud compute forwarding-rules describe hidaa-443-v6 --global || \
+  gcloud compute forwarding-rules create hidaa-443-v6 --global --load-balancing-scheme=EXTERNAL_MANAGED \
+    --address=hidaa-ip6 --target-https-proxy=hidaa-https --ports=443
 # The marketing site (hidaaco.com, www) is the portal's home page, through the same rules and a second certificate.
 if [ -n "$SITE_DOMAINS" ]; then
   exists gcloud compute ssl-certificates describe hidaa-site-cert --global || \
@@ -161,7 +190,11 @@ exists gcloud compute target-http-proxies describe hidaa-http --global || \
 exists gcloud compute forwarding-rules describe hidaa-80 --global || \
   gcloud compute forwarding-rules create hidaa-80 --global --load-balancing-scheme=EXTERNAL_MANAGED \
     --address=hidaa-ip --target-http-proxy=hidaa-http --ports=80
+exists gcloud compute forwarding-rules describe hidaa-80-v6 --global || \
+  gcloud compute forwarding-rules create hidaa-80-v6 --global --load-balancing-scheme=EXTERNAL_MANAGED \
+    --address=hidaa-ip6 --target-http-proxy=hidaa-http --ports=80
 IP="$(gcloud compute addresses describe hidaa-ip --global --format='value(address)')"
+IP6="$(gcloud compute addresses describe hidaa-ip6 --global --format='value(address)')"
 
 step "8/9 Cloud Scheduler jobs (Asia/Riyadh)"
 JOB_TOKEN="$(get jobs-token)"
@@ -181,18 +214,23 @@ job daily-report "0 * * * *"
 job retention "30 3 * * *"
 job license-guard "0 6 * * *"
 job billing "0 7 * * *"
+job templates "20 */3 * * *"
 
 step "9/9 Done"
 cat <<EOF
 
 Load balancer IP: $IP
 
-Now, at your domain registrar, add:   A   app   $IP
-                                     A   @     $IP   (hidaaco.com home page)
-                                     A   www   $IP
+Now, at your domain registrar, add:   A      app   $IP
+                                     A      @     $IP   (hidaaco.com home page)
+                                     A      www   $IP
+                                     AAAA   app   $IP6
+                                     AAAA   @     $IP6
+                                     AAAA   www   $IP6
 The HTTPS certificate is issued automatically 15-60 minutes after the record is visible.
 Check:  gcloud compute ssl-certificates describe hidaa-cert --global --format='value(managed.status)'
 Then open https://$DOMAIN/signup
 
-Operator token (for /admin/*):  gcloud secrets versions access latest --secret=admin-token
+Admin console: https://$DOMAIN/ops  (key:  gcloud secrets versions access latest --secret=admin-token)
+Uptime and error alerts by email:  bash deploy/cloudrun/monitoring.sh
 EOF

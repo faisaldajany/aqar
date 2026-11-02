@@ -30,6 +30,7 @@ import sa.waslah.agent.common.Mailer;
 import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.office.OfficeAlerts;
 import sa.waslah.agent.tenant.TenantContext;
+import sa.waslah.agent.whatsapp.WaTemplates;
 
 /**
  * The operator console for the Hidaa team (portal /ops): every office and its users, subscriptions, the FAL review,
@@ -74,10 +75,12 @@ public class OpsController {
     private final SessionGuard sessions;
     private final RateLimiter limits;
     private final Mailer mailer;
+    private final WaTemplates templates;
 
     public OpsController(JdbcClient jdbc, OpsAuth ops, PlanLimits plans, OfficeAlerts alerts, BillingService billing,
                          PromoService promos, PasswordResetService resets, SessionGuard sessions, RateLimiter limits,
-                         Mailer mailer) {
+                         Mailer mailer, WaTemplates templates) {
+        this.templates = templates;
         this.jdbc = jdbc;
         this.ops = ops;
         this.plans = plans;
@@ -186,6 +189,7 @@ public class OpsController {
                     "periodsUsed", a.periodsUsed(), "usedUp", a.usedUp())).orElse(null));
             PlanLimits.Usage u = plans.usageThisMonth();
             o.put("usage", Map.of("conversations", u.conversations(), "included", u.included(), "overage", u.overage()));
+            o.put("templates", templates.statuses());
         });
         o.put("audit", auditRows(id, 50));
         return o;
@@ -291,6 +295,19 @@ public class OpsController {
         sessions.evictAll();
         audit(http, "REACTIVATED", id, null, null);
         return summary(id).orElseThrow();
+    }
+
+    /** Creates missing WhatsApp templates on the office's account and refreshes Meta's review. */
+    @PostMapping("/api/ops/offices/{id}/templates/sync")
+    Map<String, Object> syncTemplates(HttpServletRequest http, @PathVariable UUID id) {
+        ops.require(http);
+        requireOffice(id);
+        List<Map<String, Object>> rows = TenantContext.call(id, () -> {
+            templates.syncOffice();
+            return templates.statuses();
+        });
+        audit(http, "TEMPLATES_SYNC", id, null, null);
+        return Map.of("templates", rows);
     }
 
     // ---- Users ----

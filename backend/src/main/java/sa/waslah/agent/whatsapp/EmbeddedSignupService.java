@@ -28,12 +28,15 @@ public class EmbeddedSignupService {
     private final MetaGraphClient meta;
     private final WaAccounts accounts;
     private final TransactionTemplate tx;
+    private final WaTemplates templates;
 
-    public EmbeddedSignupService(WaslahProperties props, MetaGraphClient meta, WaAccounts accounts, TransactionTemplate tx) {
+    public EmbeddedSignupService(WaslahProperties props, MetaGraphClient meta, WaAccounts accounts, TransactionTemplate tx,
+                                 WaTemplates templates) {
         this.props = props;
         this.meta = meta;
         this.accounts = accounts;
         this.tx = tx;
+        this.templates = templates;
     }
 
     public Result complete(Request r) {
@@ -43,6 +46,7 @@ public class EmbeddedSignupService {
             String phoneId = blank(r.phoneNumberId()) ? "mock-pn-" + officeId.toString().substring(0, 8) : r.phoneNumberId();
             String waba = blank(r.wabaId()) ? "mock-waba" : r.wabaId();
             UUID id = tx.execute(s -> accounts.save(officeId, waba, phoneId, "+966 50 000 0000", "مكتب تجريبي", "mock-token", true));
+            provisionTemplates(id);
             return new Result(id, "+966 50 000 0000", true);
         }
 
@@ -62,7 +66,17 @@ public class EmbeddedSignupService {
         UUID id = tx.execute(s -> accounts.save(officeId, r.wabaId(), r.phoneNumberId(),
                 info.displayPhone(), info.verifiedName(), token, r.coexistence()));
         log.info("Office {} connected WhatsApp number {} (coexistence={})", officeId, r.phoneNumberId(), r.coexistence());
+        provisionTemplates(id);
         return new Result(id, info.displayPhone(), r.coexistence());
+    }
+
+    /** The office's own copies of Hidaa's templates; a failure here never fails the connection (the sync job retries). */
+    private void provisionTemplates(UUID accountId) {
+        try {
+            accounts.byId(accountId).ifPresent(templates::provision);
+        } catch (RuntimeException e) {
+            log.warn("Templates not provisioned for account {}: {}", accountId, e.getMessage());
+        }
     }
 
     private static boolean blank(String s) {

@@ -26,6 +26,7 @@ import sa.waslah.agent.office.OfficeAlerts;
 import sa.waslah.agent.whatsapp.MessagingWindowPolicy;
 import sa.waslah.agent.whatsapp.OutboundMessageService;
 import sa.waslah.agent.whatsapp.WaAccounts;
+import sa.waslah.agent.whatsapp.WaTemplates;
 import sa.waslah.agent.whatsapp.WhatsAppClient;
 
 /**
@@ -66,12 +67,14 @@ public class BookingService {
     private final OfficeAlerts alerts;
     private final JdbcClient jdbc;
     private final WaslahProperties props;
+    private final WaTemplates templates;
     private final SecureRandom random = new SecureRandom();
 
     public BookingService(BookingStore bookings, BookingSettings.Store settings, ListingStore listings,
                           MarketerStore marketers, ConversationStore conversations, OutboundMessageService outbound,
                           WaAccounts accounts, WhatsAppClient whatsapp, MessagingWindowPolicy window, OfficeAlerts alerts,
-                          JdbcClient jdbc, WaslahProperties props) {
+                          JdbcClient jdbc, WaslahProperties props, WaTemplates templates) {
+        this.templates = templates;
         this.bookings = bookings;
         this.settings = settings;
         this.listings = listings;
@@ -216,7 +219,7 @@ public class BookingService {
         String text = fill(self ? s.templateSelf() : s.templateRep(), v).replaceAll("\n{3,}", "\n\n").trim();
 
         bookings.decide(b.id(), "CONFIRMED", method, code, text);
-        boolean sent = sendToCustomer(b.conversationId(), text, props.agent().reminderTemplate(),
+        boolean sent = sendToCustomer(b.conversationId(), text, WaTemplates.Kind.REMINDER,
                 List.of(v.get("العميل"), l.title(), v.get("اليوم") + " " + v.get("الوقت")));
         if (!sent) {
             alerts.raise(officeId, "CONFIRMATION_NOT_SENT", b.id(),
@@ -240,19 +243,22 @@ public class BookingService {
     }
 
     /** Free text inside the 24-hour window; otherwise the approved template if configured. Returns false if nothing was sent. */
-    boolean sendToCustomer(UUID conversationId, String text, String templateOutsideWindow, List<String> templateParams) {
+    boolean sendToCustomer(UUID conversationId, String text, WaTemplates.Kind templateOutsideWindow, List<String> templateParams) {
         ConversationStore.ConversationRef conv = conversations.find(conversationId).orElseThrow();
         if (window.isOpen(conv.lastInboundAt(), Instant.now())) {
             outbound.sendText(conversationId, text, Sender.AGENT);
             return true;
         }
-        if (templateOutsideWindow == null || templateOutsideWindow.isBlank() || conv.waAccountId() == null) {
+        if (conv.waAccountId() == null) {
             return false;
         }
         try {
+            java.util.Optional<WaTemplates.Resolved> template = templates.resolve(conv.waAccountId(), templateOutsideWindow);
+            if (template.isEmpty()) return false;
             WaAccounts.Account a = accounts.byId(conv.waAccountId()).orElseThrow();
-            String wamid = whatsapp.sendTemplate(accounts.credentials(a), conv.waId(), templateOutsideWindow,
-                    props.agent().handoffTemplateLanguage(), templateParams);
+            List<String> params = templateParams.stream().map(p -> p == null ? "" : p.replaceAll("\\s+", " ").trim()).toList();
+            String wamid = whatsapp.sendTemplate(accounts.credentials(a), conv.waId(), template.get().name(),
+                    template.get().language(), params);
             conversations.insertMessage(a.officeId(), conversationId, wamid, "OUT", Sender.SYSTEM, "template", text, null,
                     "sent", Instant.now());
             return true;

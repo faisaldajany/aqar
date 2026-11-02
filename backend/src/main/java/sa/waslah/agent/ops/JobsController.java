@@ -18,6 +18,7 @@ import sa.waslah.agent.listing.LicenseGuardJob;
 import sa.waslah.agent.privacy.PrivacyService;
 import sa.waslah.agent.report.DailyReport;
 import sa.waslah.agent.support.SupportService;
+import sa.waslah.agent.whatsapp.WaTemplates;
 
 /**
  * Timed jobs as HTTP calls, for Cloud Scheduler when the app scales to zero. Each job is idempotent, so a
@@ -34,10 +35,13 @@ public class JobsController {
     private final DailyReport reports;
     private final PrivacyService privacy;
     private final SupportService support;
+    private final WaTemplates templates;
     private final String token;
 
     public JobsController(BookingJobs bookings, LicenseGuardJob licenses, BillingJobs billing, DailyReport reports,
-                          PrivacyService privacy, SupportService support, @Value("${waslah.jobs.token:}") String token) {
+                          PrivacyService privacy, SupportService support, WaTemplates templates,
+                          @Value("${waslah.jobs.token:}") String token) {
+        this.templates = templates;
         this.bookings = bookings;
         this.licenses = licenses;
         this.billing = billing;
@@ -61,6 +65,7 @@ public class JobsController {
             case "billing" -> billing.daily();           // 07:00 Riyadh
             case "retention" -> privacy.retention();     // 03:30 Riyadh
             case "support-retry" -> support.retry();     // every 10 minutes
+            case "templates" -> templates.syncAll();     // every 3 hours: create missing WhatsApp templates, refresh reviews
             default -> throw ApiException.notFound("no_job", "Unknown job");
         }
         long ms = System.currentTimeMillis() - start;

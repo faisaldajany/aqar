@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import sa.waslah.agent.billing.PlanLimits;
 import sa.waslah.agent.tenant.TenantContext;
 import sa.waslah.agent.whatsapp.WaAccounts;
+import sa.waslah.agent.whatsapp.WaTemplates;
 import sa.waslah.agent.whatsapp.WhatsAppClient;
 
 /**
@@ -38,7 +39,11 @@ public class DailyReport {
     private final WhatsAppClient whatsapp;
     private final ReportProperties props;
 
-    public DailyReport(JdbcClient jdbc, PlanLimits plans, WaAccounts accounts, WhatsAppClient whatsapp, ReportProperties props) {
+    private final WaTemplates templates;
+
+    public DailyReport(JdbcClient jdbc, PlanLimits plans, WaAccounts accounts, WhatsAppClient whatsapp, ReportProperties props,
+                       WaTemplates templates) {
+        this.templates = templates;
         this.jdbc = jdbc;
         this.plans = plans;
         this.accounts = accounts;
@@ -77,16 +82,18 @@ public class DailyReport {
         String sentTo = null, error = null;
         Optional<WaAccounts.Account> acct = jdbc.sql("select id from wa_accounts order by connected_at desc limit 1")
                 .query(UUID.class).optional().flatMap(accounts::byId);
+        Optional<WaTemplates.Resolved> template = templates.resolve(acct.map(WaAccounts.Account::id).orElse(null),
+                WaTemplates.Kind.REPORT);
         if (phone == null) {
             error = "no owner phone";
-        } else if (props.template() == null || props.template().isBlank()) {
+        } else if (template.isEmpty()) {
             error = "no approved report template";
         } else if (acct.isEmpty()) {
             error = "whatsapp not connected";
         } else {
             try {
-                whatsapp.sendTemplate(accounts.credentials(acct.get()), phone, props.template(),
-                        props.templateLanguage(), r.templateParams());
+                whatsapp.sendTemplate(accounts.credentials(acct.get()), phone, template.get().name(),
+                        template.get().language(), r.templateParams());
                 sentTo = phone;
             } catch (RuntimeException e) {
                 error = e.getMessage();

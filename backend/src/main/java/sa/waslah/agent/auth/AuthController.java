@@ -63,32 +63,41 @@ public class AuthController {
         return withSession(s);
     }
 
-    /** Failed attempts are limited per email (10 in 15 minutes) and per IP (30 in 15 minutes). */
+    /**
+     * Wrong passwords are limited in 15 minutes to 10 per email from one address, 50 per email from anywhere and 50 per
+     * address. A stranger guessing someone's password from one address locks out only that address, not the owner.
+     * Every attempt is counted before the password is checked, so parallel guesses cannot slip past the limit, and
+     * given back unless the password was wrong.
+     */
     @PostMapping("/login")
     ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest r, HttpServletRequest http) {
-        String byEmail = "login:" + r.email().trim().toLowerCase(Locale.ROOT);
-        String byIp = "login-ip:" + ClientIp.hash(http, "auth");
-        if (!limits.allowed(byEmail, 10, WINDOW) || !limits.allowed(byIp, 30, WINDOW)) throw RateLimiter.tooMany();
+        String email = r.email().trim().toLowerCase(Locale.ROOT);
+        String ip = ClientIp.hash(http, "auth");
+        String fromHere = loginKey(email, ip);
+        Map<String, Integer> keys = Map.of(fromHere, 10, "login-email:" + email, 50, "login-ip:" + ip, 50);
+        if (!limits.tryAcquireAll(WINDOW, keys)) throw RateLimiter.tooMany();
+        ResponseEntity<Map<String, Object>> ok;
         try {
-            ResponseEntity<Map<String, Object>> ok = withSession(auth.login(r.email(), r.password()));
-            limits.reset(byEmail);
-            return ok;
+            ok = withSession(auth.login(r.email(), r.password()));
         } catch (ApiException e) {
-            if ("bad_credentials".equals(e.code())) {
-                limits.record(byEmail);
-                limits.record(byIp);
-            }
+            if (!"bad_credentials".equals(e.code())) keys.keySet().forEach(limits::undo);
             throw e;
         }
+        keys.keySet().forEach(limits::undo);
+        limits.reset(fromHere);
+        return ok;
+    }
+
+    static String loginKey(String email, String ipHash) {
+        return "login:" + email + "|" + ipHash;
     }
 
     /** Always the same answer, whether or not the email has an account. */
     @PostMapping("/forgot")
     Map<String, Object> forgot(@Valid @RequestBody ForgotRequest r, HttpServletRequest http) {
         limits.check("forgot:" + ClientIp.hash(http, "auth"), 5, Duration.ofHours(1));
-        String byEmail = "forgot-email:" + r.email().trim().toLowerCase(Locale.ROOT);
-        if (limits.allowed(byEmail, 3, Duration.ofHours(1))) {
-            limits.record(byEmail);
+        // Over 3 an hour for one email, nothing is sent, and the answer is still the same.
+        if (limits.tryAcquire("forgot-email:" + r.email().trim().toLowerCase(Locale.ROOT), 3, Duration.ofHours(1))) {
             resets.requestByEmail(r.email());
         }
         return Map.of("ok", true, "message", "إذا كان البريد مسجّلاً لدينا فسيصلك رابط لإعادة تعيين كلمة المرور خلال دقائق.");
@@ -97,8 +106,9 @@ public class AuthController {
     @PostMapping("/reset")
     Map<String, Object> reset(@Valid @RequestBody ResetRequest r, HttpServletRequest http) {
         limits.check("reset:" + ClientIp.hash(http, "auth"), 10, Duration.ofHours(1));
-        String email = resets.reset(r.token(), r.password());
-        limits.reset("login:" + email);
+        String email = resets.reset(r.token(), r.password()).trim().toLowerCase(Locale.ROOT);
+        limits.reset("login-email:" + email);
+        limits.reset(loginKey(email, ClientIp.hash(http, "auth")));
         return Map.of("ok", true);
     }
 

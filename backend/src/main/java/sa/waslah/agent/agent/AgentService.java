@@ -126,10 +126,12 @@ public class AgentService {
         if (conv.isEmpty() || !conv.get().agentActive(Instant.now())) {
             return;
         }
-        if (!subscription.state().serving(Instant.now())) {
-            // Trial over or subscription lapsed: the customer's message stays in the inbox for the office.
-            alerts.raise(e.officeId(), "AGENT_STOPPED", null,
-                    "الوكيل متوقف لأن الاشتراك غير فعّال، ورسائل العملاء تنتظر ردكم في المحادثات. فعّل الاشتراك من صفحة الاشتراك.",
+        sa.waslah.agent.billing.Subscription.State state = subscription.state();
+        if (!state.serving(Instant.now())) {
+            // Trial over, subscription lapsed or office suspended: the customer's message stays in the inbox.
+            alerts.raise(e.officeId(), "AGENT_STOPPED", null, state.suspendedAt() != null
+                            ? "الوكيل متوقف لأن حساب المكتب موقوف من فريق حداء، ورسائل العملاء تنتظر ردكم في واتساب المكتب. تواصل مع الدعم: support@hidaaco.com"
+                            : "الوكيل متوقف لأن الاشتراك غير فعّال، ورسائل العملاء تنتظر ردكم في المحادثات. فعّل الاشتراك من صفحة الاشتراك.",
                     "stopped-" + LocalDate.now(RIYADH));
             return;
         }

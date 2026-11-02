@@ -48,7 +48,9 @@ cannot be sent from another. So after Embedded Signup, Hidaa calls `POST /{waba-
 Wording lives in `WaTemplates.Kind`. Meta usually reviews in minutes. Status is refreshed every 3 hours
 (job `templates`), before a send when it is older than 10 minutes, and from the WhatsApp page or /ops ("تحديث").
 A rejected template shows Meta's reason; change the wording and bump the name (`_v2`), since an approved
-name cannot be edited in place. The office pays Meta for template messages from its own account.
+name cannot be edited in place. Keep the parameters the same: the next sync creates the new name on every
+connected account, and each account keeps sending its approved earlier version until Meta approves the new one.
+The office pays Meta for template messages from its own account.
 
 ## Confirm against Meta's current docs before going live
 

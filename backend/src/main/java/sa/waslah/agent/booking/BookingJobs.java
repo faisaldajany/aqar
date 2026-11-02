@@ -49,8 +49,10 @@ public class BookingJobs {
         }
     }
 
-    /** Must run under the office's tenant. */
+    /** Must run under the office's tenant. A suspended office sends nothing to its customers. */
     public void runFor(UUID office, Instant now) {
+        boolean suspended = jdbc.sql("select suspended_at is not null from offices").query(Boolean.class).optional().orElse(false);
+        if (suspended) return;
         LocalDate today = LocalDate.now(SlotEngine.RIYADH);
         for (BookingStore.Booking b : bookings.dueReminders(now)) {
             String when = SlotEngine.dayLabel(b.startsAt(), today) + " الساعة " + SlotEngine.time(b.startsAt().atZone(SlotEngine.RIYADH).toLocalTime());

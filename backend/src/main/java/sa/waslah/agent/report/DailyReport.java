@@ -68,7 +68,7 @@ public class DailyReport {
 
     /** Must run under the office's tenant. */
     boolean due(int hour, LocalDate date) {
-        Boolean wanted = jdbc.sql("select report_enabled and report_hour = ? from offices").param(hour)
+        Boolean wanted = jdbc.sql("select report_enabled and report_hour = ? and suspended_at is null from offices").param(hour)
                 .query(Boolean.class).single();
         if (!Boolean.TRUE.equals(wanted)) return false;
         return !jdbc.sql("select exists(select 1 from daily_reports where report_date = ?)")

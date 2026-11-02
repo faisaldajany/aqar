@@ -1,6 +1,7 @@
 package sa.waslah.agent.billing;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.tenant.TenantContext;
 
 @RestController
@@ -36,9 +38,11 @@ public class BillingController {
     private final BillingProperties props;
     private final sa.waslah.agent.config.WaslahProperties app;
     private final PromoService promos;
+    private final RateLimiter limits;
 
     public BillingController(BillingService billing, Subscription subscription, PlanLimits plans, BillingProperties props,
-                             sa.waslah.agent.config.WaslahProperties app, PromoService promos) {
+                             sa.waslah.agent.config.WaslahProperties app, PromoService promos, RateLimiter limits) {
+        this.limits = limits;
         this.app = app;
         this.promos = promos;
         this.billing = billing;
@@ -100,8 +104,10 @@ public class BillingController {
         return out;
     }
 
+    /** 10 tries an hour per office, so codes cannot be guessed by trying many. */
     @PostMapping("/api/billing/promo")
     Map<String, Object> applyPromo(@RequestBody PromoRequest r) {
+        limits.check("promo:" + TenantContext.require(), 10, Duration.ofHours(1));
         PromoService.Promo p = promos.apply(r == null ? null : r.code());
         Map<String, Object> out = state();
         out.put("applied", p.summary());

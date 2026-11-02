@@ -70,6 +70,29 @@ class WaTemplatesTest extends IntegrationTest {
         assertThat(TenantContext.call(office, () -> templates.resolve(account, WaTemplates.Kind.REPORT))).isPresent();
     }
 
+    @Test
+    void aNewWordingIsCreatedAndThePreviousApprovedVersionIsSentMeanwhile() {
+        // The office has the previous version of the report template, approved.
+        TenantContext.run(office, () -> jdbc.sql("update wa_templates set name = 'hidaa_daily_report_v0', status = 'APPROVED' where kind = 'REPORT'").update());
+        assertThat(TenantContext.call(office, () -> templates.resolve(account, WaTemplates.Kind.REPORT)))
+                .contains(new WaTemplates.Resolved("hidaa_daily_report_v0", "ar"));
+
+        TenantContext.run(office, () -> templates.syncOffice());
+        List<String> names = TenantContext.call(office, () -> jdbc.sql("select name from wa_templates where kind = 'REPORT' order by name")
+                .query(String.class).list());
+        assertThat(names).containsExactly("hidaa_daily_report_v0", "hidaa_daily_report_v1");
+        assertThat(TenantContext.call(office, () -> templates.resolve(account, WaTemplates.Kind.REPORT)))
+                .as("the new wording is in review").contains(new WaTemplates.Resolved("hidaa_daily_report_v0", "ar"));
+
+        TenantContext.run(office, () -> jdbc.sql("update wa_templates set status = 'APPROVED' where name = 'hidaa_daily_report_v1'").update());
+        assertThat(TenantContext.call(office, () -> templates.resolve(account, WaTemplates.Kind.REPORT)))
+                .contains(new WaTemplates.Resolved("hidaa_daily_report_v1", "ar"));
+        List<Map<String, Object>> report = TenantContext.call(office, () -> templates.statuses()).stream()
+                .filter(r -> "REPORT".equals(r.get("kind"))).toList();
+        assertThat(report).hasSize(1);
+        assertThat(report.get(0).get("name")).isEqualTo("hidaa_daily_report_v1");
+    }
+
     private static final Pattern PARAM = Pattern.compile("\\{\\{(\\d+)}}");
 
     /** Meta rejects templates whose variables are out of order, at the start or end, or side by side. */

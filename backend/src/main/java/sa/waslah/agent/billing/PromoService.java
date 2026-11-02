@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.tenant.TenantContext;
 
@@ -30,8 +31,9 @@ import sa.waslah.agent.tenant.TenantContext;
  *   <li>TRIAL_DAYS: extra days on the free trial, for offices that have not subscribed yet.</li>
  *   <li>A code can be limited to plans and cycles, a date window, a total number of uses, and new customers
  *       (no paid subscription yet). Each office can use each code once, and holds one discount at a time.</li>
- *   <li>A discount counts as used when its first invoice is paid; a trial code when it is applied. A discount the
- *       office has started keeps going for its duration even if the code later expires or is switched off.</li>
+ *   <li>A use is taken from the code's limit when the code is applied, atomically, so a capped code never goes over
+ *       its cap; removing a discount before any invoice used it gives the use back. A discount the office has started
+ *       keeps going for its duration even if the code later expires or is switched off.</li>
  * </ul>
  * Office-side methods run under the office's tenant.
  */
@@ -93,9 +95,11 @@ public class PromoService {
     private static final String P_COLUMNS = String.join(", ", FIELDS.stream().map(f -> "p." + f).toList());
 
     private final JdbcClient jdbc;
+    private final TransactionTemplate tx;
 
-    public PromoService(JdbcClient jdbc) {
+    public PromoService(JdbcClient jdbc, TransactionTemplate tx) {
         this.jdbc = jdbc;
+        this.tx = tx;
     }
 
     /** Uppercase, no spaces: " launch30 " is LAUNCH30. */
@@ -126,44 +130,65 @@ public class PromoService {
         return p;
     }
 
-    /** Applies a code to the current office. Trial codes take effect now; discounts wait for the next invoice. */
+    /**
+     * Applies a code to the current office, serialized per office. A use is taken from the code's limit here, in the
+     * same transaction as the office's claim, so a capped code never goes over its cap and two parallel requests
+     * cannot both use it; an office that removes a discount before any invoice used it gives the use back.
+     * Trial codes take effect now; discounts wait for the next subscription invoice.
+     */
     public Promo apply(String code) {
+        // The code the office already holds: nothing to do (even if it has since reached its cap with this office's use).
+        Optional<Applied> held = current();
+        if (held.isPresent() && held.get().promo().code().equals(normalize(code))) return held.get().promo();
         Promo p = usable(code);
         UUID office = TenantContext.require();
-        boolean usedBefore = jdbc.sql("select exists(select 1 from promo_redemptions where promo_code_id = ?)")
-                .param(p.id()).query(Boolean.class).single();
-        if (usedBefore) throw ApiException.conflict("promo_already_used", "استخدمت هذا الكود من قبل.");
-        boolean customer = hasPaidSubscription();
-        if (p.newCustomersOnly() && customer) {
-            throw ApiException.badRequest("promo_new_only", "هذا الكود للمشتركين الجدد فقط.");
-        }
-
-        if ("TRIAL_DAYS".equals(p.kind())) {
-            String status = jdbc.sql("select subscription_status from offices").query(String.class).single();
-            if (customer || !("TRIAL".equals(status) || "EXPIRED".equals(status))) {
-                throw ApiException.badRequest("promo_trial_only", "أيام التجربة الإضافية للحسابات التي لم تشترك بعد.");
+        return tx.execute(status -> {
+            lockOffice();
+            boolean customer = hasPaidSubscription();
+            if (p.newCustomersOnly() && customer) {
+                throw ApiException.badRequest("promo_new_only", "هذا الكود للمشتركين الجدد فقط.");
             }
-            jdbc.sql("""
-                    update offices set subscription_status = 'TRIAL',
-                           trial_ends_at = greatest(trial_ends_at, now()) + make_interval(days => ?)""")
-                    .param(p.trialDays()).update();
-            recordRedemption(office, p.id());
-            return p;
-        }
 
-        Optional<Applied> current = current();
-        if (current.isPresent() && !current.get().promo().id().equals(p.id())
-                && current.get().periodsUsed() > 0 && !current.get().usedUp()) {
-            throw ApiException.conflict("promo_active", "لديك خصم فعّال حالياً (" + current.get().promo().code()
-                    + "). يمكنك استخدام كود جديد بعد انتهائه.");
-        }
-        jdbc.sql("update offices set promo_code_id = ?, promo_periods_used = 0").param(p.id()).update();
-        return p;
+            if ("TRIAL_DAYS".equals(p.kind())) {
+                String st = jdbc.sql("select subscription_status from offices").query(String.class).single();
+                if (customer || !("TRIAL".equals(st) || "EXPIRED".equals(st))) {
+                    throw ApiException.badRequest("promo_trial_only", "أيام التجربة الإضافية للحسابات التي لم تشترك بعد.");
+                }
+                claim(office, p);
+                jdbc.sql("""
+                        update offices set subscription_status = 'TRIAL',
+                               trial_ends_at = greatest(trial_ends_at, now()) + make_interval(days => ?)""")
+                        .param(p.trialDays()).update();
+                return p;
+            }
+
+            Optional<Applied> current = current();
+            if (current.isPresent() && current.get().promo().id().equals(p.id())) return p;
+            if (current.isPresent() && current.get().periodsUsed() > 0 && !current.get().usedUp()) {
+                throw ApiException.conflict("promo_active", "لديك خصم فعّال حالياً (" + current.get().promo().code()
+                        + "). يمكنك استخدام كود جديد بعد انتهائه.");
+            }
+            boolean claimedBefore = jdbc.sql("select exists(select 1 from promo_redemptions where promo_code_id = ?)")
+                    .param(p.id()).query(Boolean.class).single();
+            if (claimedBefore) {
+                // Claimed earlier and kept (e.g. replaced after use): only if no paid invoice ever carried it.
+                if (usedOnPaidInvoice(p.id())) throw ApiException.conflict("promo_already_used", "استخدمت هذا الكود من قبل.");
+            } else {
+                claim(office, p);
+            }
+            current.ifPresent(this::releaseIfUnused);
+            jdbc.sql("update offices set promo_code_id = ?, promo_periods_used = 0").param(p.id()).update();
+            return p;
+        });
     }
 
-    /** Removes the office's discount. Periods already discounted stay on their invoices. */
+    /** Removes the office's discount; if no invoice used it yet, its use goes back to the code. */
     public void remove() {
-        jdbc.sql("update offices set promo_code_id = null, promo_periods_used = 0").update();
+        tx.executeWithoutResult(status -> {
+            lockOffice();
+            current().ifPresent(this::releaseIfUnused);
+            jdbc.sql("update offices set promo_code_id = null, promo_periods_used = 0").update();
+        });
     }
 
     public Optional<Applied> current() {
@@ -179,11 +204,11 @@ public class PromoService {
         if (!p.plans().isEmpty() && !p.plans().contains(plan.name())) return 0;
         if (!p.cycles().isEmpty() && !p.cycles().contains(cycle)) return 0;
         if (a.periodsUsed() == 0) {
-            // Not started yet: the code must still be valid. Once started, it runs its course.
+            // Not started yet: the code must still be on and in its window (its use was already taken when applied).
+            // Once started, it runs its course.
             Instant now = Instant.now();
             if (!p.active() || (p.expiresAt() != null && !p.expiresAt().isAfter(now))
-                    || (p.startsAt() != null && p.startsAt().isAfter(now))
-                    || (p.maxRedemptions() != null && p.redemptions() >= p.maxRedemptions())) {
+                    || (p.startsAt() != null && p.startsAt().isAfter(now))) {
                 return 0;
             }
         }
@@ -194,25 +219,49 @@ public class PromoService {
         return Math.min(off, grossHalalas);
     }
 
-    /** A discounted subscription invoice was paid: count the period, and the code's use on its first period. */
+    /** A discounted subscription invoice was paid: one more period of the office's discount is used. */
     public void onPaid(UUID promoCodeId) {
         if (promoCodeId == null) return;
         jdbc.sql("update offices set promo_periods_used = promo_periods_used + 1 where promo_code_id = ?")
                 .param(promoCodeId).update();
-        recordRedemption(TenantContext.require(), promoCodeId);
     }
 
-    private void recordRedemption(UUID office, UUID promoCodeId) {
+    /** The office's claim and the code's count, both or neither (the caller's transaction rolls back on a throw). */
+    private void claim(UUID office, Promo p) {
         int added = jdbc.sql("insert into promo_redemptions (office_id, promo_code_id) values (?, ?) on conflict do nothing")
-                .params(office, promoCodeId).update();
-        if (added == 1) {
-            jdbc.sql("update promo_codes set redemptions = redemptions + 1 where id = ?").param(promoCodeId).update();
+                .params(office, p.id()).update();
+        if (added == 0) throw ApiException.conflict("promo_already_used", "استخدمت هذا الكود من قبل.");
+        int counted = jdbc.sql("""
+                        update promo_codes set redemptions = redemptions + 1
+                        where id = ? and (max_redemptions is null or redemptions < max_redemptions)""")
+                .param(p.id()).update();
+        if (counted == 0) throw ApiException.badRequest("promo_used_up", "انتهى عدد مرات استخدام هذا الكود.");
+    }
+
+    private void releaseIfUnused(Applied a) {
+        if (a.periodsUsed() > 0 || usedOnPaidInvoice(a.promo().id())) return;
+        // Its unpaid invoices go too, so the discount is not paid for after its use was given back.
+        jdbc.sql("update invoices set status = 'VOID' where promo_code_id = ? and status = 'DUE'").param(a.promo().id()).update();
+        int removed = jdbc.sql("delete from promo_redemptions where promo_code_id = ?").param(a.promo().id()).update();
+        if (removed == 1) {
+            jdbc.sql("update promo_codes set redemptions = greatest(redemptions - 1, 0) where id = ?").param(a.promo().id()).update();
         }
     }
 
+    private boolean usedOnPaidInvoice(UUID promoId) {
+        return jdbc.sql("select exists(select 1 from invoices where promo_code_id = ? and status = 'PAID')")
+                .param(promoId).query(Boolean.class).single();
+    }
+
+    /** Any paid subscription (a 100% promo period included): the office is no longer a new customer. */
     private boolean hasPaidSubscription() {
-        return jdbc.sql("select exists(select 1 from invoices where kind = 'SUBSCRIPTION' and status = 'PAID' and total_halalas > 0)")
+        return jdbc.sql("select exists(select 1 from invoices where kind = 'SUBSCRIPTION' and status = 'PAID')")
                 .query(Boolean.class).single();
+    }
+
+    /** Serializes promo and checkout changes for the current office (its offices row, under RLS). */
+    void lockOffice() {
+        jdbc.sql("select id from offices for update").query(UUID.class).optional();
     }
 
     // ---- Operator side (not tenant data) ----

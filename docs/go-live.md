@@ -117,9 +117,14 @@ Needs Hidaa/legal:
 
 ## 8. Security built in
 
-- Sign-in, signup, password reset and admin login are rate-limited (in memory; the API runs as one instance).
+- Sign-in, signup, password reset, promo codes and the admin key are rate-limited (in memory; the API runs as one
+  instance). Wrong passwords: 10 per email from one address, 50 per email, 50 per address, per 15 minutes, so a
+  stranger cannot lock an owner out from one address. IPv6 callers are counted by their /64 network.
 - Disabling a user, suspending an office or changing a password ends existing sessions on the next request.
-- Password reset links are one-time, stored hashed, valid 1 hour (24 hours when created in /ops).
+  A suspended office's agent, reminders, follow-ups and daily report stop until it is reactivated.
+- Password reset links are one-time (claimed atomically), stored hashed, valid 1 hour (24 hours when created in /ops).
+- Admin key: at least 24 characters (setup.sh makes 48). Changing it (`admin-token` secret, then redeploy) ends every
+  /ops session. Wrong keys: 5 per 15 minutes per address, for the login form and the `X-Admin-Token` header together.
 - Pages send HSTS, no-framing, nosniff, referrer and permissions headers and a minimal CSP. A stricter CSP
   (script sources) can follow once WhatsApp Embedded Signup has been tested end-to-end with it.
 

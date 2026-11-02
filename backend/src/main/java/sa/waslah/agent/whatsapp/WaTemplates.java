@@ -20,8 +20,9 @@ import sa.waslah.agent.tenant.TenantContext;
  * The four Utility templates Hidaa sends outside WhatsApp's 24-hour window, created on each office's own WhatsApp
  * Business account when it connects (a template only works on the account it was approved on). Meta reviews them,
  * usually within minutes; until one is APPROVED the message is not sent and the office is alerted, as before.
- * Parameter order is fixed by the callers, so a changed wording needs a new name (bump the _v suffix).
- * Office-side methods run under the office's tenant.
+ * Parameter order is fixed by the callers, so a changed wording needs a new name (bump the _v suffix) and must keep
+ * the same parameters: the next sync creates the new version on every account, and the previous approved version is
+ * still sent until Meta approves the new one. Office-side methods run under the office's tenant.
  */
 @Service
 public class WaTemplates {
@@ -76,13 +77,13 @@ public class WaTemplates {
     }
 
     /**
-     * Creates the templates this account does not have yet (or that failed before). Never throws: a failure is stored as
-     * ERROR with Meta's reason and retried by the next sync. In mock mode the rows are recorded as PENDING.
+     * Creates the current version of each template this account does not have yet (or that failed before). Never
+     * throws: a failure is stored as ERROR with Meta's reason and retried by the next sync. In mock mode the rows are
+     * recorded as PENDING.
      */
     public void provision(WaAccounts.Account acct) {
         for (Kind k : Kind.values()) {
-            Optional<String> status = jdbc.sql("select status from wa_templates where wa_account_id = ? and kind = ?")
-                    .params(acct.id(), k.name()).query(String.class).optional();
+            Optional<String> status = currentStatus(acct.id(), k);
             if (status.isPresent() && !"ERROR".equals(status.get())) continue;
             if (props.whatsapp().isMock()) {
                 upsert(acct, k, "PENDING", null, null);
@@ -99,13 +100,12 @@ public class WaTemplates {
         }
     }
 
-    /** Asks Meta for the current status of every template on this account that is not approved yet. */
+    /** Asks Meta for the current status of every current-version template on this account that is not approved yet. */
     public void refresh(WaAccounts.Account acct) {
         if (props.whatsapp().isMock()) return;
         String token = accounts.credentials(acct).accessToken();
         for (Kind k : Kind.values()) {
-            String status = jdbc.sql("select status from wa_templates where wa_account_id = ? and kind = ?")
-                    .params(acct.id(), k.name()).query(String.class).optional().orElse(null);
+            String status = currentStatus(acct.id(), k).orElse(null);
             if (status == null || "ERROR".equals(status) || "APPROVED".equals(status)) continue;
             try {
                 meta.findTemplate(acct.wabaId(), token, k.templateName, LANGUAGE).ifPresentOrElse(
@@ -140,29 +140,27 @@ public class WaTemplates {
     }
 
     /**
-     * The template to send for {@code kind} from this account: its own approved one. A pending one is re-checked with
-     * Meta at most every 10 minutes. Falls back to a name set in configuration (Hidaa's own number), else empty.
+     * The template to send for {@code kind} from this account: its own approved current version, else its latest
+     * approved earlier version (while the new wording is in review). A pending one is re-checked with Meta at most
+     * every 10 minutes. Falls back to a name set in configuration (Hidaa's own number), else empty.
      */
     public Optional<Resolved> resolve(UUID waAccountId, Kind kind) {
         if (waAccountId != null) {
-            record Row(String name, String language, String status, Instant checkedAt) {
-            }
-            Optional<Row> row = jdbc.sql("select name, language, status, checked_at from wa_templates where wa_account_id = ? and kind = ?")
-                    .params(waAccountId, kind.name())
-                    .query((rs, n) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3),
-                            rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toInstant()))
-                    .optional();
-            if (row.isPresent() && "PENDING".equals(row.get().status()) && !props.whatsapp().isMock()
-                    && (row.get().checkedAt() == null || row.get().checkedAt().isBefore(Instant.now().minus(RECHECK)))) {
+            Optional<Row> current = row(waAccountId, kind.templateName);
+            if (current.isPresent() && "PENDING".equals(current.get().status()) && !props.whatsapp().isMock()
+                    && (current.get().checkedAt() == null || current.get().checkedAt().isBefore(Instant.now().minus(RECHECK)))) {
                 accounts.byId(waAccountId).ifPresent(this::refresh);
-                row = jdbc.sql("select name, language, status, checked_at from wa_templates where wa_account_id = ? and kind = ?")
-                        .params(waAccountId, kind.name())
-                        .query((rs, n) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3), null))
-                        .optional();
+                current = row(waAccountId, kind.templateName);
             }
-            if (row.isPresent() && "APPROVED".equals(row.get().status())) {
-                return Optional.of(new Resolved(row.get().name(), row.get().language()));
+            if (current.isPresent() && "APPROVED".equals(current.get().status())) {
+                return Optional.of(new Resolved(current.get().name(), current.get().language()));
             }
+            Optional<Resolved> previous = jdbc.sql("""
+                            select name, language from wa_templates
+                            where wa_account_id = ? and kind = ? and status = 'APPROVED' order by updated_at desc limit 1""")
+                    .params(waAccountId, kind.name())
+                    .query((rs, n) -> new Resolved(rs.getString(1), rs.getString(2))).optional();
+            if (previous.isPresent()) return previous;
         }
         String configured = switch (kind) {
             case HANDOFF -> props.agent().handoffTemplate();
@@ -175,9 +173,17 @@ public class WaTemplates {
         return Optional.of(new Resolved(configured, lang == null || lang.isBlank() ? LANGUAGE : lang));
     }
 
-    /** The current office's templates, for the portal and the operator console. */
+    /**
+     * The current office's templates on its latest connected account, one per kind, for the portal and the operator
+     * console: the one that is sent (approved, current version first), else the current version's review.
+     */
     public List<Map<String, Object>> statuses() {
-        return jdbc.sql("select kind, name, status, reason, updated_at from wa_templates order by kind")
+        String current = String.join(",", java.util.Arrays.stream(Kind.values()).map(k -> k.templateName).toList());
+        return jdbc.sql("""
+                        select distinct on (kind) kind, name, status, reason, updated_at from wa_templates
+                        where wa_account_id = (select id from wa_accounts order by connected_at desc limit 1)
+                        order by kind, (status = 'APPROVED') desc, (name = any(string_to_array(?, ','))) desc, updated_at desc""")
+                .param(current)
                 .query((rs, n) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("kind", rs.getString(1));
@@ -189,12 +195,29 @@ public class WaTemplates {
                 }).list();
     }
 
+    record Row(String name, String language, String status, Instant checkedAt) {
+    }
+
+    private Optional<Row> row(UUID waAccountId, String name) {
+        return jdbc.sql("select name, language, status, checked_at from wa_templates where wa_account_id = ? and name = ?")
+                .params(waAccountId, name)
+                .query((rs, n) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3),
+                        rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toInstant()))
+                .optional();
+    }
+
+    /** The status of the current version of {@code k} on this account, if it was ever created. */
+    private Optional<String> currentStatus(UUID waAccountId, Kind k) {
+        return row(waAccountId, k.templateName).map(Row::status);
+    }
+
+    /** Records the current version of {@code k} on this account. */
     private void upsert(WaAccounts.Account acct, Kind k, String status, String metaId, String reason) {
         jdbc.sql("""
                 insert into wa_templates (office_id, wa_account_id, kind, name, language, status, meta_id, reason, checked_at, updated_at)
                 values (?, ?, ?, ?, ?, ?, ?, ?, now(), now())
-                on conflict (wa_account_id, kind) do update set
-                    name = excluded.name, status = excluded.status, meta_id = coalesce(excluded.meta_id, wa_templates.meta_id),
+                on conflict (wa_account_id, name) do update set
+                    status = excluded.status, meta_id = coalesce(excluded.meta_id, wa_templates.meta_id),
                     reason = excluded.reason, checked_at = now(), updated_at = now()""")
                 .params(acct.officeId(), acct.id(), k.name(), k.templateName, LANGUAGE, status == null ? "PENDING" : status,
                         metaId, reason == null ? null : reason.length() > 500 ? reason.substring(0, 500) : reason)

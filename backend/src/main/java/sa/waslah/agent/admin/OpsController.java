@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,13 +72,12 @@ public class OpsController {
     private final PromoService promos;
     private final PasswordResetService resets;
     private final SessionGuard sessions;
-    private final RateLimiter limits;
     private final Mailer mailer;
     private final WaTemplates templates;
 
     public OpsController(JdbcClient jdbc, OpsAuth ops, PlanLimits plans, OfficeAlerts alerts, BillingService billing,
-                         PromoService promos, PasswordResetService resets, SessionGuard sessions, RateLimiter limits,
-                         Mailer mailer, WaTemplates templates) {
+                         PromoService promos, PasswordResetService resets, SessionGuard sessions, Mailer mailer,
+                         WaTemplates templates) {
         this.templates = templates;
         this.jdbc = jdbc;
         this.ops = ops;
@@ -89,23 +87,20 @@ public class OpsController {
         this.promos = promos;
         this.resets = resets;
         this.sessions = sessions;
-        this.limits = limits;
         this.mailer = mailer;
     }
 
     // ---- Session ----
 
-    /** 5 wrong keys per 15 minutes per address; the same 404 as a disabled console. */
+    /** 5 wrong keys per 15 minutes per address (shared with the header); a disabled console is a 404. */
     @PostMapping("/api/ops/login")
     ResponseEntity<Map<String, Object>> login(@RequestBody Login r, HttpServletRequest http) {
         if (!ops.enabled()) throw OpsAuth.notFound();
-        String key = "ops-login:" + ClientIp.hash(http, "ops");
-        if (!limits.allowed(key, 5, Duration.ofMinutes(15))) throw RateLimiter.tooMany();
-        if (r == null || !ops.keyMatches(r.key())) {
-            limits.record(key);
-            throw new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED, "bad_key", "مفتاح الإدارة غير صحيح.");
+        switch (ops.check(http, r == null ? null : r.key())) {
+            case LIMITED -> throw RateLimiter.tooMany();
+            case WRONG -> throw new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED, "bad_key", "مفتاح الإدارة غير صحيح.");
+            case OK -> { }
         }
-        limits.reset(key);
         audit(http, "LOGIN", null, null, null);
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, ops.sessionCookie().toString()).body(Map.of("ok", true));
     }
@@ -264,6 +259,9 @@ public class OpsController {
         PlanLimits.Plan plan = parsePlan(p == null ? null : p.plan());
         String warning = TenantContext.call(id, () -> {
             jdbc.sql("update offices set plan = ?").param(plan.name()).update();
+            // An unpaid invoice for another plan would switch the plan back when paid.
+            jdbc.sql("update invoices set status = 'VOID' where kind = 'SUBSCRIPTION' and status = 'DUE' and plan <> ?")
+                    .param(plan.name()).update();
             int active = jdbc.sql("select count(*) from marketers where active").query(Integer.class).single();
             return active > plan.marketers
                     ? "لدى المكتب " + active + " مسوّقين نشطين وباقة " + plan.arabicName + " تسمح بـ " + plan.marketers + "."

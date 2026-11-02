@@ -27,7 +27,8 @@ create table promo_codes (
 );
 grant select, insert, update on promo_codes to waslah_app;
 
--- Codes an office has used: once per office per code. Tenant data.
+-- Codes an office has claimed: once per office per code. A row is the office's use of the code's limit, taken when the
+-- code is applied (so a capped code cannot go over its cap) and given back if an unused discount is removed. Tenant data.
 create table promo_redemptions (
     office_id      uuid        not null references offices (id),
     promo_code_id  uuid        not null references promo_codes (id),
@@ -38,7 +39,7 @@ alter table promo_redemptions enable row level security;
 alter table promo_redemptions force row level security;
 create policy tenant_isolation on promo_redemptions
     using (office_id = app_current_office()) with check (office_id = app_current_office());
-grant select, insert on promo_redemptions to waslah_app;
+grant select, insert, delete on promo_redemptions to waslah_app;
 
 alter table offices
     add column promo_code_id       uuid references promo_codes (id),

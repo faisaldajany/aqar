@@ -11,6 +11,8 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,13 @@ public class PasswordResetService {
     }
 
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    /** One background thread for reset emails; they are rate-limited to a handful an hour. */
+    private final ExecutorService mailThread = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "reset-mail");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final JdbcClient jdbc;
     private final PasswordEncoder passwords;
@@ -59,14 +68,17 @@ public class PasswordResetService {
         return new Link(base() + "/reset?token=" + token, expires);
     }
 
-    /** "Forgot password": emails a link if the address belongs to an active user. Says nothing either way. */
+    /**
+     * "Forgot password": emails a link if the address belongs to an active user. Says nothing either way, and the email
+     * goes out in the background, so the answer takes as long whether or not the address has an account.
+     */
     public void requestByEmail(String email) {
         String e = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
         Optional<UUID> user = jdbc.sql("select id from users where email = ? and disabled_at is null")
                 .param(e).query(UUID.class).optional();
         if (user.isEmpty()) return;
         Link link = create(user.get(), false);
-        mailer.send(e, "إعادة تعيين كلمة المرور — حداء", """
+        mailThread.execute(() -> mailer.send(e, "إعادة تعيين كلمة المرور — حداء", """
                 مرحباً،
 
                 طلبت إعادة تعيين كلمة المرور لحسابك في حداء. افتح الرابط التالي خلال ساعة لتعيين كلمة مرور جديدة:
@@ -77,7 +89,7 @@ public class PasswordResetService {
 
                 فريق حداء
                 support@hidaaco.com
-                """.formatted(link.url()));
+                """.formatted(link.url())));
     }
 
     /** Sets the new password if the link is valid, unused and not expired; returns the user's email. */
@@ -85,27 +97,29 @@ public class PasswordResetService {
         if (newPassword == null || newPassword.length() < MIN_LENGTH || newPassword.length() > 128) {
             throw ApiException.badRequest("weak_password", "كلمة المرور من 8 أحرف على الأقل.");
         }
-        record Row(UUID userId, Instant expiresAt, Instant usedAt, String email, Instant disabledAt) {
+        record Claimed(UUID userId, String email) {
         }
-        Optional<Row> row = token == null || token.isBlank() ? Optional.empty() : jdbc.sql("""
-                        select r.user_id, r.expires_at, r.used_at, u.email, u.disabled_at
-                        from password_resets r join users u on u.id = r.user_id where r.token_hash = ?""")
+        // Using the link and checking it are one statement: two requests with the same link cannot both get through.
+        Optional<Claimed> claimed = token == null || token.isBlank() ? Optional.empty() : jdbc.sql("""
+                        update password_resets r set used_at = now()
+                        from users u
+                        where r.token_hash = ? and r.used_at is null and r.expires_at > now()
+                          and u.id = r.user_id and u.disabled_at is null
+                        returning r.user_id, u.email""")
                 .param(sha256(token.trim()))
-                .query((rs, n) -> new Row(rs.getObject(1, UUID.class), rs.getTimestamp(2).toInstant(),
-                        rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toInstant(), rs.getString(4),
-                        rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant()))
+                .query((rs, n) -> new Claimed(rs.getObject(1, UUID.class), rs.getString(2)))
                 .optional();
-        if (row.isEmpty() || row.get().usedAt() != null || !row.get().expiresAt().isAfter(Instant.now())
-                || row.get().disabledAt() != null) {
+        if (claimed.isEmpty()) {
             throw ApiException.badRequest("reset_invalid", "الرابط غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.");
         }
-        UUID userId = row.get().userId();
-        jdbc.sql("update users set password_hash = ?, password_changed_at = now() where id = ?")
-                .params(passwords.encode(newPassword), userId).update();
+        UUID userId = claimed.get().userId();
+        // The application's clock, like the session's issue time it is compared with (SessionGuard).
+        jdbc.sql("update users set password_hash = ?, password_changed_at = ? where id = ?")
+                .params(passwords.encode(newPassword), Timestamp.from(Instant.now()), userId).update();
         // Every outstanding link for this user stops working, not only this one.
         jdbc.sql("update password_resets set used_at = now() where user_id = ? and used_at is null").param(userId).update();
         sessions.evictUser(userId);
-        return row.get().email();
+        return claimed.get().email();
     }
 
     private String base() {

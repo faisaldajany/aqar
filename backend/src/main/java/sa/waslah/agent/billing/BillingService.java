@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.office.OfficeAlerts;
 
@@ -36,10 +37,12 @@ public class BillingService {
     private final PlanLimits plans;
     private final OfficeAlerts alerts;
     private final PromoService promos;
+    private final TransactionTemplate tx;
 
     public BillingService(JdbcClient jdbc, PaymentGateway gateway, BillingProperties props, Subscription subscription,
-                          PlanLimits plans, OfficeAlerts alerts, PromoService promos) {
+                          PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx) {
         this.promos = promos;
+        this.tx = tx;
         this.jdbc = jdbc;
         this.gateway = gateway;
         this.props = props;
@@ -53,6 +56,14 @@ public class BillingService {
         if (!"MONTHLY".equals(cycle) && !"ANNUAL".equals(cycle)) {
             throw ApiException.badRequest("bad_cycle", "اختر الدفع الشهري أو السنوي.");
         }
+        // One checkout at a time per office (row lock): parallel requests cannot each take a discounted or free period.
+        return tx.execute(status -> {
+            promos.lockOffice();
+            return checkoutLocked(officeId, plan, cycle);
+        });
+    }
+
+    private Invoice checkoutLocked(UUID officeId, PlanLimits.Plan plan, String cycle) {
         int activeMarketers = jdbc.sql("select count(*) from marketers where active").query(Integer.class).single();
         if (activeMarketers > plan.marketers) {
             throw ApiException.conflict("too_many_marketers",
@@ -95,9 +106,11 @@ public class BillingService {
         if (months < 1 || months > 24) throw ApiException.badRequest("bad_months", "عدد الأشهر من 1 إلى 24.");
         String desc = "أشهر مجانية من فريق حداء — باقة " + plan.arabicName + " (" + months + (months == 1 ? " شهر)" : " أشهر)")
                 + (reason == null || reason.isBlank() ? "" : " — " + reason.trim());
-        Invoice inv = create(officeId, "COMP", plan.name(), "MONTHLY", desc, null, null, 0, 0, null, null, false);
+        // The office keeps its billing cycle: free months on an annual subscription do not turn it monthly.
+        String cycle = subscription.state().cycle();
+        Invoice inv = create(officeId, "COMP", plan.name(), cycle, desc, null, null, 0, 0, null, null, false);
         jdbc.sql("update invoices set status = 'PAID', paid_at = now() where id = ?").param(inv.id()).update();
-        subscription.activateFor(plan, "MONTHLY", months, Instant.now());
+        subscription.activateFor(plan, cycle, months, Instant.now());
         return find(inv.id()).orElseThrow();
     }
 

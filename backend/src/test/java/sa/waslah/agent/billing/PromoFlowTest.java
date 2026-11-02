@@ -177,6 +177,79 @@ class PromoFlowTest extends IntegrationTest {
     }
 
     @Test
+    void aCappedCodesUseIsTakenWhenAppliedAndGivenBackWhenRemovedUnused() {
+        PromoService.Promo one = promos.create(new PromoService.NewPromo("CAP" + tag, "PERCENT", 10, null, null, 1,
+                List.of(), List.of(), false, 1, null, null, null));
+        as(office, () -> promos.apply(one.code()));
+        assertThat(promos.find(one.code()).orElseThrow().redemptions()).isEqualTo(1);
+        assertThat(as(office, () -> promos.apply(one.code())).code()).as("applying the held code again is fine").isEqualTo(one.code());
+        UUID other = newOffice();
+        assertThatThrownBy(() -> as(other, () -> promos.apply(one.code()))).hasMessageContaining("عدد مرات");
+
+        BillingService.Invoice due = as(office, () -> billing.checkout(office, PlanLimits.Plan.BASIC, "MONTHLY"));
+        assertThat(due.discountHalalas()).isPositive();
+        as(office, () -> {
+            promos.remove();
+            return null;
+        });
+        assertThat(promos.find(one.code()).orElseThrow().redemptions()).isZero();
+        String status = as(office, () -> jdbc.sql("select status from invoices where id = ?").param(due.id()).query(String.class).single());
+        assertThat(status).as("its unpaid invoice went with it").isEqualTo("VOID");
+        as(other, () -> promos.apply(one.code()));
+        assertThat(promos.find(one.code()).orElseThrow().redemptions()).isEqualTo(1);
+    }
+
+    @Test
+    void parallelCheckoutsGetOneFreePeriod() throws Exception {
+        PromoService.Promo free = percent("ONEFREE", 100, 1);
+        as(office, () -> promos.apply(free.code()));
+        Instant trialEnd = as(office, () -> subscription.state().trialEndsAt());
+        List<Object> results = parallel(6, () -> as(office, () -> billing.checkout(office, PlanLimits.Plan.BASIC, "MONTHLY")));
+        assertThat(results).allMatch(r -> r instanceof BillingService.Invoice);
+        long free100 = as(office, () -> jdbc.sql("select count(*) from invoices where status = 'PAID' and total_halalas = 0")
+                .query(Long.class).single());
+        assertThat(free100).isEqualTo(1);
+        Subscription.State s = as(office, () -> subscription.state());
+        assertThat(s.paidUntil()).isBefore(trialEnd.plus(java.time.Duration.ofDays(32)));
+        assertThat(as(office, () -> promos.current().orElseThrow().periodsUsed())).isEqualTo(1);
+    }
+
+    @Test
+    void parallelTrialCodeExtendsTheTrialOnce() throws Exception {
+        PromoService.Promo p = promos.create(new PromoService.NewPromo("TWICE" + tag, "TRIAL_DAYS", null, null, 16, null,
+                List.of(), List.of(), true, null, null, null, null));
+        List<Object> results = parallel(6, () -> as(office, () -> promos.apply(p.code())));
+        assertThat(results).filteredOn(r -> r instanceof PromoService.Promo).hasSize(1);
+        assertThat(as(office, () -> subscription.state().trialDaysLeft(Instant.now()))).isEqualTo(30);
+        assertThat(promos.find(p.code()).orElseThrow().redemptions()).isEqualTo(1);
+    }
+
+    /** Runs {@code task} on n threads at once; each result is the value or the exception. */
+    static List<Object> parallel(int n, java.util.concurrent.Callable<Object> task) throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(n);
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        try {
+            List<java.util.concurrent.Future<Object>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < n; i++) {
+                futures.add(pool.submit(() -> {
+                    go.await();
+                    try {
+                        return task.call();
+                    } catch (RuntimeException e) {
+                        return e;
+                    }
+                }));
+            }
+            go.countDown();
+            List<Object> out = new java.util.ArrayList<>();
+            for (java.util.concurrent.Future<Object> f : futures) out.add(f.get(60, java.util.concurrent.TimeUnit.SECONDS));
+            return out;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void operatorCanSwitchACodeOff() {
         PromoService.Promo p = percent("OFF", 10, 1);
         promos.setActive(p.id(), false);

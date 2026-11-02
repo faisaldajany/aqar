@@ -8,15 +8,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -25,7 +26,8 @@ import sa.waslah.agent.tenant.TenantFilter;
 /**
  * Sessions are stateless JWTs that live 12 hours. This ends one early when its user is disabled, its office is
  * suspended, or the password changed after the token was issued. The check is cached for 30 seconds per user, and
- * the operator console evicts the cache on every change, so its effect is immediate.
+ * every change evicts the cache, so its effect is immediate. A lookup that was already running when the cache was
+ * evicted may have read the old state, so its result is not kept.
  */
 @Component
 public class SessionGuard {
@@ -37,6 +39,8 @@ public class SessionGuard {
 
     private final JdbcClient jdbc;
     private final Map<UUID, Status> cache = new ConcurrentHashMap<>();
+    /** Bumped by every eviction, before the entry is removed. */
+    private final AtomicLong evictions = new AtomicLong();
 
     public SessionGuard(JdbcClient jdbc) {
         this.jdbc = jdbc;
@@ -46,6 +50,7 @@ public class SessionGuard {
     public String revoked(UUID userId, UUID officeId, Instant issuedAt) {
         Status s = cache.get(userId);
         if (s == null || System.currentTimeMillis() - s.loadedAt() > TTL_MS) {
+            long before = evictions.get();
             Optional<Status> loaded = jdbc.sql("""
                             select u.disabled_at, u.password_changed_at,
                                    (select o.suspended_at from offices o where o.id = u.office_id)
@@ -57,24 +62,35 @@ public class SessionGuard {
             if (loaded.isEmpty()) return "unknown_user";
             s = loaded.get();
             cache.put(userId, s);
+            // Evicted while reading: drop what was read. (An eviction after this check removes it itself.)
+            if (evictions.get() != before) cache.remove(userId, s);
         }
         if (s.disabledAt() != null) return "disabled";
         if (s.suspendedAt() != null) return "suspended";
-        // JWT times are whole seconds; a session signed in the same second as the change is the new one.
-        if (s.passwordChangedAt() != null && issuedAt != null
-                && issuedAt.isBefore(s.passwordChangedAt().truncatedTo(ChronoUnit.SECONDS))) {
+        // issuedAt is exact for sessions that carry iat_ms. Older ones have whole seconds, which is never later than
+        // the real time, so one signed in the same second as the change is ended too.
+        if (s.passwordChangedAt() != null && (issuedAt == null || issuedAt.isBefore(s.passwordChangedAt()))) {
             return "password_changed";
         }
         return null;
     }
 
     public void evictUser(UUID userId) {
+        evictions.incrementAndGet();
         cache.remove(userId);
     }
 
     /** After an office-wide change (suspension): every user is re-checked on the next request. */
     public void evictAll() {
+        evictions.incrementAndGet();
         cache.clear();
+    }
+
+    /** When the session was signed in: exact if the token has iat_ms, else the whole second of "iat". */
+    static Instant issuedAt(Jwt token) {
+        Object ms = token.getClaims().get(SessionTokens.ISSUED_MS);
+        if (ms instanceof Number n) return Instant.ofEpochMilli(n.longValue());
+        return token.getIssuedAt();
     }
 
     private static Instant ts(Timestamp t) {
@@ -102,7 +118,7 @@ public class SessionGuard {
                 if (office != null && subject != null) {
                     String reason;
                     try {
-                        reason = guard.revoked(UUID.fromString(subject), UUID.fromString(office), jwt.getToken().getIssuedAt());
+                        reason = guard.revoked(UUID.fromString(subject), UUID.fromString(office), issuedAt(jwt.getToken()));
                     } catch (IllegalArgumentException e) {
                         reason = "bad_token";
                     }

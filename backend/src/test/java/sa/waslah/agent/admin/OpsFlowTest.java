@@ -18,7 +18,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import sa.waslah.agent.IntegrationTest;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import sa.waslah.agent.billing.Subscription;
+import sa.waslah.agent.common.RateLimiter;
+import sa.waslah.agent.config.WaslahProperties;
 import sa.waslah.agent.tenant.TenantContext;
 
 /** The operator console over HTTP: key login, office and user controls, promo codes, and their effect on sessions. */
@@ -29,6 +33,10 @@ class OpsFlowTest extends IntegrationTest {
     @Autowired TestRestTemplate http;
     @Autowired Subscription subscription;
     @Autowired JdbcClient jdbc;
+    @Autowired JwtEncoder jwtEncoder;
+    @Autowired JwtDecoder jwtDecoder;
+    @Autowired WaslahProperties props;
+    @Autowired RateLimiter limits;
 
     String email;
     String officeCookie;
@@ -91,6 +99,17 @@ class OpsFlowTest extends IntegrationTest {
                 .getStatusCode().value()).as("scripts keep working").isEqualTo(200);
     }
 
+    @Test
+    void changingTheKeyEndsOperatorSessions() {
+        OpsAuth rotated = new OpsAuth("a-different-admin-key-0123456789", jwtEncoder, jwtDecoder, props, limits);
+        String old = OpsAuth.COOKIE + "=" + rotated.sessionCookie().getValue();
+        assertThat(call(HttpMethod.GET, "/api/ops/offices", null, old).getStatusCode().value())
+                .as("a session opened with another key").isEqualTo(404);
+        assertThat(call(HttpMethod.GET, "/api/ops/offices", null, ops).getStatusCode().value()).isEqualTo(200);
+        assertThat(new OpsAuth("too-short-key-12345678", jwtEncoder, jwtDecoder, props, limits).enabled())
+                .as("keys under 24 characters switch the console off").isFalse();
+    }
+
     static HttpHeaders headers(String cookie) {
         HttpHeaders h = new HttpHeaders();
         h.add(HttpHeaders.COOKIE, cookie);
@@ -125,6 +144,27 @@ class OpsFlowTest extends IntegrationTest {
     }
 
     @Test
+    void freeMonthsKeepAnAnnualSubscriptionAnnual() {
+        TenantContext.run(office, () -> jdbc.sql("""
+                update offices set subscription_status = 'ACTIVE', billing_cycle = 'ANNUAL', paid_until = now() + interval '200 days'""")
+                .update());
+        assertThat(opsPost("/api/ops/offices/" + office + "/comp", Map.of("months", 1)).getStatusCode().value()).isEqualTo(200);
+        Subscription.State s = TenantContext.call(office, () -> subscription.state());
+        assertThat(s.cycle()).isEqualTo("ANNUAL");
+        assertThat(Duration.between(Instant.now(), s.paidUntil()).toDays()).isBetween(226L, 232L);
+    }
+
+    @Test
+    void planChangeVoidsUnpaidInvoicesForAnotherPlan() {
+        ResponseEntity<Map> checkout = call(HttpMethod.POST, "/api/billing/checkout", Map.of("plan", "BASIC", "cycle", "MONTHLY"), officeCookie);
+        assertThat(checkout.getStatusCode().value()).isEqualTo(200);
+        opsPost("/api/ops/offices/" + office + "/plan", Map.of("plan", "GROWTH"));
+        String status = TenantContext.call(office, () -> jdbc.sql("select status from invoices where id = ?::uuid")
+                .param(String.valueOf(checkout.getBody().get("id"))).query(String.class).single());
+        assertThat(status).as("paying it would switch the plan back").isEqualTo("VOID");
+    }
+
+    @Test
     void suspensionStopsTheAgentSignsEveryoneOutAndBlocksSignIn() {
         assertThat(call(HttpMethod.GET, "/api/me", null, officeCookie).getStatusCode().value()).isEqualTo(200);
         opsPost("/api/ops/offices/" + office + "/suspend", Map.of("reason", "عدم سداد"));
@@ -153,7 +193,7 @@ class OpsFlowTest extends IntegrationTest {
     @Test
     void resetLinkSetsANewPasswordOnceAndEndsOldSessions() throws Exception {
         UUID user = jdbc.sql("select id from users where email = ?").param(email).query(UUID.class).single();
-        Thread.sleep(1100); // sessions are compared to the password change by the second
+        // No pause: sessions carry their exact issue time, so one from the same second as the change is told apart.
         ResponseEntity<Map> link = opsPost("/api/ops/users/" + user + "/reset-link", Map.of("sendEmail", false));
         String url = String.valueOf(link.getBody().get("url"));
         assertThat(url).contains("/reset?token=");
@@ -169,7 +209,10 @@ class OpsFlowTest extends IntegrationTest {
         assertThat(call(HttpMethod.GET, "/api/me", null, officeCookie).getStatusCode().value())
                 .as("the session from before the change ended").isEqualTo(401);
         assertThat(login("password123")).isEqualTo(401);
-        assertThat(login("new-password-1")).isEqualTo(200);
+        ResponseEntity<Map> fresh = http.postForEntity("/api/auth/login", Map.of("email", email, "password", "new-password-1"), Map.class);
+        assertThat(fresh.getStatusCode().value()).isEqualTo(200);
+        assertThat(call(HttpMethod.GET, "/api/me", null, cookie(fresh, "waslah_session")).getStatusCode().value())
+                .as("a session signed in right after the change is the new one").isEqualTo(200);
     }
 
     @Test

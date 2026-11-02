@@ -122,7 +122,7 @@ waslah:
     webhook-retention-days: ${WEBHOOK_RETENTION_DAYS:30}
   support:
     # Support form messages are forwarded here (Reply-To is the sender, so you can answer directly).
-    forward-to: ${SUPPORT_FORWARD_TO:faisal@hidaaco.com}
+    forward-to: ${SUPPORT_FORWARD_TO:support@hidaaco.com}
     from: ${SUPPORT_FROM:no-reply@hidaaco.com}
   jobs:
     # internal = timers inside the app (single server); external = Cloud Scheduler calls /internal/jobs/* (Cloud Run).

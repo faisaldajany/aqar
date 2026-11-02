@@ -76,7 +76,7 @@ export function HomeInteractions() {
           const data = await res.json().catch(() => ({}));
           if (!res.ok) { say(data.message ?? "تعذّر الإرسال. حاول مرة أخرى.", false); return; }
           form.reset();
-          say("وصلتني رسالتك، وأرد عليك خلال يوم عمل.", true);
+          say("وصلتنا رسالتك، ونرد عليك خلال يوم عمل.", true);
         } catch {
           say("تعذّر الإرسال. تحقق من الاتصال وحاول مرة أخرى.", false);
         } finally {

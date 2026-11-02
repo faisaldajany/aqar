@@ -103,7 +103,7 @@ else
 gcloud run deploy "$API" --image "$IMG/api:$TAG" --region "$REGION" --service-account "$SA_EMAIL" \
   --add-cloudsql-instances "$CONN" --allow-unauthenticated --ingress internal-and-cloud-load-balancing \
   --min-instances 0 --max-instances 1 --no-cpu-throttling --cpu-boost --cpu 1 --memory 1Gi --timeout 300 \
-  --set-env-vars "^|^DB_URL=$JDBC|DB_APP_USER=waslah_app|DB_OWNER_USER=waslah|COOKIE_SECURE=true|DEV_TOOLS=false|JOBS_SCHEDULER=external|WA_MODE=${WA_MODE:-mock}|BILLING_PROVIDER=${BILLING_PROVIDER:-mock}|PORTAL_BASE_URL=https://$DOMAIN|API_BASE_URL=https://$DOMAIN|SUPPORT_FORWARD_TO=faisal@hidaaco.com|SUPPORT_FROM=no-reply@hidaaco.com|SENTRY_ENVIRONMENT=production" \
+  --set-env-vars "^|^DB_URL=$JDBC|DB_APP_USER=waslah_app|DB_OWNER_USER=waslah|COOKIE_SECURE=true|DEV_TOOLS=false|JOBS_SCHEDULER=external|WA_MODE=${WA_MODE:-mock}|BILLING_PROVIDER=${BILLING_PROVIDER:-mock}|PORTAL_BASE_URL=https://$DOMAIN|API_BASE_URL=https://$DOMAIN|SUPPORT_FORWARD_TO=support@hidaaco.com|SUPPORT_FROM=no-reply@hidaaco.com|SENTRY_ENVIRONMENT=production" \
   --set-secrets "DB_APP_PASSWORD=db-app-password:latest,DB_OWNER_PASSWORD=db-owner-password:latest,JWT_SECRET=jwt-secret:latest,TOKEN_ENC_KEY=token-enc-key:latest,JOBS_TOKEN=jobs-token:latest,ADMIN_TOKEN=admin-token:latest,GEMINI_API_KEY=gemini-api-key:latest"
 fi
 if exists gcloud run services describe "$PORTAL" --region "$REGION"; then

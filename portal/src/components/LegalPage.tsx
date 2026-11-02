@@ -9,7 +9,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
         <h1>{title}</h1>
         <p className="muted small">آخر تحديث: {updated}</p>
         {children}
-        <p className="muted small">للاستفسار: <a href="mailto:faisal@hidaaco.com">faisal@hidaaco.com</a> أو <Link href="/contact">نموذج التواصل</Link>.</p>
+        <p className="muted small">للاستفسار: <a href="mailto:support@hidaaco.com" dir="ltr">support@hidaaco.com</a> أو <Link href="/contact">نموذج التواصل</Link>.</p>
       </main>
     </div>
   );

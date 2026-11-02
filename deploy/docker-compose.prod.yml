@@ -60,7 +60,7 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
-      SUPPORT_FORWARD_TO: ${SUPPORT_FORWARD_TO:-faisal@hidaaco.com}
+      SUPPORT_FORWARD_TO: ${SUPPORT_FORWARD_TO:-support@hidaaco.com}
       SUPPORT_FROM: ${SUPPORT_FROM:-no-reply@hidaaco.com}
       SENTRY_ENVIRONMENT: production
 

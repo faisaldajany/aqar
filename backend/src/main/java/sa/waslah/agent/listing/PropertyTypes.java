@@ -7,7 +7,9 @@ public final class PropertyTypes {
 
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("فلة", "فيلا"), Map.entry("فله", "فيلا"), Map.entry("فيلة", "فيلا"), Map.entry("فيله", "فيلا"),
-            Map.entry("villa", "فيلا"),
+            Map.entry("villa", "فيلا"), Map.entry("فلل", "فيلا"), Map.entry("فلا", "فيلا"), Map.entry("فيلات", "فيلا"),
+            Map.entry("فلّة", "فيلا"), Map.entry("شقق", "شقة"), Map.entry("أراضي", "أرض"), Map.entry("اراضي", "أرض"),
+            Map.entry("أدوار", "دور"), Map.entry("ادوار", "دور"), Map.entry("عماير", "عمارة"), Map.entry("عمائر", "عمارة"),
             Map.entry("شقه", "شقة"), Map.entry("apartment", "شقة"), Map.entry("flat", "شقة"),
             Map.entry("ارض", "أرض"), Map.entry("land", "أرض"),
             Map.entry("دبلكس", "دوبلكس"), Map.entry("duplex", "دوبلكس"),

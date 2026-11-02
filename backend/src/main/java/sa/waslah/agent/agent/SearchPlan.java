@@ -87,9 +87,11 @@ public final class SearchPlan {
             if (!hits.isEmpty()) {
                 String where = areas.stream().map(a -> a.arabicName).collect(Collectors.joining(" و"));
                 return new Result<>(Match.NEARBY, hits,
-                        "لا يوجد عقار مطابق في " + String.join(" أو ", r.districts()) + ". هذه بدائل في أحياء قريبة من "
-                                + where + ". قل للعميل بوضوح أنه لا يوجد حالياً في الحي الذي طلبه، ثم اعرض البدائل"
-                                + " واذكر حي كل عقار، واسأله هل تناسبه.",
+                        "لا يوجد عقار مطابق في " + String.join(" أو ", r.districts())
+                                + (r.maxPrice() != null ? " ضمن ميزانيته" : "") + ". هذه بدائل في أحياء قريبة من "
+                                + where + ". قل للعميل بوضوح أنه لا يوجد حالياً في الحي الذي طلبه"
+                                + (r.maxPrice() != null ? " ضمن ميزانيته (قد يوجد فيه بسعر أعلى)" : "")
+                                + "، ثم اعرض البدائل واذكر حي كل عقار، واسأله هل تناسبه.",
                         areas.iterator().next());
             }
         }

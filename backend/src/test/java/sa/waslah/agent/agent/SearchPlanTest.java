@@ -154,6 +154,7 @@ class SearchPlanTest {
         var r = run("{\"districts\":\"المروج\",\"property_type\":\"شقة\",\"max_price\":50000}");
         assertThat(r.match()).isEqualTo(SearchPlan.Match.NEARBY);
         assertThat(r.listings()).extracting(L::district).containsExactly("القيروان");
+        assertThat(r.note()).contains("ضمن ميزانيته");
     }
 
     @Test

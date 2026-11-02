@@ -117,6 +117,9 @@ class AgentUnitTests {
             assertThat(ReplyGuard.correction("نعم متوفرة لدينا محلات تجارية للإيجار", Set.of(), false))
                     .isEqualTo(ReplyGuard.MUST_SEARCH);
             assertThat(ReplyGuard.correction("عندنا فيلا في النرجس", Set.of(AgentTools.SEARCH), false)).isNull();
+            assertThat(ReplyGuard.correction("المستخدم طلب شقة للإيجار. قمت بالبحث وتم العرض.\n\nالرد:\nتبي نحدد موعد؟",
+                    Set.of(), false)).isEqualTo(ReplyGuard.NO_REASONING);
+            assertThat(ReplyGuard.correction("هلا فيك، عندنا شقة بالملقا تناسبك", Set.of(AgentTools.SEARCH), false)).isNull();
             assertThat(ReplyGuard.correction("ما عندي معلومات عن المطاعم، أقدر أساعدك بالعقار", Set.of(), false)).isNull();
         }
 

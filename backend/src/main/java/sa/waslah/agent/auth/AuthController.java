@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.common.ClientIp;
+import sa.waslah.agent.common.RateLimiter;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -29,24 +35,71 @@ public class AuthController {
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {
     }
 
+    public record ForgotRequest(@NotBlank @Email String email) {
+    }
+
+    public record ResetRequest(@NotBlank String token, @NotBlank @Size(min = 8, max = 128) String password) {
+    }
+
+    static final Duration WINDOW = Duration.ofMinutes(15);
+
     private final AuthService auth;
     private final SessionTokens tokens;
+    private final RateLimiter limits;
+    private final PasswordResetService resets;
 
-    public AuthController(AuthService auth, SessionTokens tokens) {
+    public AuthController(AuthService auth, SessionTokens tokens, RateLimiter limits, PasswordResetService resets) {
         this.auth = auth;
         this.tokens = tokens;
+        this.limits = limits;
+        this.resets = resets;
     }
 
     @PostMapping("/signup")
-    ResponseEntity<Map<String, Object>> signup(@Valid @RequestBody SignupRequest r) {
+    ResponseEntity<Map<String, Object>> signup(@Valid @RequestBody SignupRequest r, HttpServletRequest http) {
+        limits.check("signup:" + ClientIp.hash(http, "auth"), 10, Duration.ofHours(1));
         AuthService.SignedIn s = auth.signup(new AuthService.Signup(
                 r.officeName(), r.falLicense(), r.fullName(), r.email(), r.password(), r.promoCode()));
         return withSession(s);
     }
 
+    /** Failed attempts are limited per email (10 in 15 minutes) and per IP (30 in 15 minutes). */
     @PostMapping("/login")
-    ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest r) {
-        return withSession(auth.login(r.email(), r.password()));
+    ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest r, HttpServletRequest http) {
+        String byEmail = "login:" + r.email().trim().toLowerCase(Locale.ROOT);
+        String byIp = "login-ip:" + ClientIp.hash(http, "auth");
+        if (!limits.allowed(byEmail, 10, WINDOW) || !limits.allowed(byIp, 30, WINDOW)) throw RateLimiter.tooMany();
+        try {
+            ResponseEntity<Map<String, Object>> ok = withSession(auth.login(r.email(), r.password()));
+            limits.reset(byEmail);
+            return ok;
+        } catch (ApiException e) {
+            if ("bad_credentials".equals(e.code())) {
+                limits.record(byEmail);
+                limits.record(byIp);
+            }
+            throw e;
+        }
+    }
+
+    /** Always the same answer, whether or not the email has an account. */
+    @PostMapping("/forgot")
+    Map<String, Object> forgot(@Valid @RequestBody ForgotRequest r, HttpServletRequest http) {
+        limits.check("forgot:" + ClientIp.hash(http, "auth"), 5, Duration.ofHours(1));
+        String byEmail = "forgot-email:" + r.email().trim().toLowerCase(Locale.ROOT);
+        if (limits.allowed(byEmail, 3, Duration.ofHours(1))) {
+            limits.record(byEmail);
+            resets.requestByEmail(r.email());
+        }
+        return Map.of("ok", true, "message", "إذا كان البريد مسجّلاً لدينا فسيصلك رابط لإعادة تعيين كلمة المرور خلال دقائق.");
+    }
+
+    @PostMapping("/reset")
+    Map<String, Object> reset(@Valid @RequestBody ResetRequest r, HttpServletRequest http) {
+        limits.check("reset:" + ClientIp.hash(http, "auth"), 10, Duration.ofHours(1));
+        String email = resets.reset(r.token(), r.password());
+        limits.reset("login:" + email);
+        return Map.of("ok", true);
     }
 
     @PostMapping("/logout")

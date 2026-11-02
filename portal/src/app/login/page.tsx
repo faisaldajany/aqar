@@ -34,7 +34,7 @@ export default function LoginPage() {
         <label className="f" htmlFor="email">البريد الإلكتروني
           <input id="email" name="email" type="email" autoComplete="email" required />
         </label>
-        <label className="f" htmlFor="password">كلمة المرور
+        <label className="f" htmlFor="password"><span className="lbl">كلمة المرور <Link href="/forgot" className="small">نسيت كلمة المرور؟</Link></span>
           <input id="password" name="password" type="password" autoComplete="current-password" required />
         </label>
         {error && <p className="err" role="alert">{error}</p>}

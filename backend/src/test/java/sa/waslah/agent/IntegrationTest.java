@@ -18,7 +18,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
                 "waslah.llm.provider=scripted",
                 "waslah.agent.enabled=false",
                 "waslah.agent.debounce-ms=0",
-                "waslah.booking.job-initial-delay-ms=86400000"
+                "waslah.booking.job-initial-delay-ms=86400000",
+                "waslah.rate-limits.enabled=false",
+                "waslah.admin-token=test-admin-token-0123456789"
         })
 public abstract class IntegrationTest {
 

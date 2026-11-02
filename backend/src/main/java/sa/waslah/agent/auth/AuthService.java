@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -76,18 +77,29 @@ public class AuthService {
     }
 
     public SignedIn login(String email, String password) {
-        Optional<UserRow> user = jdbc.sql("select id, office_id, password_hash, role from users where email = ?")
+        Optional<UserRow> user = jdbc.sql("select id, office_id, password_hash, role, disabled_at from users where email = ?")
                 .param(normalize(email))
                 .query((rs, n) -> new UserRow(
                         rs.getObject("id", UUID.class),
                         rs.getObject("office_id", UUID.class),
                         rs.getString("password_hash"),
-                        rs.getString("role")))
+                        rs.getString("role"),
+                        rs.getTimestamp("disabled_at") != null))
                 .optional();
         if (user.isEmpty() || !passwords.matches(password, user.get().passwordHash())) {
             throw ApiException.unauthorized("bad_credentials", "البريد أو كلمة المرور غير صحيحة.");
         }
         UserRow u = user.get();
+        // Only after the password matched, so these messages do not reveal which emails exist.
+        if (u.disabled()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "account_disabled", "هذا الحساب موقوف. تواصل مع الدعم: support@hidaaco.com");
+        }
+        boolean suspended = TenantContext.call(u.officeId(), () ->
+                jdbc.sql("select suspended_at is not null from offices").query(Boolean.class).optional().orElse(false));
+        if (suspended) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "office_suspended", "حساب المكتب موقوف. تواصل مع الدعم: support@hidaaco.com");
+        }
+        jdbc.sql("update users set last_login_at = now() where id = ?").param(u.id()).update();
         return new SignedIn(u.id(), u.officeId(), u.role());
     }
 
@@ -95,6 +107,6 @@ public class AuthService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private record UserRow(UUID id, UUID officeId, String passwordHash, String role) {
+    private record UserRow(UUID id, UUID officeId, String passwordHash, String role, boolean disabled) {
     }
 }

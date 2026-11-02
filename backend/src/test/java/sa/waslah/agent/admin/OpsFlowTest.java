@@ -103,9 +103,9 @@ class OpsFlowTest extends IntegrationTest {
     void changingTheKeyEndsOperatorSessions() {
         OpsAuth rotated = new OpsAuth("a-different-admin-key-0123456789", jwtEncoder, jwtDecoder, props, limits);
         String old = OpsAuth.COOKIE + "=" + rotated.sessionCookie().getValue();
-        assertThat(call(HttpMethod.GET, "/api/ops/offices", null, old).getStatusCode().value())
+        assertThat(call(HttpMethod.GET, "/api/ops/session", null, old).getStatusCode().value())
                 .as("a session opened with another key").isEqualTo(404);
-        assertThat(call(HttpMethod.GET, "/api/ops/offices", null, ops).getStatusCode().value()).isEqualTo(200);
+        assertThat(call(HttpMethod.GET, "/api/ops/session", null, ops).getStatusCode().value()).isEqualTo(200);
         assertThat(new OpsAuth("too-short-key-12345678", jwtEncoder, jwtDecoder, props, limits).enabled())
                 .as("keys under 24 characters switch the console off").isFalse();
     }

@@ -73,7 +73,9 @@ public class ListingStore {
                  from listings l
                  where l.status = 'ACTIVE' and l.license_expiry >= current_date
                    and (cast(:purpose as text) is null or l.purpose = :purpose)
-                   and (cast(:ptype as text) is null or ar_norm(l.property_type) like '%' || ar_norm(:ptype) || '%')
+                   and (cast(:ptype as text) is null or ar_norm(l.property_type) like '%' || ar_norm(:ptype) || '%'
+                        or (position(' ' in trim(cast(:ptype as text))) > 0
+                            and ar_norm(l.property_type || ' ' || coalesce(l.title, '')) like '%' || ar_norm(:ptype) || '%'))
                    and (cast(:districts as text) is null or exists (
                         select 1 from unnest(string_to_array(cast(:districts as text), '|')) d
                         where ar_norm(l.district) like '%' || ar_norm(d) || '%'))

@@ -246,12 +246,18 @@ class AgentEval {
             this.listings = listings;
         }
 
+        /** Type, or for a multi-word type ("فيلا دوبلكس") type plus title, as in ListingStore.search. */
+        static boolean typeMatches(Listing l, String type) {
+            return ar(l.type()).contains(ar(type))
+                    || (type.trim().contains(" ") && ar(l.type() + " " + l.title()).contains(ar(type)));
+        }
+
         /** Same rules as ListingStore.search, over the YAML fixture. */
         List<Listing> search(ListingStore.Query q) {
             return listings.stream()
                     .filter(l -> !l.expiry().isBefore(LocalDate.now()))
                     .filter(l -> q.purpose() == null || l.purpose().equals(q.purpose()))
-                    .filter(l -> q.propertyType() == null || ar(l.type()).contains(ar(PropertyTypes.canonical(q.propertyType()))))
+                    .filter(l -> q.propertyType() == null || typeMatches(l, PropertyTypes.canonical(q.propertyType())))
                     .filter(l -> q.districts().isEmpty() || q.districts().stream().anyMatch(d -> ar(l.district()).contains(ar(d))))
                     .filter(l -> q.excludeDistricts().stream().noneMatch(d -> ar(l.district()).contains(ar(d))))
                     .filter(l -> q.maxPrice() == null || l.price().compareTo(q.maxPrice()) <= 0)

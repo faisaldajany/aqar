@@ -92,6 +92,12 @@ class ListingsFlowTest extends IntegrationTest {
                 null, null, List.of(), List.of(), null, null, null, new BigDecimal("150"), 10)))
                 .stream().map(ListingStore.Listing::adLicense).toList();
         assertThat(big).containsExactly("7200500001");
+
+        // A multi-word type also matches the title: "شقة الملقا" finds the listing titled so.
+        List<String> titled = TenantContext.call(office, () -> listings.search(new ListingStore.Query(
+                null, "شقة الملقا", List.of(), List.of(), null, null, null, null, 10)))
+                .stream().map(ListingStore.Listing::adLicense).toList();
+        assertThat(titled).containsExactly("7200500001");
     }
 
     private void add(String title, String district, long price, int area, String license) {

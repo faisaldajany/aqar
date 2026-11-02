@@ -73,6 +73,38 @@ public final class RiyadhAreas {
         return partial.size() == 1 ? Optional.of(partial.get(0)) : Optional.empty();
     }
 
+    /**
+     * The known district a slightly misspelled name means ("الععارض" -> "العارض"): one letter added, dropped or
+     * changed, and only when exactly one known district is that close. Known and unknown-but-unlike names come back as is.
+     */
+    public static String correct(String district) {
+        if (district == null || district.isBlank()) return district;
+        String n = normalize(district);
+        if (BY_DISTRICT.containsKey(n) || n.length() < 4 || areaOf(district).isPresent()) return district;
+        List<String> close = allDistricts().stream().filter(d -> editDistanceAtMostOne(n, normalize(d))).toList();
+        return close.size() == 1 ? close.get(0) : district;
+    }
+
+    static boolean editDistanceAtMostOne(String a, String b) {
+        if (Math.abs(a.length() - b.length()) > 1) return false;
+        int i = 0, j = 0, edits = 0;
+        while (i < a.length() && j < b.length()) {
+            if (a.charAt(i) == b.charAt(j)) {
+                i++;
+                j++;
+                continue;
+            }
+            if (++edits > 1) return false;
+            if (a.length() > b.length()) i++;
+            else if (a.length() < b.length()) j++;
+            else {
+                i++;
+                j++;
+            }
+        }
+        return edits + (a.length() - i) + (b.length() - j) <= 1;
+    }
+
     /** NORTH, "north", "شمال", "شمال الرياض", "الشمال" all give NORTH. */
     public static Optional<Area> parse(String raw) {
         if (raw == null || raw.isBlank()) return Optional.empty();

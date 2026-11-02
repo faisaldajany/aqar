@@ -49,8 +49,9 @@ public final class SearchPlan {
                 // "شمال الرياض" passed as a district is an area; a real district name is never parsed as one.
                 if (asArea.isPresent() && RiyadhAreas.areaOf(n).isEmpty()) {
                     if (area == null) area = asArea.get();
-                } else if (!districts.contains(n)) {
-                    districts.add(n);
+                } else {
+                    String fixed = RiyadhAreas.correct(n);
+                    if (!districts.contains(fixed)) districts.add(fixed);
                 }
             }
             return new Request(text(a, "purpose"), text(a, "property_type"), List.copyOf(districts), area,

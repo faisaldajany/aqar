@@ -80,6 +80,13 @@ class SearchPlanTest {
         }
 
         @Test
+        void oneLetterTyposInDistrictNamesAreCorrected() throws Exception {
+            var r = SearchPlan.Request.from(JSON.readTree("{\"districts\":\"الععارض، النرجس، الدرعية\"}"));
+            assertThat(r.districts()).containsExactly("العارض", "النرجس", "الدرعية");
+            assertThat(RiyadhAreas.correct("الصناعة")).isEqualTo("الصناعة");
+        }
+
+        @Test
         void zeroAndJunkNumbersAreIgnored() throws Exception {
             var r = SearchPlan.Request.from(JSON.readTree("{\"max_price\":0,\"min_price\":\"abc\",\"min_rooms\":0}"));
             assertThat(r.maxPrice()).isNull();

@@ -32,16 +32,20 @@ public interface AgentTools {
     static List<Llm.Tool> specs(ObjectMapper json) {
         return List.of(
                 tool(json, SEARCH,
-                        "Search this office's available listings. Returns at most 3 matches with their ad license number and expiry. "
+                        "Search this office's available listings. Returns at most 3 with their ad license number and expiry. "
+                                + "If nothing matches exactly it returns nearby districts or slightly-over-budget listings instead; "
+                                + "the 'match' field says which (EXACT, NEARBY, ABOVE_BUDGET, NONE) and 'note' says how to present them. "
                                 + "Only listings returned here may be mentioned to the customer.",
                         """
                         {"type":"object","properties":{
                           "purpose":{"type":"string","enum":["SALE","RENT"],"description":"SALE for buying, RENT for renting. Omit unless the customer said which; never assume."},
                           "property_type":{"type":"string","description":"e.g. فيلا، شقة، أرض، دور، عمارة، محل"},
-                          "district":{"type":"string","description":"Riyadh district in Arabic, e.g. النرجس"},
-                          "max_price":{"type":"number","description":"Maximum price in SAR (annual rent for RENT)"},
-                          "min_price":{"type":"number"},
-                          "min_rooms":{"type":"integer"}}}"""),
+                          "districts":{"type":"string","description":"One or more Riyadh districts in Arabic, comma separated, e.g. النرجس، الملقا. Omit when the customer named only a part of the city."},
+                          "area":{"type":"string","enum":["NORTH","SOUTH","EAST","WEST","CENTER"],"description":"Part of Riyadh when the customer says e.g. شمال الرياض / الشمال / شرق الرياض. Searches all its districts."},
+                          "max_price":{"type":"number","description":"Maximum price in SAR as a full number (1500000, not 1.5). For RENT it is the annual rent: multiply a monthly amount by 12."},
+                          "min_price":{"type":"number","description":"Minimum price in SAR, only when the customer gave a range (بين 40 و 60 ألف)."},
+                          "min_rooms":{"type":"integer","description":"Minimum bedrooms"},
+                          "min_area_sqm":{"type":"number","description":"Minimum area in square metres"}}}"""),
                 tool(json, SAVE_LEAD,
                         "Save what you learned about the customer's need. Call it whenever you learn something new; send only known fields.",
                         """

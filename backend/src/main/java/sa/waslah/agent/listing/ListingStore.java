@@ -34,8 +34,18 @@ public class ListingStore {
         }
     }
 
-    public record Query(String purpose, String propertyType, String district, BigDecimal maxPrice,
-                        BigDecimal minPrice, Integer minRooms, int limit) {
+    /**
+     * districts: any of these (partial names match, "النسيم" finds both النسيم districts); empty = anywhere.
+     * excludeDistricts: none of these (used to offer nearby districts without repeating the ones searched).
+     */
+    public record Query(String purpose, String propertyType, List<String> districts, List<String> excludeDistricts,
+                        BigDecimal maxPrice, BigDecimal minPrice, Integer minRooms, BigDecimal minAreaSqm, int limit) {
+
+        public Query {
+            districts = districts == null ? List.of() : districts.stream().filter(d -> d != null && !d.isBlank()).toList();
+            excludeDistricts = excludeDistricts == null ? List.of()
+                    : excludeDistricts.stream().filter(d -> d != null && !d.isBlank()).toList();
+        }
     }
 
     public record Photo(UUID id, String contentType, byte[] bytes) {
@@ -64,7 +74,13 @@ public class ListingStore {
                  where l.status = 'ACTIVE' and l.license_expiry >= current_date
                    and (cast(:purpose as text) is null or l.purpose = :purpose)
                    and (cast(:ptype as text) is null or ar_norm(l.property_type) like '%' || ar_norm(:ptype) || '%')
-                   and (cast(:district as text) is null or ar_norm(l.district) like '%' || ar_norm(:district) || '%')
+                   and (cast(:districts as text) is null or exists (
+                        select 1 from unnest(string_to_array(cast(:districts as text), '|')) d
+                        where ar_norm(l.district) like '%' || ar_norm(d) || '%'))
+                   and (cast(:excluded as text) is null or not exists (
+                        select 1 from unnest(string_to_array(cast(:excluded as text), '|')) d
+                        where ar_norm(l.district) like '%' || ar_norm(d) || '%'))
+                   and (cast(:minarea as numeric) is null or l.area_sqm >= :minarea)
                    and (cast(:maxp as numeric) is null or l.price <= :maxp)
                    and (cast(:minp as numeric) is null or l.price >= :minp)
                    and (cast(:rooms as int) is null or coalesce(l.rooms, 0) >= :rooms)
@@ -72,7 +88,9 @@ public class ListingStore {
                  limit :lim""")
                 .param("purpose", blankToNull(q.purpose()))
                 .param("ptype", blankToNull(PropertyTypes.canonical(q.propertyType())))
-                .param("district", blankToNull(q.district()))
+                .param("districts", joined(q.districts()))
+                .param("excluded", joined(q.excludeDistricts()))
+                .param("minarea", q.minAreaSqm())
                 .param("maxp", q.maxPrice())
                 .param("minp", q.minPrice())
                 .param("rooms", q.minRooms())
@@ -245,6 +263,10 @@ public class ListingStore {
             b.append('"').append(items.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
         }
         return b.append('}').toString();
+    }
+
+    private static String joined(List<String> names) {
+        return names.isEmpty() ? null : String.join("|", names.stream().map(n -> n.replace("|", " ").trim()).toList());
     }
 
     private static String blankToNull(String s) {

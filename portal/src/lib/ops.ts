@@ -57,12 +57,12 @@ export const ACTION_LABELS: Record<string, string> = {
 /** "2 نوفمبر 2026، 3:15 م" in Riyadh time, or "—". */
 export function when(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("ar-SA-u-ca-gregory", {
+  return new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", {
     day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh",
   });
 }
 
 export function day(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Riyadh" });
+  return new Date(iso).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Riyadh" });
 }

@@ -88,7 +88,7 @@ export default function OpsOfficePage() {
       {notice && <p className={notice.ok ? "card small" : "err"} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
 
       <div className="grid2">
-        <div className="card">
+        <div className="card" style={{ alignSelf: "stretch" }}>
           <h2>البيانات</h2>
           <dl className="facts">
             <dt>المالك</dt><dd dir="ltr">{o.ownerEmail ?? "—"}</dd>
@@ -104,7 +104,7 @@ export default function OpsOfficePage() {
           </dl>
         </div>
 
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10, alignSelf: "stretch" }}>
           <h2>رخصة فال</h2>
           {o.falNote && <p className="small muted">ملاحظة: {o.falNote}</p>}
           <p className="small muted">تحقق من الرقم في خدمة «الاستعلام عن رخص فال» لدى الهيئة العامة للعقار.</p>
@@ -123,7 +123,7 @@ export default function OpsOfficePage() {
       </div>
 
       <div className="grid3">
-        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }} onSubmit={(e) => {
+        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8, alignSelf: "stretch" }} onSubmit={(e) => {
           const f = form(e);
           void act("trial", `/ops/offices/${o.id}/trial`, { days: Number(f.get("days")) }, "مُدّدت التجربة.");
         }}>
@@ -134,7 +134,7 @@ export default function OpsOfficePage() {
           </> : <p className="small muted">للمكاتب التي لم تشترك بعد. للمشتركين استخدم الأشهر المجانية.</p>}
         </form>
 
-        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }} onSubmit={(e) => {
+        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8, alignSelf: "stretch" }} onSubmit={(e) => {
           const f = form(e);
           void act("comp", `/ops/offices/${o.id}/comp`, { months: Number(f.get("months")), plan: f.get("plan"), reason: String(f.get("reason") ?? "") || null }, "أُضيفت الأشهر المجانية.");
         }}>
@@ -149,7 +149,7 @@ export default function OpsOfficePage() {
           <button className="btn" disabled={busy === "comp"}>أضف</button>
         </form>
 
-        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }} onSubmit={(e) => {
+        <form className="card" style={{ display: "flex", flexDirection: "column", gap: 8, alignSelf: "stretch" }} onSubmit={(e) => {
           const f = form(e);
           void act("plan", `/ops/offices/${o.id}/plan`, { plan: f.get("plan") }, "تغيّرت الباقة. تُطبّق من الفاتورة القادمة.");
         }}>
@@ -162,7 +162,7 @@ export default function OpsOfficePage() {
         </form>
       </div>
 
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8, alignSelf: "stretch" }}>
         <h2>إيقاف المكتب</h2>
         {o.suspended ? (
           <div className="row">

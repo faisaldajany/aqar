@@ -62,8 +62,8 @@ class WaTemplatesTest extends IntegrationTest {
         assertThat(sent.get(0).kind()).isEqualTo("template");
         assertThat(sent.get(0).to()).isEqualTo("966551112222");
         assertThat(sent.get(0).content()).startsWith("hidaa_daily_report_v1:ar:");
-        String error = TenantContext.call(office, () -> jdbc.sql("select error from daily_reports").query(String.class).single());
-        assertThat(error).isNull();
+        String error = TenantContext.call(office, () -> jdbc.sql("select coalesce(error, '') from daily_reports").query(String.class).single());
+        assertThat(error).as("sent without error").isEmpty();
 
         // Re-running provisioning keeps what exists.
         TenantContext.run(office, () -> templates.syncOffice());

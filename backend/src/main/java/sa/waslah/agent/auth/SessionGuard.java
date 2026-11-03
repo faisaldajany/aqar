@@ -34,16 +34,34 @@ public class SessionGuard {
 
     static final long TTL_MS = 30_000;
 
-    record Status(Instant disabledAt, Instant passwordChangedAt, Instant suspendedAt, long loadedAt) {
+    record Status(Instant disabledAt, Instant passwordChangedAt, Instant suspendedAt, boolean emailConfirmed, long loadedAt) {
     }
 
+    /** What an account that has not confirmed its email may still call: who it is, signing out, and the confirmation itself. */
+    static final java.util.List<String> UNVERIFIED_ALLOWED = java.util.List.of("/api/me", "/api/auth/", "/api/verify-email");
+
     private final JdbcClient jdbc;
+    private final boolean verificationRequired;
     private final Map<UUID, Status> cache = new ConcurrentHashMap<>();
     /** Bumped by every eviction, before the entry is removed. */
     private final AtomicLong evictions = new AtomicLong();
 
-    public SessionGuard(JdbcClient jdbc) {
+    public SessionGuard(JdbcClient jdbc,
+                        @org.springframework.beans.factory.annotation.Value("${waslah.email-verification.required:true}") boolean verificationRequired) {
         this.jdbc = jdbc;
+        this.verificationRequired = verificationRequired;
+    }
+
+    /** Whether the user has confirmed their email (from the same 30-second cache as {@link #revoked}). */
+    public boolean emailConfirmed(UUID userId) {
+        Status s = cache.get(userId);
+        if (s != null) return s.emailConfirmed();
+        return jdbc.sql("select email_confirmed_at is not null from users where id = ?").param(userId)
+                .query(Boolean.class).optional().orElse(false);
+    }
+
+    public boolean verificationRequired() {
+        return verificationRequired;
     }
 
     /** Null when the session may continue; otherwise why not. Runs under the token's office tenant. */
@@ -53,11 +71,12 @@ public class SessionGuard {
             long before = evictions.get();
             Optional<Status> loaded = jdbc.sql("""
                             select u.disabled_at, u.password_changed_at,
-                                   (select o.suspended_at from offices o where o.id = u.office_id)
+                                   (select o.suspended_at from offices o where o.id = u.office_id),
+                                   u.email_confirmed_at is not null
                             from users u where u.id = ? and u.office_id = ?""")
                     .params(userId, officeId)
                     .query((rs, n) -> new Status(ts(rs.getTimestamp(1)), ts(rs.getTimestamp(2)), ts(rs.getTimestamp(3)),
-                            System.currentTimeMillis()))
+                            rs.getBoolean(4), System.currentTimeMillis()))
                     .optional();
             if (loaded.isEmpty()) return "unknown_user";
             s = loaded.get();
@@ -133,6 +152,17 @@ public class SessionGuard {
                         };
                         response.getOutputStream().write(("{\"error\":\"session_revoked\",\"reason\":\"" + reason
                                 + "\",\"message\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8));
+                        return;
+                    }
+                    // Signed in but the email is not confirmed yet: only the confirmation screen's calls go through.
+                    String path = request.getRequestURI();
+                    if (guard.verificationRequired() && path.startsWith("/api/")
+                            && UNVERIFIED_ALLOWED.stream().noneMatch(path::startsWith)
+                            && !guard.emailConfirmed(UUID.fromString(subject))) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getOutputStream().write(("{\"error\":\"email_unverified\",\"message\":\""
+                                + "أكّد بريدك أولاً بالرمز الذي أرسلناه.\"}").getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                 }

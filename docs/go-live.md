@@ -132,6 +132,11 @@ Needs Hidaa/legal:
 
 ## 8. Security built in
 
+- Email verification: a new account gets one email with a 6-digit code (30 minutes, 5 tries) and a link (48 hours);
+  until it confirms, the portal shows only the confirmation screen and the API answers 403 `email_unverified`.
+  Accounts made before this count as verified, except hidaaco.com ones (those decide test payments). Needs mail
+  (Spacemail) working; turn off with `EMAIL_VERIFICATION_REQUIRED=false` only in an emergency.
+
 - Sign-in, signup, password reset, promo codes and the admin key are rate-limited (in memory; the API runs as one
   instance). Wrong passwords: 10 per email from one address, 50 per email, 50 per address, per 15 minutes, so a
   stranger cannot lock an owner out from one address. IPv6 callers are counted by their /64 network.

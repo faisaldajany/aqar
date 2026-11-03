@@ -25,13 +25,16 @@ public class MeController {
         UUID officeId = TenantContext.require();
         UUID userId = UUID.fromString(jwt.getSubject());
 
-        Map<String, Object> user = jdbc.sql("select id, email, full_name, role from users where id = ? and office_id = ?")
+        Map<String, Object> user = jdbc.sql("""
+                        select id, email, full_name, role, email_confirmed_at is not null as verified
+                        from users where id = ? and office_id = ?""")
                 .params(userId, officeId)
                 .query((rs, n) -> Map.<String, Object>of(
                         "id", rs.getObject("id", UUID.class),
                         "email", rs.getString("email"),
                         "fullName", rs.getString("full_name"),
-                        "role", rs.getString("role")))
+                        "role", rs.getString("role"),
+                        "emailVerified", rs.getBoolean("verified")))
                 .optional()
                 .orElseThrow(() -> ApiException.unauthorized("no_user", "انتهت الجلسة."));
 

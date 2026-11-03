@@ -24,7 +24,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
 }
 
 export type Me = {
-  user: { id: string; email: string; fullName: string; role: string };
+  user: { id: string; email: string; fullName: string; role: string; emailVerified?: boolean };
   office: { id: string; name: string; falLicense: string; status: string };
   whatsapp: { connected: boolean; displayPhone?: string; verifiedName?: string; coexistence?: boolean; status?: string };
 };

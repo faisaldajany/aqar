@@ -10,10 +10,15 @@ import java.util.List;
  * @param preheader  the grey line inboxes show after the subject
  * @param greeting   "مرحباً فيصل،", or null
  * @param paragraphs the message
+ * @param code       a one-time code shown large under the message (e.g. "482913"), or null
  * @param button     the call to action, or null
  * @param note       a smaller line under the button (why they got this, what if it was not them), or null
  */
-public record Email(String preheader, String greeting, List<String> paragraphs, Button button, String note) {
+public record Email(String preheader, String greeting, List<String> paragraphs, String code, Button button, String note) {
+
+    public Email(String preheader, String greeting, List<String> paragraphs, Button button, String note) {
+        this(preheader, greeting, paragraphs, null, button, note);
+    }
 
     public record Button(String label, String url) {
     }
@@ -35,6 +40,7 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
         StringBuilder b = new StringBuilder();
         if (greeting != null) b.append(greeting).append("\n\n");
         for (String p : paragraphs) b.append(p).append("\n\n");
+        if (code != null) b.append("الرمز: ").append(code).append("\n\n");
         if (button != null) b.append(button.label()).append(":\n").append(button.url()).append("\n\n");
         if (note != null) b.append(note).append("\n\n");
         b.append("فريق حداء\nsupport@hidaaco.com\n");
@@ -45,6 +51,13 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
         StringBuilder body = new StringBuilder();
         if (greeting != null) body.append(p(esc(greeting), "font-weight:bold;"));
         for (String para : paragraphs) body.append(p(esc(para), ""));
+        if (code != null) {
+            body.append("""
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 10px 0;">
+                      <tr><td dir="ltr" align="center" bgcolor="%s" style="padding:14px 24px;border:1px solid %s;border-radius:10px;font-family:Menlo,Consolas,'Courier New',monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:%s;">%s</td></tr>
+                    </table>
+                    """.formatted(BG, LINE, NIGHT, esc(code)));
+        }
         if (button != null) {
             String url = esc(button.url());
             body.append("""

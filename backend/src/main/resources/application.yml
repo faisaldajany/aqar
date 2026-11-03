@@ -121,6 +121,9 @@ waslah:
     template-language: ${REPORT_TEMPLATE_LANG:ar}
   # Platform operator console (/admin/*): reviews FAL licenses across offices. Blank disables it.
   admin-token: ${ADMIN_TOKEN:}
+  # New accounts confirm their email (6-digit code or link) before using the portal.
+  email-verification:
+    required: ${EMAIL_VERIFICATION_REQUIRED:true}
   # Estimated AI cost in /ops → الاستخدام: the model's list price per million tokens (USD), converted to SAR.
   ops:
     llm-input-usd-per-million: ${LLM_PRICE_INPUT_USD:0.10}

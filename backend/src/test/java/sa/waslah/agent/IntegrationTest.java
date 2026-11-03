@@ -20,7 +20,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
                 "waslah.agent.debounce-ms=0",
                 "waslah.booking.job-initial-delay-ms=86400000",
                 "waslah.rate-limits.enabled=false",
-                "waslah.admin-token=test-admin-token-0123456789"
+                "waslah.admin-token=test-admin-token-0123456789",
+                // Tests sign up many accounts without reading their email; EmailVerificationTest turns this on.
+                "waslah.email-verification.required=false"
         })
 public abstract class IntegrationTest {
 

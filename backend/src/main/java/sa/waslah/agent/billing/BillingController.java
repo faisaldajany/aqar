@@ -119,7 +119,7 @@ public class BillingController {
                                            org.springframework.security.oauth2.jwt.Jwt jwt) {
         UUID user = UUID.fromString(jwt.getSubject());
         limits.check("confirm-send:" + user, 3, Duration.ofHours(1));
-        boolean sent = confirmations.sendIfInternal(user);
+        boolean sent = confirmations.send(user);
         return Map.of("sent", sent);
     }
 

@@ -66,8 +66,8 @@ public class AuthController {
         limits.check("signup:" + ClientIp.hash(http, "auth"), 10, Duration.ofHours(1));
         AuthService.SignedIn s = auth.signup(new AuthService.Signup(
                 r.officeName(), r.falLicense(), r.fullName(), r.email(), r.password(), r.promoCode()));
-        // A company (hidaaco.com) address gets a confirmation link; once confirmed, the office pays in test mode.
-        confirmations.sendIfInternal(s.userId());
+        // The verification email: a 6-digit code and a link. (A confirmed hidaaco.com address also means test payments.)
+        confirmations.send(s.userId());
         return withSession(s);
     }
 

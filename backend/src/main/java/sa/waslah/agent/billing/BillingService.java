@@ -27,8 +27,17 @@ public class BillingService {
     public record Invoice(UUID id, String number, String kind, String plan, String cycle, String description,
                           LocalDate periodStart, LocalDate periodEnd, long subtotalHalalas, long vatHalalas,
                           long totalHalalas, String status, String provider, String providerRef, String payUrl,
-                          Instant createdAt, Instant paidAt, long discountHalalas, String promoCode) {
+                          Instant createdAt, Instant paidAt, long discountHalalas, String promoCode,
+                          long refundedHalalas, Instant refundedAt, String lastFailureReason, Instant lastFailureAt) {
     }
+
+    /** What a refund changed: the total refunded so far, whether it was all of it, and whether the period was taken back. */
+    public record Refund(Invoice invoice, long refundedHalalas, boolean full, boolean periodTakenBack) {
+    }
+
+    /** Moyasar's hosted pages work for 7 days; a page this close to the end is replaced rather than handed out. */
+    static final String PAGE_STILL_GOOD = "pay_url is not null and pay_url_expires_at > now() + interval '30 minutes'";
+    static final java.time.Duration PAGE_LIFETIME = java.time.Duration.ofDays(7);
 
     private final JdbcClient jdbc;
     private final PaymentGateways gateways;
@@ -78,7 +87,7 @@ public class BillingService {
 
         // Reuse an unpaid invoice for the same choice (the same discount, the same gateway) instead of piling up new ones.
         Optional<Invoice> open = jdbc.sql(SELECT + " where kind = 'SUBSCRIPTION' and status = 'DUE' and plan = ? and cycle = ? "
-                        + "and discount_halalas = ? and provider = ? and created_at > now() - interval '6 days' order by created_at desc limit 1")
+                        + "and discount_halalas = ? and provider = ? and " + PAGE_STILL_GOOD + " order by created_at desc limit 1")
                 .params(plan.name(), cycle, discount, gateways.forOffice(officeId).name()).query(BillingService::map).optional();
         if (open.isPresent() && open.get().payUrl() != null) return open.get();
 
@@ -220,19 +229,8 @@ public class BillingService {
                         subtotal, vat, subtotal + vat, discount, promoId, promoCode)
                 .update();
         if (withPayPage) {
-            String success = props.portalBaseUrl() + "/billing?invoice=" + id;
-            String callback = props.apiBaseUrl() == null || props.apiBaseUrl().isBlank() ? null
-                    : props.apiBaseUrl() + "/webhooks/moyasar";
-            if (callback != null && MoyasarWebhookAuth.configured(props.moyasarWebhookSecret())) {
-                callback += "?token=" + MoyasarWebhookAuth.callbackToken(props.moyasarWebhookSecret());
-            }
             try {
-                PaymentGateway gateway = gateways.forOffice(officeId);
-                PaymentGateway.Checkout c = gateway.create(subtotal + vat, description + " — " + number, id.toString(), success, callback);
-                jdbc.sql("update invoices set provider = ?, provider_ref = ?, pay_url = ? where id = ?")
-                        .params(gateway.name(), c.providerRef(), c.url(), id).update();
-                jdbc.sql("insert into billing_refs (provider_ref, office_id, invoice_id) values (?, ?, ?) on conflict do nothing")
-                        .params(c.providerRef(), officeId, id).update();
+                attachPayPage(officeId, id, number, subtotal + vat, description);
             } catch (RuntimeException e) {
                 log.warn("Payment page for invoice {} not created: {}", id, e.getMessage());
                 if ("SUBSCRIPTION".equals(kind)) {
@@ -241,6 +239,82 @@ public class BillingService {
             }
         }
         return find(id).orElseThrow();
+    }
+
+    /** A hosted payment page for the invoice, from the office's gateway; replaces the one it had. */
+    private void attachPayPage(UUID officeId, UUID id, String number, long totalHalalas, String description) {
+        String success = props.portalBaseUrl() + "/billing?invoice=" + id;
+        String callback = props.apiBaseUrl() == null || props.apiBaseUrl().isBlank() ? null
+                : props.apiBaseUrl() + "/webhooks/moyasar";
+        if (callback != null && MoyasarWebhookAuth.configured(props.moyasarWebhookSecret())) {
+            callback += "?token=" + MoyasarWebhookAuth.callbackToken(props.moyasarWebhookSecret());
+        }
+        PaymentGateway gateway = gateways.forOffice(officeId);
+        PaymentGateway.Checkout c = gateway.create(totalHalalas, description + " — " + number, id.toString(), success, callback);
+        jdbc.sql("update invoices set provider = ?, provider_ref = ?, pay_url = ?, pay_url_expires_at = ? where id = ?")
+                .params(gateway.name(), c.providerRef(), c.url(), Timestamp.from(Instant.now().plus(PAGE_LIFETIME)), id).update();
+        jdbc.sql("insert into billing_refs (provider_ref, office_id, invoice_id) values (?, ?, ?) on conflict do nothing")
+                .params(c.providerRef(), officeId, id).update();
+    }
+
+    /**
+     * «ادفع» on a due invoice: its payment page, or a new one when that page expired or is about to (Moyasar pages last
+     * 7 days, and an overage invoice can wait longer than that). Paid in the meantime: returned as paid.
+     */
+    public Invoice payPage(UUID invoiceId) {
+        Invoice inv = confirm(invoiceId);
+        if (!"DUE".equals(inv.status()) || inv.totalHalalas() <= 0) return inv;
+        boolean good = jdbc.sql("select " + PAGE_STILL_GOOD + " from invoices where id = ?").param(invoiceId)
+                .query(Boolean.class).single();
+        if (good) return inv;
+        UUID officeId = jdbc.sql("select office_id from invoices where id = ?").param(invoiceId)
+                .query((rs, n) -> rs.getObject(1, UUID.class)).single();
+        try {
+            attachPayPage(officeId, invoiceId, inv.number(), inv.totalHalalas(), inv.description());
+        } catch (RuntimeException e) {
+            log.warn("New payment page for invoice {} not created: {}", invoiceId, e.getMessage());
+            throw ApiException.badGateway("payment_unavailable", "تعذّر فتح صفحة الدفع الآن. حاول بعد قليل.");
+        }
+        return find(invoiceId).orElseThrow();
+    }
+
+    /** The provider says the page expired or was canceled: the next «ادفع» makes a new one. */
+    public void payPageGone(UUID invoiceId, String providerRef) {
+        jdbc.sql("update invoices set pay_url_expires_at = now() where id = ? and status = 'DUE' and provider_ref = ?")
+                .params(invoiceId, providerRef).update();
+    }
+
+    /** A declined attempt on the payment page, with the provider's reason: shown on the billing page and in /ops. */
+    public void paymentFailed(UUID invoiceId, String reason) {
+        String r = reason == null || reason.isBlank() ? null : reason.length() > 300 ? reason.substring(0, 300) : reason.trim();
+        jdbc.sql("update invoices set last_failure_at = now(), last_failure_reason = ? where id = ? and status = 'DUE'")
+                .params(r, invoiceId).update();
+    }
+
+    /**
+     * The provider reports {@code refundedHalalas} refunded on the invoice's payment so far (a total, so a repeated
+     * notification changes nothing). All of it: the invoice is REFUNDED, and a subscription's period is taken back
+     * (paid-until moves back by the months it bought; the usual renewal and grace follow). Part of it (a correction):
+     * recorded, the subscription stays. Empty when nothing changed.
+     */
+    public Optional<Refund> refunded(UUID invoiceId, long refundedHalalas) {
+        return tx.execute(status -> {
+            promos.lockOffice();
+            Invoice inv = find(invoiceId).orElse(null);
+            if (inv == null || inv.totalHalalas() <= 0) return Optional.<Refund>empty();
+            if (!"PAID".equals(inv.status()) && !"REFUNDED".equals(inv.status())) return Optional.<Refund>empty();
+            long amount = Math.min(refundedHalalas, inv.totalHalalas());
+            if (amount <= inv.refundedHalalas()) return Optional.<Refund>empty();
+            jdbc.sql("update invoices set refunded_halalas = ?, refunded_at = now() where id = ?").params(amount, invoiceId).update();
+            boolean full = amount >= inv.totalHalalas();
+            boolean takenBack = false;
+            if (full && jdbc.sql("update invoices set status = 'REFUNDED' where id = ? and status = 'PAID'").param(invoiceId).update() == 1
+                    && "SUBSCRIPTION".equals(inv.kind())) {
+                subscription.takeBack("ANNUAL".equals(inv.cycle()) ? 12 : 1);
+                takenBack = true;
+            }
+            return Optional.of(new Refund(find(invoiceId).orElseThrow(), amount, full, takenBack));
+        });
     }
 
     static long halalas(BigDecimal sar) {
@@ -254,16 +328,19 @@ public class BillingService {
     private static final String SELECT = """
             select id, number, kind, plan, cycle, description, period_start, period_end, subtotal_halalas, vat_halalas,
                    total_halalas, status, provider, provider_ref, pay_url, created_at, paid_at, discount_halalas,
-                   promo_code from invoices""";
+                   promo_code, refunded_halalas, refunded_at, last_failure_reason, last_failure_at from invoices""";
 
     private static Invoice map(java.sql.ResultSet rs, int n) throws java.sql.SQLException {
         java.sql.Date ps = rs.getDate("period_start"), pe = rs.getDate("period_end");
-        Timestamp paid = rs.getTimestamp("paid_at");
+        Timestamp paid = rs.getTimestamp("paid_at"), refunded = rs.getTimestamp("refunded_at"),
+                failed = rs.getTimestamp("last_failure_at");
         return new Invoice(rs.getObject("id", UUID.class), rs.getString("number"), rs.getString("kind"), rs.getString("plan"),
                 rs.getString("cycle"), rs.getString("description"), ps == null ? null : ps.toLocalDate(),
                 pe == null ? null : pe.toLocalDate(), rs.getLong("subtotal_halalas"), rs.getLong("vat_halalas"),
                 rs.getLong("total_halalas"), rs.getString("status"), rs.getString("provider"), rs.getString("provider_ref"),
                 rs.getString("pay_url"), rs.getTimestamp("created_at").toInstant(), paid == null ? null : paid.toInstant(),
-                rs.getLong("discount_halalas"), rs.getString("promo_code"));
+                rs.getLong("discount_halalas"), rs.getString("promo_code"), rs.getLong("refunded_halalas"),
+                refunded == null ? null : refunded.toInstant(), rs.getString("last_failure_reason"),
+                failed == null ? null : failed.toInstant());
     }
 }

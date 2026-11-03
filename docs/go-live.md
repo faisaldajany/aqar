@@ -46,9 +46,13 @@ A self-visit rejection is free text only, so it reaches the customer only inside
       offices (owner email on hidaaco.com, confirmed from the emailed link) keep paying with test cards; every other
       office pays for real.
 - [ ] Webhook in Moyasar → Settings → Webhooks, in test mode and again in live mode: URL
-      `https://app.hidaaco.com/webhooks/moyasar`, method POST, event `PAYMENT_PAID` only, Secret Token = the
+      `https://app.hidaaco.com/webhooks/moyasar`, method POST, events `PAYMENT_PAID`, `PAYMENT_FAILED`, `PAYMENT_REFUNDED`, `PAYMENT_VOIDED`, `INVOICE_EXPIRED`, `INVOICE_CANCELED`, `PAYOUT_FAILED`, `PAYOUT_RETURNED`, `PAYOUT_CANCELED`, Secret Token = the
       `moyasar-webhook-secret` secret (`MOYASAR_WEBHOOK_SECRET` on hidaa-api). Each invoice's own callback carries a
       token derived from the same secret, so both kinds of notification are checked.
+- [ ] What each event does: paid → invoice paid; failed → the reason shows on the billing page and in /ops; refunded or
+      voided → invoice مستردة, refunds come off revenue in the month made, a full refund of a subscription takes its
+      months back, the office gets a notice and the team an email; invoice expired/canceled → «ادفع» makes a new page;
+      payout failed/returned/canceled → email to the team. Every status is re-checked with Moyasar's API first.
 - [ ] Renewal is a new hosted invoice each period (no stored cards). Saved-card auto-charge is a later
       improvement (Moyasar tokenization).
 

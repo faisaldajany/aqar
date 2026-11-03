@@ -49,14 +49,16 @@ export type OpsSupport = {
 export type OpsInvoice = {
   id: string; officeId: string; office: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP";
   plan: string | null; cycle: string | null; description: string; subtotal: number; vat: number; total: number;
-  status: "DUE" | "PAID" | "VOID"; provider: string | null; createdAt: string; paidAt: string | null; discount: number; promoCode: string | null;
+  status: "DUE" | "PAID" | "VOID" | "REFUNDED"; provider: string | null; createdAt: string; paidAt: string | null; discount: number; promoCode: string | null;
+  refunded: number; refundedAt: string | null; lastFailureReason: string | null; lastFailureAt: string | null;
   /** Paid with Moyasar test cards (internal office): shown, not counted. */
   test: boolean;
 };
 
 export type OpsRevenue = {
   mrr: number; arr: number; payingOffices: number; unpaidTotal: number; unpaidCount: number;
-  months: { month: string; subscriptions: number; overage: number; setup: number; total: number; vat: number }[];
+  /** total = collected minus refunds made that month (before VAT). */
+  months: { month: string; subscriptions: number; overage: number; setup: number; refunds: number; total: number; vat: number }[];
   invoices: OpsInvoice[];
 };
 

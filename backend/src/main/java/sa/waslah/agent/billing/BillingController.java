@@ -44,10 +44,13 @@ public class BillingController {
     private final RateLimiter limits;
     private final PaymentGateways gateways;
     private final sa.waslah.agent.auth.EmailConfirmationService confirmations;
+    private final MoyasarEvents events;
 
     public BillingController(BillingService billing, Subscription subscription, PlanLimits plans, BillingProperties props,
                              sa.waslah.agent.config.WaslahProperties app, PromoService promos, RateLimiter limits,
-                             PaymentGateways gateways, sa.waslah.agent.auth.EmailConfirmationService confirmations) {
+                             PaymentGateways gateways, sa.waslah.agent.auth.EmailConfirmationService confirmations,
+                             MoyasarEvents events) {
+        this.events = events;
         this.limits = limits;
         this.gateways = gateways;
         this.confirmations = confirmations;
@@ -178,11 +181,15 @@ public class BillingController {
         return billing.mockPay(id);
     }
 
+    /** «ادفع»: the invoice's payment page, renewed if it expired. */
+    @PostMapping("/api/billing/invoices/{id}/pay")
+    BillingService.Invoice pay(@PathVariable UUID id) {
+        return billing.payPage(id);
+    }
+
     /**
-     * Moyasar's payment notification: the invoice's callback, or the dashboard webhook (event payment_paid, with the
-     * payment in "data" and its invoice in data.invoice_id). The body only tells us which invoice to re-check; the paid
-     * status itself always comes from Moyasar's API, so a forged notification cannot mark anything paid. With
-     * MOYASAR_WEBHOOK_SECRET set, a notification without the right token is turned away (see {@link MoyasarWebhookAuth}).
+     * Moyasar's notifications: each invoice's own callback, and the dashboard webhook's events (see {@link MoyasarEvents}).
+     * With MOYASAR_WEBHOOK_SECRET set, a notification without the right token is turned away (see {@link MoyasarWebhookAuth}).
      */
     @PostMapping("/webhooks/moyasar")
     ResponseEntity<Map<String, Object>> moyasar(@RequestBody JsonNode body,
@@ -191,25 +198,7 @@ public class BillingController {
             log.warn("Moyasar notification turned away: missing or wrong secret token");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false));
         }
-        List<String> refs = new ArrayList<>();
-        for (JsonNode n : List.of(body.path("id"), body.path("invoice_id"), body.path("data").path("id"),
-                body.path("data").path("invoice_id"))) {
-            if (n.isTextual()) refs.add(n.asText());
-        }
-        for (String ref : refs) {
-            Optional<UUID[]> hit = billing.officeForProviderRef(ref);
-            if (hit.isPresent()) {
-                UUID office = hit.get()[0], invoice = hit.get()[1];
-                try {
-                    TenantContext.run(office, () -> billing.confirm(invoice));
-                } catch (RuntimeException e) {
-                    log.warn("Moyasar notification for {} not processed: {}", ref, e.getMessage());
-                }
-                return ResponseEntity.ok(Map.of("ok", true));
-            }
-        }
-        // Not one of our invoices (another event, or another app on the same Moyasar account): acknowledged, so
-        // Moyasar does not keep retrying it.
-        return ResponseEntity.ok(Map.of("ok", false));
+        boolean authenticated = MoyasarWebhookAuth.configured(props.moyasarWebhookSecret());
+        return ResponseEntity.ok(events.handle(body, authenticated));
     }
 }

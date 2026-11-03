@@ -241,7 +241,12 @@ export default function OpsOfficePage() {
                   <td className="small">{i.description}</td>
                   <td>{i.discountHalalas ? `${sar(i.discountHalalas)} ريال` : "—"}</td>
                   <td>{sar(i.totalHalalas)} ريال</td>
-                  <td>{i.status === "PAID" ? <span className="pill p-ok">مدفوعة</span> : i.status === "DUE" ? <span className="pill p-warn">مستحقة</span> : <span className="pill p-idle">ملغاة</span>}</td>
+                  <td>
+                    {i.status === "PAID" ? <span className="pill p-ok">مدفوعة</span> : i.status === "DUE" ? <span className="pill p-warn">مستحقة</span>
+                      : i.status === "REFUNDED" ? <span className="pill p-idle">مستردة</span> : <span className="pill p-idle">ملغاة</span>}
+                    {i.refundedHalalas > 0 && i.status === "PAID" && <><br /><span className="small muted">استُرد {(i.refundedHalalas / 100).toLocaleString("en-US")} ريال</span></>}
+                    {i.status === "DUE" && i.lastFailureReason && <><br /><span className="small err">رُفضت: {i.lastFailureReason}</span></>}
+                  </td>
                   <td className="small">{day(i.paidAt ?? i.createdAt)}</td>
                 </tr>
               ))}

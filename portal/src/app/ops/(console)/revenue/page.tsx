@@ -6,8 +6,8 @@ import { ColumnChart, type ChartDatum } from "@/components/Charts";
 import { api, ApiError } from "@/lib/api";
 import { day, sar, type OpsInvoice, type OpsRevenue } from "@/lib/ops";
 
-type Filter = "ALL" | "DUE" | "PAID" | "VOID";
-const FILTERS: [Filter, string][] = [["ALL", "الكل"], ["DUE", "مستحقة"], ["PAID", "مدفوعة"], ["VOID", "ملغاة"]];
+type Filter = "ALL" | "DUE" | "PAID" | "REFUNDED" | "VOID";
+const FILTERS: [Filter, string][] = [["ALL", "الكل"], ["DUE", "مستحقة"], ["PAID", "مدفوعة"], ["REFUNDED", "مستردة"], ["VOID", "ملغاة"]];
 const KIND: Record<OpsInvoice["kind"], string> = { SUBSCRIPTION: "اشتراك", OVERAGE: "محادثات إضافية", SETUP: "إعداد", COMP: "مجاني" };
 const LOCALE = "ar-SA-u-ca-gregory-nu-latn";
 
@@ -20,7 +20,8 @@ function monthLabel(ym: string) {
 }
 
 function StatusPill({ s }: { s: OpsInvoice["status"] }) {
-  return s === "PAID" ? <span className="pill p-ok">مدفوعة</span> : s === "DUE" ? <span className="pill p-warn">مستحقة</span> : <span className="pill p-idle">ملغاة</span>;
+  return s === "PAID" ? <span className="pill p-ok">مدفوعة</span> : s === "DUE" ? <span className="pill p-warn">مستحقة</span>
+    : s === "REFUNDED" ? <span className="pill p-idle">مستردة</span> : <span className="pill p-idle">ملغاة</span>;
 }
 
 export default function OpsRevenuePage() {
@@ -90,6 +91,12 @@ export default function OpsRevenuePage() {
           data={data.months.map((m): ChartDatum => ({ label: monthLabel(m.month), title: monthTitle(m.month),
             values: { subscriptions: m.subscriptions, overage: m.overage, setup: m.setup } }))}
         />
+        {data.months.some((m) => (m.refunds ?? 0) > 0) && (
+          <p className="small muted">
+            المسترد خلال 12 شهراً: {sar(data.months.reduce((t, m) => t + (m.refunds ?? 0), 0))} ريال قبل الضريبة. الأعمدة تعرض المحصّل،
+            و«حُصّل هذا الشهر» بعد خصم المسترد في الشهر نفسه.
+          </p>
+        )}
       </section>
 
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -112,10 +119,14 @@ export default function OpsRevenuePage() {
               <td><Link href={`/ops/offices/${i.officeId}`}>{i.office}</Link></td>
               <td className="small">{i.description}{i.discount > 0 && <><br /><span className="muted">خصم {sar(i.discount)}{i.promoCode ? ` (${i.promoCode})` : ""}</span></>}</td>
               <td className="num">{sar(i.total)}<br /><span className="small muted">منها ضريبة {sar(i.vat)}</span></td>
-              <td><StatusPill s={i.status} />{i.test && <><br /><span className="pill p-acc">تجريبية</span></>}</td>
+              <td>
+                <StatusPill s={i.status} />{i.test && <><br /><span className="pill p-acc">تجريبية</span></>}
+                {i.refunded > 0 && <><br /><span className="small muted">استُرد {sar(i.refunded)}{i.refundedAt ? ` في ${day(i.refundedAt)}` : ""}</span></>}
+                {i.status === "DUE" && i.lastFailureReason && <><br /><span className="small err" title={i.lastFailureAt ? day(i.lastFailureAt) : undefined}>رُفضت: {i.lastFailureReason}</span></>}
+              </td>
               <td className="small">{day(i.createdAt)}{i.paidAt && <><br /><span className="muted">دُفعت {day(i.paidAt)}</span></>}</td>
               <td>
-                {i.status !== "PAID" && i.kind !== "COMP" && (paying === i.id ? (
+                {(i.status === "DUE" || i.status === "VOID") && i.kind !== "COMP" && (paying === i.id ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
                     <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مرجع التحويل البنكي" aria-label="مرجع التحويل" />
                     <div className="row">

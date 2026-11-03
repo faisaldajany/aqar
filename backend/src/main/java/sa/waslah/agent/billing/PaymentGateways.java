@@ -78,8 +78,13 @@ public class PaymentGateways {
 
     /** Asks the gateway that created the invoice whether it is paid; false for a gateway no longer configured. */
     public boolean isPaid(String provider, String providerRef) {
+        PaymentGateway g = byProvider(provider);
+        return g != null && g.isPaid(providerRef);
+    }
+
+    /** The gateway that created invoices recorded under this provider name, or null if it is no longer configured. */
+    public PaymentGateway byProvider(String provider) {
         PaymentGateway g = TEST.equals(provider) ? test : main;
-        if (g == null || !g.name().equals(provider)) return false;
-        return g.isPaid(providerRef);
+        return g == null || !g.name().equals(provider) ? null : g;
     }
 }

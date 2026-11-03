@@ -190,6 +190,114 @@ class BillingFlowTest extends IntegrationTest {
         assertThat(rest.getForEntity("/admin/offices", String.class).getStatusCode().value()).isEqualTo(404);
     }
 
+    // ---- Moyasar events beyond "paid" ----
+
+    MockPaymentGateway mock() {
+        return (MockPaymentGateway) gateway;
+    }
+
+    BillingService.Invoice invoice(UUID id) {
+        return TenantContext.call(office, () -> billing.find(id).orElseThrow());
+    }
+
+    void event(String type, Map<String, Object> data) {
+        rest.postForEntity("/webhooks/moyasar", Map.of("id", "evt_" + UUID.randomUUID(), "type", type, "live", false, "data", data), Map.class);
+    }
+
+    @Test
+    void failedPaymentKeepsTheReasonButOnlyWhenMoyasarSaysSo() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        // A made-up payment id: Moyasar does not know it, so nothing is recorded.
+        event("payment_failed", Map.of("id", "pay_forged", "invoice_id", inv.providerRef(), "source", Map.of("message", "x")));
+        assertThat(invoice(inv.id()).lastFailureReason()).isNull();
+
+        mock().record(new PaymentGateway.Payment("pay_f1", "failed", inv.totalHalalas(), 0, inv.providerRef(), "INSUFFICIENT_FUNDS"));
+        event("payment_failed", Map.of("id", "pay_f1", "invoice_id", inv.providerRef()));
+        BillingService.Invoice after = invoice(inv.id());
+        assertThat(after.lastFailureReason()).isEqualTo("INSUFFICIENT_FUNDS");
+        assertThat(after.lastFailureAt()).isNotNull();
+        assertThat(after.status()).isEqualTo("DUE");
+    }
+
+    @Test
+    void fullRefundTakesTheSubscriptionPeriodBackOnce() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        mock().pay(inv.providerRef());
+        TenantContext.call(office, () -> billing.confirm(inv.id()));
+        Instant paidUntil = TenantContext.call(office, () -> subscription.state().paidUntil());
+        Instant trialEnd = TenantContext.call(office, () -> subscription.state().trialEndsAt());
+
+        mock().record(new PaymentGateway.Payment("pay_r1", "refunded", inv.totalHalalas(), inv.totalHalalas(), inv.providerRef(), null));
+        event("payment_refunded", Map.of("id", "pay_r1", "invoice_id", inv.providerRef()));
+        BillingService.Invoice after = invoice(inv.id());
+        assertThat(after.status()).isEqualTo("REFUNDED");
+        assertThat(after.refundedHalalas()).isEqualTo(inv.totalHalalas());
+        // Paid during the trial: the month it bought is gone, back to the trial's end.
+        Instant now = TenantContext.call(office, () -> subscription.state().paidUntil());
+        assertThat(Duration.between(now, paidUntil).toDays()).isBetween(27L, 31L);
+        assertThat(Duration.between(trialEnd, now).abs().toDays()).isLessThanOrEqualTo(3); // month lengths differ
+        assertThat(kinds()).contains("REFUND");
+
+        // Moyasar sends it again: nothing more is taken back.
+        event("payment_refunded", Map.of("id", "pay_r1", "invoice_id", inv.providerRef()));
+        assertThat(TenantContext.call(office, () -> subscription.state().paidUntil())).isEqualTo(now);
+    }
+
+    @Test
+    void partialRefundIsRecordedAndTheSubscriptionStays() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        mock().pay(inv.providerRef());
+        TenantContext.call(office, () -> billing.confirm(inv.id()));
+        Instant paidUntil = TenantContext.call(office, () -> subscription.state().paidUntil());
+
+        mock().record(new PaymentGateway.Payment("pay_p1", "paid", inv.totalHalalas(), 10_000, inv.providerRef(), null));
+        event("payment_refunded", Map.of("id", "pay_p1", "invoice_id", inv.providerRef()));
+        BillingService.Invoice after = invoice(inv.id());
+        assertThat(after.status()).isEqualTo("PAID");
+        assertThat(after.refundedHalalas()).isEqualTo(10_000);
+        assertThat(TenantContext.call(office, () -> subscription.state().paidUntil())).isEqualTo(paidUntil);
+    }
+
+    @Test
+    void expiredPaymentPageIsReplacedWhenTheOfficePays() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        // Still good: «ادفع» gives the same page.
+        assertThat(TenantContext.call(office, () -> billing.payPage(inv.id())).payUrl()).isEqualTo(inv.payUrl());
+
+        // Moyasar says it expired (only believed because Moyasar's API says so too).
+        event("invoice_expired", Map.of("id", inv.providerRef(), "status", "expired"));
+        assertThat(TenantContext.call(office, () -> billing.payPage(inv.id())).payUrl()).isEqualTo(inv.payUrl());
+        mock().setInvoiceStatus(inv.providerRef(), "expired");
+        event("invoice_expired", Map.of("id", inv.providerRef(), "status", "expired"));
+        BillingService.Invoice renewed = TenantContext.call(office, () -> billing.payPage(inv.id()));
+        assertThat(renewed.payUrl()).isNotEqualTo(inv.payUrl());
+        assertThat(renewed.providerRef()).isNotEqualTo(inv.providerRef());
+
+        // Paying on the new page is found from its own notification, and a new checkout does not reuse a dead page.
+        mock().pay(renewed.providerRef());
+        rest.postForEntity("/webhooks/moyasar", Map.of("id", renewed.providerRef()), Map.class);
+        assertThat(invoice(inv.id()).status()).isEqualTo("PAID");
+    }
+
+    @Test
+    void oldPageIsReplacedEvenWithoutANotification() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        TenantContext.run(office, () -> jdbc.sql("update invoices set pay_url_expires_at = now() - interval '1 day' where id = ?")
+                .param(inv.id()).update());
+        assertThat(TenantContext.call(office, () -> billing.payPage(inv.id())).payUrl()).isNotEqualTo(inv.payUrl());
+        // And checkout makes a fresh invoice rather than handing out the dead page.
+        TenantContext.run(office, () -> jdbc.sql("update invoices set pay_url_expires_at = now() - interval '1 day' where id = ?")
+                .param(inv.id()).update());
+        assertThat(TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY")).id()).isNotEqualTo(inv.id());
+    }
+
+    @Test
+    void payoutProblemsNeedTheSecretToBeTrusted() {
+        var res = rest.postForEntity("/webhooks/moyasar", Map.of("type", "payout_failed", "data", Map.of("id", "po_1", "amount", 100_00)), Map.class);
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(res.getBody().get("ok")).isEqualTo(false);
+    }
+
     private List<String> kinds() {
         return TenantContext.call(office, () -> jdbc.sql("select kind from office_alerts").query(String.class).list());
     }

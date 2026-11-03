@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "حداء",
   description: "وكيل آلي على رقم واتساب مكتبك العقاري: يرد خلال ثوانٍ، ويعرض عقاراتك المرخّصة، ويحجز المعاينة.",
   metadataBase: new URL("https://hidaaco.com"),
-  openGraph: { title: "حداء — وكيل واتساب لمكاتب العقار", locale: "ar_SA", type: "website" },
+  openGraph: { title: "حداء — وكيل لمكاتب العقار", locale: "ar_SA", type: "website" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BarList, ColumnChart, Delta, num, SplitBar, type ChartDatum } from "@/components/Charts";
 import { Icon } from "@/components/Icon";
-import { api, type Alert, type Demand, type Insights, type Onboarding, type Stats, type Usage } from "@/lib/api";
+import { api, type Alert, type Booking, type Demand, type Insights, type Onboarding, type Stats, type Usage } from "@/lib/api";
 import { useSession } from "../session";
 
 const STEP_HINT: Record<string, string> = {
@@ -53,6 +53,9 @@ export default function Dashboard() {
   const [ins, setIns] = useState<Insights | null>(null);
   const [loadingIns, setLoadingIns] = useState(false);
   const [deals, setDeals] = useState<Deals | null>(null);
+  const [todayBookings, setTodayBookings] = useState<Booking[]>([]);
+  const [attention, setAttention] = useState<{ noInterest: number; licenceEnding: number; noCard: number } | null>(null);
+  const [gaps, setGaps] = useState(0);
 
   useEffect(() => {
     setLoadingIns(true);
@@ -65,6 +68,14 @@ export default function Dashboard() {
     api<Stats>("/stats").then(setStats).catch(() => undefined);
     api<Onboarding>("/onboarding").then(setOnb).catch(() => undefined);
     api<Deals>("/customers/summary").then(setDeals).catch(() => undefined);
+    const day = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const now = new Date();
+    api<Booking[]>(`/bookings?from=${day(now)}&to=${day(new Date(now.getTime() + 86_400_000))}`)
+      .then((b) => setTodayBookings(b.filter((x) => !["CANCELLED", "REJECTED"].includes(x.status))))
+      .catch(() => undefined);
+    api<{ attention: { noInterest: number; licenceEnding: number; noCard: number } }>("/listings/interest?days=30")
+      .then((r) => setAttention(r.attention)).catch(() => undefined);
+    api<unknown[]>("/agent/gaps?days=7").then((g) => setGaps(g.length)).catch(() => undefined);
   }, []);
 
   async function dismiss(id: string) {
@@ -143,11 +154,27 @@ export default function Dashboard() {
                 <span className="row">
                   {a.kind.startsWith("LICENSE") && <Link className="btn" href="/listings">العقارات</Link>}
                   {a.kind === "SELF_VISIT_REQUEST" && <Link className="btn" href="/bookings">راجع الطلب</Link>}
+                  {a.kind.startsWith("HANDOFF_") && <Link className="btn" href="/handoffs">التحويلات</Link>}
+                  {a.kind === "REFUND" && <Link className="btn" href="/billing">الفواتير</Link>}
                   <button className="btn" onClick={() => dismiss(a.id)}>تم</button>
                 </span>
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {todayBookings.length > 0 && <TodayViewings list={todayBookings} />}
+
+      {((attention && attention.noInterest + attention.licenceEnding + attention.noCard > 0) || gaps > 0) && (
+        <section className="card" aria-labelledby="attn-h" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <h2 id="attn-h">يستحق نظرة</h2>
+          <div className="attn">
+            {gaps > 0 && <Link className="btn" href="/knowledge">{gaps === 1 ? "سؤال" : gaps === 2 ? "سؤالان" : `${gaps} أسئلة`} لم يعرف الوكيل جوابها هذا الأسبوع ← علّمه</Link>}
+            {attention && attention.licenceEnding > 0 && <Link className="btn" href="/listings?tab=issues">{attention.licenceEnding} ترخيص إعلان ينتهي خلال 14 يوماً</Link>}
+            {attention && attention.noInterest > 0 && <Link className="btn" href="/listings?tab=quiet">{attention.noInterest} عقار لم يعرضه الوكيل على أحد منذ أسبوعين</Link>}
+            {attention && attention.noCard > 0 && <Link className="btn" href="/listings?tab=nocard">{attention.noCard} عقار بلا صور أو موقع</Link>}
+          </div>
         </section>
       )}
 
@@ -322,6 +349,39 @@ function DealsCard({ d }: { d: Deals }) {
         <b>{num(open)}</b>
         <span>عميل لم يُحسم بعد ({d.stages.VIEWING} عاينوا)</span>
       </Link>
+    </section>
+  );
+}
+
+const BOOKING_STATUS: Record<Booking["status"], [string, string]> = {
+  PENDING_APPROVAL: ["بانتظار موافقتك", "p-warn"], CONFIRMED: ["مؤكد", "p-acc"], DONE: ["تمت", "p-ok"],
+  NO_SHOW: ["لم يحضر", "p-bad"], CANCELLED: ["أُلغي", "p-idle"], REJECTED: ["مرفوض", "p-idle"],
+};
+
+/** Today's viewings, in order, with who shows them. */
+function TodayViewings({ list }: { list: Booking[] }) {
+  const sorted = [...list].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  return (
+    <section className="card" aria-labelledby="today-h" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 id="today-h">مواعيد اليوم <span className="small muted">({sorted.length})</span></h2>
+        <Link href="/bookings" className="linkbtn small">كل المواعيد</Link>
+      </div>
+      <ul className="today">
+        {sorted.slice(0, 8).map((b) => {
+          const [label, cls] = BOOKING_STATUS[b.status];
+          return (
+            <li key={b.id}>
+              <span className="t">{new Date(b.startsAt).toLocaleTimeString("ar-SA-u-nu-latn", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" })}</span>
+              <span className="small">
+                <b>{b.listingTitle}</b> · {b.listingDistrict}
+                <br /><span className="muted">{b.customerName ?? b.customerWaId.replace(/^9665/, "05")} · {b.mode === "SELF_VISIT" ? "زيارة ذاتية" : b.marketerName ?? "مع مسوّق"}</span>
+              </span>
+              <span className={`pill ${cls}`}>{label}</span>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

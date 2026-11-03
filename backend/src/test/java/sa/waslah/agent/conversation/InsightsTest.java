@@ -37,7 +37,7 @@ class InsightsTest extends IntegrationTest {
         TenantContext.run(office, () -> signup.complete(new EmbeddedSignupService.Request(null, null, pn, true)));
     }
 
-    UUID customer(String waId, String text) {
+    UUID customer(String waId, String text) throws Exception {
         String body = """
                 {"object":"whatsapp_business_account","entry":[{"id":"W","changes":[{"field":"messages","value":{
                 "messaging_product":"whatsapp","metadata":{"phone_number_id":"%s"},
@@ -57,7 +57,7 @@ class InsightsTest extends IntegrationTest {
     }
 
     @Test
-    void countsCustomersNotTheTestChatAndShowsDemandAgainstListings() {
+    void countsCustomersNotTheTestChatAndShowsDemandAgainstListings() throws Exception {
         UUID a = customer("966550000001", "أبي فيلا في النرجس");
         UUID b = customer("966550000002", "شقة للإيجار");
         lead(a, "SALE", "فيلا", "حي النرجس، الملقا", 2_000_000, "CASH");

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, customersAr, daysUntil, fmt, type AqarDraft, type Listing, type ListingForm } from "@/lib/api";
 import ImportWizard from "./ImportWizard";
 import ListingFormView from "./ListingFormView";
@@ -15,10 +16,22 @@ function licensePill(l: Listing) {
   return <span className="pill p-ok">ساري حتى {l.licenseExpiry}</span>;
 }
 
+type Interest = {
+  listings: Record<string, { shown: number; cards: number; viewings: number }>;
+  attention: { noInterest: number; noInterestIds: string[]; licenceEnding: number; noCard: number };
+};
+
 export default function ListingsPage() {
+  return <Suspense fallback={null}><Listings /></Suspense>;
+}
+
+function Listings() {
+  const tab = useSearchParams().get("tab");
   const [listings, setListings] = useState<Listing[]>([]);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
-  const [filter, setFilter] = useState<"all" | "issues" | "nocard">("all");
+  const [filter, setFilter] = useState<"all" | "issues" | "nocard" | "quiet">(
+    tab === "issues" || tab === "nocard" || tab === "quiet" ? tab : "all");
+  const [interest, setInterest] = useState<Interest | null>(null);
   const [error, setError] = useState("");
   const [waiting, setWaiting] = useState<Record<string, number>>({});
 
@@ -30,6 +43,7 @@ export default function ListingsPage() {
     }
     // Customers each listing fits who have not been told about it yet.
     api<Record<string, number>>("/listings/matches").then(setWaiting).catch(() => undefined);
+    api<Interest>("/listings/interest?days=30").then(setInterest).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -52,8 +66,11 @@ export default function ListingsPage() {
   if (mode.kind === "edit") return <ListingFormView id={mode.listing.id} initial={mode.listing} onDone={back} />;
 
   const totalWaiting = Object.values(waiting).reduce((t, n) => t + n, 0);
+  const quiet = new Set(interest?.attention.noInterestIds ?? []);
   const shown = listings.filter((l) =>
-    filter === "issues" ? daysUntil(l.licenseExpiry) <= 7 : filter === "nocard" ? !(l.latitude != null) || l.uploadedPhotos + l.photoUrls.length === 0 : true);
+    filter === "issues" ? daysUntil(l.licenseExpiry) <= 14
+      : filter === "nocard" ? !(l.latitude != null) || l.uploadedPhotos + l.photoUrls.length === 0
+        : filter === "quiet" ? quiet.has(l.id) : true);
 
   return (
     <>
@@ -75,7 +92,8 @@ export default function ListingsPage() {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([["all", `الكل (${listings.length})`], ["issues", "تراخيص تحتاج تحديث"], ["nocard", "بلا موقع أو صور"]] as const).map(([k, label]) => (
+        {([["all", `الكل (${listings.length})`], ["issues", "تراخيص تنتهي خلال 14 يوماً"], ["nocard", "بلا موقع أو صور"],
+           ["quiet", `بلا اهتمام${quiet.size ? ` (${quiet.size})` : ""}`]] as const).map(([k, label]) => (
           <button key={k} className="tab" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}>{label}</button>
         ))}
       </div>
@@ -90,6 +108,7 @@ export default function ListingsPage() {
                 <tr key={l.id} style={{ opacity: l.status === "ACTIVE" ? 1 : 0.6 }}>
                   <td>
                     <b>{l.title}</b><div className="small muted">{l.district} · {l.propertyType}{l.areaSqm ? ` · ${fmt(l.areaSqm)} م²` : ""}{l.vacant ? "" : " · مسكون"}</div>
+                    {interest && l.status === "ACTIVE" && <InterestLine i={interest.listings[l.id]} quiet={quiet.has(l.id)} />}
                     {l.status === "ACTIVE" && waiting[l.id] > 0 && (
                       <Link href={`/listings/${l.id}/matches`} className="pill p-acc" style={{ marginTop: 4 }}>يطابق {customersAr(waiting[l.id])}</Link>
                     )}
@@ -112,6 +131,16 @@ export default function ListingsPage() {
       )}
     </>
   );
+}
+
+/** "عرضه الوكيل على 12 · صوره لـ5 · معاينتان" over the last 30 days. */
+function InterestLine({ i, quiet }: { i?: { shown: number; cards: number; viewings: number }; quiet: boolean }) {
+  if (quiet) return <div className="small" style={{ color: "var(--warn)" }}>لم يعرضه الوكيل على أحد منذ أسبوعين: راجع السعر أو الوصف أو الصور</div>;
+  if (!i || (i.shown === 0 && i.viewings === 0)) return <div className="small muted">لم يُعرض بعد (30 يوماً)</div>;
+  const parts = [`عرضه الوكيل على ${i.shown}`];
+  if (i.cards) parts.push(`صوره لـ${i.cards}`);
+  if (i.viewings) parts.push(i.viewings === 1 ? "معاينة" : i.viewings === 2 ? "معاينتان" : `${i.viewings} معاينات`);
+  return <div className="small muted">{parts.join(" · ")} <span>(30 يوماً)</span></div>;
 }
 
 function AqarLink({ onDraft, onCancel }: { onDraft: (d: Partial<ListingForm>) => void; onCancel: () => void }) {

@@ -17,6 +17,7 @@ const NAV: { href: string; label: string; icon: string; group: "work" | "setup" 
   { href: "/try", label: "جرّب الوكيل", icon: "try", group: "work" },
   { href: "/listings", label: "العقارات", icon: "building", group: "setup" },
   { href: "/marketers", label: "المسوّقون", icon: "people", group: "setup" },
+  { href: "/knowledge", label: "معلومات للوكيل", icon: "book", group: "setup" },
   { href: "/whatsapp", label: "ربط واتساب", icon: "phone", group: "setup" },
   { href: "/billing", label: "الاشتراك", icon: "card", group: "setup" },
   { href: "/settings", label: "الإعدادات", icon: "gear", group: "setup" },

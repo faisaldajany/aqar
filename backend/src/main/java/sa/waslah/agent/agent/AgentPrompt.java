@@ -13,6 +13,40 @@ public final class AgentPrompt {
     }
 
     public static String system(String officeName, String falLicense, LocalDate today) {
+        return system(officeName, falLicense, today, java.util.List.of());
+    }
+
+    /** A question the office answered for the agent (معلومات للوكيل). */
+    public record Fact(String question, String answer) {
+    }
+
+    /**
+     * @param facts the office's own answers to questions the listings do not cover; told to the agent as the only
+     *              other source it may answer from
+     */
+    public static String system(String officeName, String falLicense, LocalDate today, java.util.List<Fact> facts) {
+        return base(officeName, falLicense, today) + facts(facts);
+    }
+
+    static String facts(java.util.List<Fact> facts) {
+        if (facts == null || facts.isEmpty()) return "";
+        StringBuilder b = new StringBuilder("""
+
+                معلومات من المكتب (كتبها المكتب بنفسه):
+                - إذا سأل العميل عن شيء منها فأجب منها بصياغتك المختصرة بدل التحويل. لا تضف عليها ولا تستنتج منها أسعاراً
+                  أو عقارات. وإذا لم يكن السؤال فيها فاتبع القواعد أعلاه.
+                """);
+        for (Fact f : facts) {
+            b.append("- س: ").append(oneLine(f.question())).append("\n  ج: ").append(oneLine(f.answer())).append('\n');
+        }
+        return b.toString();
+    }
+
+    private static String oneLine(String s) {
+        return s == null ? "" : s.replaceAll("\\s+", " ").trim();
+    }
+
+    private static String base(String officeName, String falLicense, LocalDate today) {
         String fal = falLicense == null || falLicense.isBlank() ? ""
                 : "\n- رقم رخصة فال للمكتب: " + falLicense + ". اذكره مرة واحدة في أول رد مع تعريفك بنفسك، ولا تكرره.";
         return """

@@ -178,7 +178,9 @@ public class AgentService {
                 props.agent().humanPauseHours(), listing -> sendCard(e.conversationId(), listing), bookingService, bookingStore);
 
         String fal = jdbc.sql("select fal_license from offices").query(String.class).optional().orElse(null);
-        AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, fal, LocalDate.now(RIYADH)), turns, tools, prior);
+        List<AgentPrompt.Fact> facts = jdbc.sql("select question, answer from agent_facts order by created_at limit 40")
+                .query((rs, n) -> new AgentPrompt.Fact(rs.getString(1), rs.getString(2))).list();
+        AgentBrain.Outcome out = brain.respond(AgentPrompt.system(officeName, fal, LocalDate.now(RIYADH), facts), turns, tools, prior);
         send(e.conversationId(), out.reply());
 
         ArrayNode calls = json.createArrayNode();

@@ -41,6 +41,45 @@ export type OpsSupport = {
   source: string; forwarded: boolean; forwardError: string | null;
 };
 
+export type OpsInvoice = {
+  id: string; officeId: string; office: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP";
+  plan: string | null; cycle: string | null; description: string; subtotal: number; vat: number; total: number;
+  status: "DUE" | "PAID" | "VOID"; provider: string | null; createdAt: string; paidAt: string | null; discount: number; promoCode: string | null;
+};
+
+export type OpsRevenue = {
+  mrr: number; arr: number; payingOffices: number; unpaidTotal: number; unpaidCount: number;
+  months: { month: string; subscriptions: number; overage: number; setup: number; total: number; vat: number }[];
+  invoices: OpsInvoice[];
+};
+
+export type OpsUsageRow = {
+  officeId: string; office: string; plan: OpsOffice["plan"]; status: string; conversations: number; replies: number; errors: number;
+  inputTokens: number; outputTokens: number; aiCost: number; revenue: number; margin: number;
+};
+
+export type OpsUsage = {
+  month: string; prices: { inputUsdPerMillion: number; outputUsdPerMillion: number; usdToSar: number };
+  totals: Omit<OpsUsageRow, "officeId" | "office" | "plan" | "status"> & { costPerReply: number | null };
+  offices: OpsUsageRow[];
+};
+
+export type FunnelStep = "SIGNED_UP" | "WHATSAPP" | "LISTINGS" | "CONVERSATION" | "PAID";
+export type OpsFunnel = {
+  days: number; steps: { key: FunnelStep; count: number }[];
+  stuck: { officeId: string; office: string; createdAt: string; status: string; next: FunnelStep }[];
+};
+
+export const FUNNEL_LABELS: Record<FunnelStep, string> = {
+  SIGNED_UP: "سجّل", WHATSAPP: "ربط واتساب حقيقي", LISTINGS: "أضاف عقارات", CONVERSATION: "وصله أول عميل", PAID: "اشترك ودفع",
+};
+
+/** 1234.5 → "1,234.50" */
+export function sar(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export const PLAN_NAMES: Record<OpsOffice["plan"], string> = { STARTER: "البداية", BASIC: "الأساسي", GROWTH: "النمو" };
 
 export const FAL_LABELS: Record<OpsOffice["falStatus"], [string, string]> = {
@@ -51,7 +90,7 @@ export const ACTION_LABELS: Record<string, string> = {
   LOGIN: "دخول للإدارة", FAL_VERIFIED: "توثيق فال", FAL_REJECTED: "رفض فال", TRIAL_EXTENDED: "تمديد التجربة",
   COMP_MONTHS: "أشهر مجانية", PLAN_CHANGED: "تغيير الباقة", SUSPENDED: "إيقاف المكتب", REACTIVATED: "إعادة تفعيل المكتب",
   USER_DISABLED: "إيقاف مستخدم", USER_ENABLED: "تفعيل مستخدم", RESET_LINK: "رابط كلمة مرور", PROMO_CREATED: "كود خصم جديد",
-  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", TEMPLATES_SYNC: "تحديث قوالب واتساب",
+  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
 };
 
 /** "2 نوفمبر 2026، 3:15 م" in Riyadh time, or "—". */

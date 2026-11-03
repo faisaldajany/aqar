@@ -37,6 +37,7 @@ class OpsFlowTest extends IntegrationTest {
     @Autowired JwtDecoder jwtDecoder;
     @Autowired WaslahProperties props;
     @Autowired RateLimiter limits;
+    @Autowired OpsReportsController reports;
 
     String email;
     String officeCookie;
@@ -108,6 +109,45 @@ class OpsFlowTest extends IntegrationTest {
         assertThat(call(HttpMethod.GET, "/api/ops/session", null, ops).getStatusCode().value()).isEqualTo(200);
         assertThat(new OpsAuth("too-short-key-12345678", jwtEncoder, jwtDecoder, props, limits).enabled())
                 .as("keys under 24 characters switch the console off").isFalse();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void revenueManualPaymentUsageAndFunnel() {
+        ResponseEntity<Map> checkout = call(HttpMethod.POST, "/api/billing/checkout", Map.of("plan", "BASIC", "cycle", "MONTHLY"), officeCookie);
+        String invoice = String.valueOf(checkout.getBody().get("id"));
+        ResponseEntity<Map> revenue = call(HttpMethod.GET, "/api/ops/revenue", null, ops);
+        assertThat(revenue.getStatusCode().value()).isEqualTo(200);
+        assertThat((List<Map<String, Object>>) revenue.getBody().get("invoices"))
+                .anyMatch(i -> invoice.equals(i.get("id")) && "DUE".equals(i.get("status")) && office.toString().equals(i.get("officeId")));
+        assertThat((List<?>) revenue.getBody().get("months")).hasSize(12);
+
+        assertThat(opsPost("/api/ops/invoices/" + invoice + "/paid", Map.of("officeId", office.toString())).getStatusCode().value())
+                .as("a reference is required").isEqualTo(400);
+        ResponseEntity<Map> paid = opsPost("/api/ops/invoices/" + invoice + "/paid", Map.of("officeId", office.toString(), "note", "تحويل بنكي 7781"));
+        assertThat(paid.getBody()).containsEntry("status", "PAID").containsEntry("changed", true);
+        Subscription.State s = TenantContext.call(office, () -> subscription.state());
+        assertThat(s.status()).isEqualTo("ACTIVE");
+        assertThat(s.plan().name()).isEqualTo("BASIC");
+        String provider = TenantContext.call(office, () -> jdbc.sql("select provider from invoices where id = ?::uuid")
+                .param(invoice).query(String.class).single());
+        assertThat(provider).isNotNull();
+        assertThat(opsPost("/api/ops/invoices/" + invoice + "/paid", Map.of("officeId", office.toString(), "note", "مرة ثانية")).getBody())
+                .containsEntry("changed", false);
+
+        ResponseEntity<Map> usage = call(HttpMethod.GET, "/api/ops/usage", null, ops);
+        assertThat((List<Map<String, Object>>) usage.getBody().get("offices"))
+                .anyMatch(o -> office.toString().equals(o.get("officeId")) && ((Number) o.get("revenue")).doubleValue() == 499.0);
+        assertThat(call(HttpMethod.GET, "/api/ops/usage?month=bad", null, ops).getStatusCode().value()).isEqualTo(400);
+
+        ResponseEntity<Map> funnel = call(HttpMethod.GET, "/api/ops/funnel?days=30", null, ops);
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) funnel.getBody().get("steps");
+        assertThat(steps.get(0).get("key")).isEqualTo("SIGNED_UP");
+        assertThat(((Number) steps.get(0).get("count")).intValue()).isPositive();
+
+        assertThat(call(HttpMethod.GET, "/api/ops/revenue", null, officeCookie).getStatusCode().value())
+                .as("not for offices").isEqualTo(404);
+        assertThat(reports.aiCost(1_000_000, 1_000_000)).isEqualByComparingTo("1.88");
     }
 
     static HttpHeaders headers(String cookie) {

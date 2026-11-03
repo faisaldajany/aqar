@@ -76,6 +76,7 @@ Put keys in Secret Manager, not plain variables.
 | Moyasar account | `BILLING_PROVIDER=moyasar`, secret `MOYASAR_SECRET_KEY` |
 | Email (Spacemail) | `MAIL_HOST=mail.spacemail.com`, `MAIL_PORT=465`, `MAIL_SSL=true`, `MAIL_STARTTLS=false`, `MAIL_USERNAME=no-reply@hidaaco.com`, secret `MAIL_PASSWORD`. The sender (`SUPPORT_FROM`, default `no-reply@hidaaco.com`) must be that mailbox. Needed for password reset emails and support forwarding |
 | Error tracking | `SENTRY_DSN` |
+| AI cost in /ops → الاستخدام والتكلفة | `LLM_PRICE_INPUT_USD`, `LLM_PRICE_OUTPUT_USD`: the model's list price per million tokens (defaults 0.10 and 0.40). Only changes the estimate shown |
 
 Example for one secret:
 ```bash

@@ -25,6 +25,7 @@ import sa.waslah.agent.billing.PlanLimits;
 import sa.waslah.agent.billing.PromoService;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.common.ClientIp;
+import sa.waslah.agent.common.Email;
 import sa.waslah.agent.common.Mailer;
 import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.office.OfficeAlerts;
@@ -337,17 +338,16 @@ public class OpsController {
         PasswordResetService.Link link = resets.create(id, true);
         boolean emailed = false;
         if (r != null && Boolean.TRUE.equals(r.sendEmail())) {
-            String email = jdbc.sql("select email from users where id = ?").param(id).query(String.class).single();
-            emailed = mailer.send(email, "إعادة تعيين كلمة المرور — حداء", """
-                    مرحباً،
-
-                    أرسل لك فريق حداء رابطاً لتعيين كلمة مرور جديدة لحسابك. الرابط صالح لمدة 24 ساعة:
-
-                    %s
-
-                    فريق حداء
-                    support@hidaaco.com
-                    """.formatted(link.url()));
+            record Who(String email, String fullName) {
+            }
+            Who who = jdbc.sql("select email, full_name from users where id = ?").param(id)
+                    .query((rs, n) -> new Who(rs.getString(1), rs.getString(2))).single();
+            emailed = mailer.send(who.email(), PasswordResetService.SUBJECT, new Email(
+                    "رابط من فريق حداء لتعيين كلمة مرور جديدة، صالح لمدة 24 ساعة.",
+                    Email.greet(who.fullName()),
+                    List.of("أرسل لك فريق حداء رابطاً لتعيين كلمة مرور جديدة لحسابك. الرابط صالح لمدة 24 ساعة ويُستخدم مرة واحدة."),
+                    new Email.Button("تعيين كلمة مرور جديدة", link.url()),
+                    "إذا لم تطلب ذلك من فريق حداء فتواصل معنا على support@hidaaco.com."));
         }
         audit(http, "RESET_LINK", office, id.toString(), emailed ? "emailed" : "shown");
         return Map.of("url", link.url(), "expiresAt", link.expiresAt().toString(), "emailed", emailed);

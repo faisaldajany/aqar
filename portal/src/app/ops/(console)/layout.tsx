@@ -10,6 +10,8 @@ import { OpsContext } from "./context";
 
 const NAV = [
   { href: "/ops", label: "المكاتب", icon: "building" },
+  { href: "/ops/revenue", label: "الإيرادات والفواتير", icon: "money" },
+  { href: "/ops/usage", label: "الاستخدام والتكلفة", icon: "chart" },
   { href: "/ops/promos", label: "أكواد الخصم", icon: "card" },
   { href: "/ops/support", label: "رسائل الدعم", icon: "chat" },
   { href: "/ops/audit", label: "سجل العمليات", icon: "check" },

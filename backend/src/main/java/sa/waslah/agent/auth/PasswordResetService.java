@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import sa.waslah.agent.billing.BillingProperties;
 import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.common.Email;
 import sa.waslah.agent.common.Mailer;
 
 /**
@@ -30,6 +32,7 @@ public class PasswordResetService {
     static final Duration USER_TTL = Duration.ofHours(1);
     static final Duration OPERATOR_TTL = Duration.ofHours(24);
     static final int MIN_LENGTH = 8;
+    public static final String SUBJECT = "إعادة تعيين كلمة المرور — حداء";
 
     public record Link(String url, Instant expiresAt) {
     }
@@ -74,22 +77,18 @@ public class PasswordResetService {
      */
     public void requestByEmail(String email) {
         String e = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
-        Optional<UUID> user = jdbc.sql("select id from users where email = ? and disabled_at is null")
-                .param(e).query(UUID.class).optional();
+        record Who(UUID id, String fullName) {
+        }
+        Optional<Who> user = jdbc.sql("select id, full_name from users where email = ? and disabled_at is null")
+                .param(e).query((rs, n) -> new Who(rs.getObject(1, UUID.class), rs.getString(2))).optional();
         if (user.isEmpty()) return;
-        Link link = create(user.get(), false);
-        mailThread.execute(() -> mailer.send(e, "إعادة تعيين كلمة المرور — حداء", """
-                مرحباً،
-
-                طلبت إعادة تعيين كلمة المرور لحسابك في حداء. افتح الرابط التالي خلال ساعة لتعيين كلمة مرور جديدة:
-
-                %s
-
-                إذا لم تطلب ذلك فتجاهل هذه الرسالة، ولن يتغير شيء في حسابك.
-
-                فريق حداء
-                support@hidaaco.com
-                """.formatted(link.url())));
+        Link link = create(user.get().id(), false);
+        Email email = new Email("رابط تعيين كلمة مرور جديدة لحسابك في حداء، صالح لمدة ساعة.",
+                Email.greet(user.get().fullName()),
+                List.of("طلبت إعادة تعيين كلمة المرور لحسابك في حداء. اضغط الزر لتعيين كلمة مرور جديدة. الرابط صالح لمدة ساعة ويُستخدم مرة واحدة."),
+                new Email.Button("تعيين كلمة مرور جديدة", link.url()),
+                "إذا لم تطلب ذلك فتجاهل هذه الرسالة، ولن يتغير شيء في حسابك.");
+        mailThread.execute(() -> mailer.send(e, SUBJECT, email));
     }
 
     /** Sets the new password if the link is valid, unused and not expired; returns the user's email. */

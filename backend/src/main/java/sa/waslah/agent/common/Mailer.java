@@ -9,7 +9,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
-/** Plain-text email from no-reply@hidaaco.com (password reset links). Does nothing when MAIL_HOST is not set. */
+/** Email from no-reply@hidaaco.com (password reset links). Does nothing when MAIL_HOST is not set. */
 @Component
 public class Mailer {
 
@@ -30,8 +30,17 @@ public class Mailer {
         return host != null && !host.isBlank() && mail.getIfAvailable() != null;
     }
 
-    /** Sends and returns true, or logs and returns false; never throws. */
+    /** A branded HTML email with its plain-text copy. Sends and returns true, or logs and returns false; never throws. */
+    public boolean send(String to, String subject, Email email) {
+        return deliver(to, subject, email.text(), email.html());
+    }
+
+    /** Plain text only. Sends and returns true, or logs and returns false; never throws. */
     public boolean send(String to, String subject, String text) {
+        return deliver(to, subject, text, null);
+    }
+
+    private boolean deliver(String to, String subject, String text, String html) {
         if (!configured()) {
             log.warn("Email to {} not sent: mail is not configured (MAIL_HOST)", to);
             return false;
@@ -39,16 +48,26 @@ public class Mailer {
         try {
             JavaMailSender sender = mail.getObject();
             MimeMessage msg = sender.createMimeMessage();
-            MimeMessageHelper h = new MimeMessageHelper(msg, false, "UTF-8");
+            MimeMessageHelper h = new MimeMessageHelper(msg, html != null, "UTF-8");
             h.setFrom(from, "حداء");
             h.setTo(to);
             h.setSubject(subject);
-            h.setText(text, false);
+            if (html != null) h.setText(text, html);
+            else h.setText(text, false);
             sender.send(msg);
+            log.info("Email \"{}\" sent to {}", subject, mask(to));
             return true;
         } catch (Exception e) {
             log.warn("Email to {} not sent: {}", to, e.getMessage());
             return false;
         }
+    }
+
+    /** "fa***@gmail.com": enough to tell which user in the logs. */
+    static String mask(String email) {
+        if (email == null) return "";
+        int at = email.indexOf('@');
+        if (at <= 0) return "***";
+        return email.substring(0, Math.min(2, at)) + "***" + email.substring(at);
     }
 }

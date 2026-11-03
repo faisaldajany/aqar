@@ -13,14 +13,31 @@ import java.util.List;
  * @param code       a one-time code shown large under the message (e.g. "482913"), or null
  * @param button     the call to action, or null
  * @param note       a smaller line under the button (why they got this, what if it was not them), or null
+ * @param lines      label and value rows under the message (an invoice's items and total), or empty
  */
-public record Email(String preheader, String greeting, List<String> paragraphs, String code, Button button, String note) {
+public record Email(String preheader, String greeting, List<String> paragraphs, String code, Button button, String note,
+                    List<Line> lines) {
 
     public Email(String preheader, String greeting, List<String> paragraphs, Button button, String note) {
-        this(preheader, greeting, paragraphs, null, button, note);
+        this(preheader, greeting, paragraphs, null, button, note, List.of());
+    }
+
+    public Email(String preheader, String greeting, List<String> paragraphs, String code, Button button, String note) {
+        this(preheader, greeting, paragraphs, code, button, note, List.of());
+    }
+
+    public Email {
+        lines = lines == null ? List.of() : List.copyOf(lines);
     }
 
     public record Button(String label, String url) {
+    }
+
+    /** One row of a table: "الإجمالي" … "228.85 ريال". A strong row is drawn larger (the total). */
+    public record Line(String label, String value, boolean strong) {
+        public Line(String label, String value) {
+            this(label, value, false);
+        }
     }
 
     static final String NIGHT = "#17213F";
@@ -43,6 +60,10 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
         StringBuilder b = new StringBuilder();
         if (greeting != null) b.append(greeting).append("\n\n");
         for (String p : paragraphs) b.append(p).append("\n\n");
+        if (!lines.isEmpty()) {
+            for (Line l : lines) b.append(l.label()).append(": ").append(l.value()).append('\n');
+            b.append('\n');
+        }
         if (code != null) b.append("الرمز: ").append(code).append("\n\n");
         if (button != null) b.append(button.label()).append(":\n").append(button.url()).append("\n\n");
         if (note != null) b.append(note).append("\n\n");
@@ -54,6 +75,18 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
         StringBuilder body = new StringBuilder();
         if (greeting != null) body.append(p(esc(greeting), "font-weight:bold;"));
         for (String para : paragraphs) body.append(p(esc(para), ""));
+        if (!lines.isEmpty()) {
+            body.append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" dir=\"rtl\" "
+                    + "style=\"margin:4px 0 16px 0;border-collapse:collapse;\">\n");
+            for (Line l : lines) {
+                String size = l.strong() ? "17px" : "14px";
+                String weight = l.strong() ? "bold" : "normal";
+                body.append("""
+                        <tr><td align="right" style="padding:9px 0;border-bottom:1px solid %s;font-family:%s;font-size:13px;color:%s;text-align:right;">%s</td>                        <td align="left" style="padding:9px 0;border-bottom:1px solid %s;font-family:%s;font-size:%s;font-weight:%s;color:%s;text-align:left;">%s</td></tr>
+                        """.formatted(LINE, FONT, MUTED, esc(l.label()), LINE, FONT, size, weight, NIGHT, esc(l.value())));
+            }
+            body.append("</table>\n");
+        }
         if (code != null) {
             body.append("""
                     <table role="presentation" align="center" width="%d" cellpadding="0" cellspacing="0" border="0" style="margin:8px auto 0 auto;width:%dpx;max-width:100%%;">

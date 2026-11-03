@@ -181,6 +181,12 @@ public class BillingController {
         return billing.mockPay(id);
     }
 
+    /** The printable receipt (or a due invoice) in Hidaa's design. */
+    @GetMapping("/api/billing/invoices/{id}/receipt")
+    Map<String, Object> receipt(@PathVariable UUID id) {
+        return billing.receipt(id);
+    }
+
     /** «ادفع»: the invoice's payment page, renewed if it expired. */
     @PostMapping("/api/billing/invoices/{id}/pay")
     BillingService.Invoice pay(@PathVariable UUID id) {

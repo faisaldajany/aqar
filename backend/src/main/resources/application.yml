@@ -111,6 +111,11 @@ waslah:
     internal-email-domain: ${INTERNAL_EMAIL_DOMAIN:hidaaco.com}
     # The Secret Token of the webhook in Moyasar's dashboard (Settings → Webhooks). Blank = not checked.
     moyasar-webhook-secret: ${MOYASAR_WEBHOOK_SECRET:}
+    # The seller on payment receipts (email and printable page). Set the company's legal details before charging.
+    seller-name: ${SELLER_NAME:حداء}
+    seller-vat-number: ${SELLER_VAT_NUMBER:}
+    seller-cr: ${SELLER_CR:}
+    seller-address: ${SELLER_ADDRESS:الرياض، المملكة العربية السعودية}
     portal-base-url: ${PORTAL_BASE_URL:http://localhost:3000}
     # Public URL of this API for Moyasar's payment notification (blank = rely on the customer returning to the portal).
     api-base-url: ${API_BASE_URL:}

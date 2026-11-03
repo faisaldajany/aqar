@@ -42,6 +42,13 @@ public class MockPaymentGateway implements PaymentGateway {
     }
 
     @Override
+    public Optional<Payment> paidPayment(String providerRef) {
+        return paid.contains(providerRef)
+                ? Optional.of(new Payment("mock_pay_" + providerRef, "paid", 0, 0, providerRef, null, "mada", "1111", "000000000001"))
+                : Optional.empty();
+    }
+
+    @Override
     public String invoiceStatus(String providerRef) {
         return invoiceStatus.getOrDefault(providerRef, paid.contains(providerRef) ? "paid" : "initiated");
     }

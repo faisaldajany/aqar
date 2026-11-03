@@ -47,9 +47,11 @@ public class BillingService {
     private final OfficeAlerts alerts;
     private final PromoService promos;
     private final TransactionTemplate tx;
+    private final BillingMail mail;
 
     public BillingService(JdbcClient jdbc, PaymentGateways gateways, BillingProperties props, Subscription subscription,
-                          PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx) {
+                          PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx, BillingMail mail) {
+        this.mail = mail;
         this.promos = promos;
         this.tx = tx;
         this.jdbc = jdbc;
@@ -129,6 +131,7 @@ public class BillingService {
         if ("PAID".equals(inv.status()) || inv.providerRef() == null) return inv;
         if (!gateways.isPaid(inv.provider(), inv.providerRef())) return inv;
         boolean changed = markPaid(inv);
+        if (changed) mail.paid(find(invoiceId).orElseThrow());
         if (changed && "OVERAGE".equals(inv.kind())) {
             Subscription.State s = subscription.state();
             if ("PAST_DUE".equals(s.status()) && s.paidUntil() != null && s.paidUntil().isAfter(Instant.now())) {
@@ -143,14 +146,24 @@ public class BillingService {
      * applied as if paid online. Returns false if it was already paid.
      */
     public boolean markPaidByOperator(UUID invoiceId) {
+        return markPaidByOperator(invoiceId, null);
+    }
+
+    /** @param reference the transfer reference the team recorded, shown on the receipt */
+    public boolean markPaidByOperator(UUID invoiceId, String reference) {
         Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
         if ("PAID".equals(inv.status())) return false;
+        String ref = reference == null || reference.isBlank() ? null : reference.trim().substring(0, Math.min(100, reference.trim().length()));
         boolean changed = tx.execute(status -> {
             promos.lockOffice();
             boolean c = markPaid(inv);
-            if (c) jdbc.sql("update invoices set provider = coalesce(provider, 'MANUAL') where id = ?").param(inv.id()).update();
+            if (c) {
+                jdbc.sql("update invoices set provider = coalesce(provider, 'MANUAL'), paid_method = 'MANUAL', paid_reference = ? where id = ?")
+                        .params(ref, inv.id()).update();
+            }
             return c;
         });
+        if (changed) mail.paid(find(invoiceId).orElseThrow());
         if (changed && "OVERAGE".equals(inv.kind())) {
             Subscription.State s = subscription.state();
             if ("PAST_DUE".equals(s.status()) && s.paidUntil() != null && s.paidUntil().isAfter(Instant.now())) {
@@ -187,6 +200,7 @@ public class BillingService {
                 halalas(u.overageSar()), 0, null, null, true);
         alerts.raise(officeId, "INVOICE_DUE", inv.id(), "فاتورة المحادثات الإضافية لشهر " + monthStart.toString().substring(0, 7)
                 + " جاهزة: " + sar(inv.totalHalalas()) + " ريال شامل الضريبة.", "invoice-" + inv.id());
+        mail.due(inv);
         return Optional.of(inv);
     }
 
@@ -196,6 +210,40 @@ public class BillingService {
 
     public Optional<Invoice> find(UUID id) {
         return jdbc.sql(SELECT + " where id = ?").param(id).query(BillingService::map).optional();
+    }
+
+    /** Everything the printable receipt shows: the invoice, how it was paid, the office, and the seller. */
+    public java.util.Map<String, Object> receipt(UUID invoiceId) {
+        Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("invoice", inv);
+        jdbc.sql("select paid_method, paid_last4, paid_reference from invoices where id = ?").param(invoiceId)
+                .query((rs, n) -> {
+                    out.put("paidMethod", rs.getString(1));
+                    out.put("paidLast4", rs.getString(2));
+                    out.put("paidReference", rs.getString(3));
+                    return null;
+                }).list();
+        UUID officeId = jdbc.sql("select office_id from invoices where id = ?").param(invoiceId)
+                .query((rs, n) -> rs.getObject(1, UUID.class)).single();
+        java.util.Map<String, Object> office = new java.util.LinkedHashMap<>();
+        jdbc.sql("select name, fal_license from offices").query((rs, n) -> {
+            office.put("name", rs.getString(1));
+            office.put("falLicense", rs.getString(2));
+            return null;
+        }).list();
+        office.put("email", jdbc.sql("select email from users where office_id = ? and role = 'OWNER' and disabled_at is null order by created_at limit 1")
+                .param(officeId).query(String.class).optional().orElse(null));
+        out.put("office", office);
+        java.util.Map<String, Object> seller = new java.util.LinkedHashMap<>();
+        seller.put("name", props.sellerName());
+        seller.put("vatNumber", props.sellerVatNumber());
+        seller.put("cr", props.sellerCr());
+        seller.put("address", props.sellerAddress());
+        out.put("seller", seller);
+        out.put("vatPercent", props.vatPercent());
+        out.put("test", PaymentGateways.TEST.equals(inv.provider()));
+        return out;
     }
 
     /** Payment notifications arrive without a session; this table maps the provider's id back to the office. */

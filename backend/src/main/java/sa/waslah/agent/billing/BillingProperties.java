@@ -13,11 +13,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param internalEmailDomain  the company's email domain; offices whose owner confirmed an address on it are internal
  * @param moyasarWebhookSecret the Secret Token typed in Moyasar's dashboard webhook; blank = notifications are not
  *                             checked (they are harmless either way: the paid status is always asked from Moyasar)
+ * @param sellerName       the seller on receipts (the company's legal name)
+ * @param sellerVatNumber  shown on receipts when set
+ * @param sellerCr         commercial registration, shown on receipts when set
+ * @param sellerAddress    shown on receipts when set
  */
 @ConfigurationProperties("waslah.billing")
 public record BillingProperties(String provider, String moyasarSecretKey, String portalBaseUrl, String apiBaseUrl,
                                 int vatPercent, int graceDays, String moyasarTestSecretKey, String internalEmailDomain,
-                                String moyasarWebhookSecret) {
+                                String moyasarWebhookSecret, String sellerName, String sellerVatNumber, String sellerCr,
+                                String sellerAddress) {
 
     public boolean moyasar() {
         return "moyasar".equalsIgnoreCase(provider);

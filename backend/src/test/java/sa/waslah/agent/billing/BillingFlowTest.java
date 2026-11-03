@@ -298,6 +298,52 @@ class BillingFlowTest extends IntegrationTest {
         assertThat(res.getBody().get("ok")).isEqualTo(false);
     }
 
+    // ---- Receipts ----
+
+    @Autowired BillingMail mail;
+
+    <T> T waitFor(java.util.function.Supplier<T> read, java.util.function.Predicate<T> done) throws InterruptedException {
+        T v = read.get();
+        for (int i = 0; i < 50 && !done.test(v); i++) {
+            Thread.sleep(100);
+            v = read.get();
+        }
+        return v;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void receiptKeepsHowItWasPaid() throws Exception {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        mock().pay(inv.providerRef());
+        TenantContext.call(office, () -> billing.confirm(inv.id()));
+        // Asked from the provider on the mail thread, then kept on the invoice.
+        Map<String, Object> r = waitFor(() -> TenantContext.call(office, () -> billing.receipt(inv.id())), m -> m.get("paidMethod") != null);
+        assertThat(r.get("paidMethod")).isEqualTo("mada");
+        assertThat(r.get("paidLast4")).isEqualTo("1111");
+        assertThat((String) ((Map<String, Object>) r.get("office")).get("email")).endsWith("@bill.sa");
+        assertThat(((Map<String, Object>) r.get("seller")).get("name")).isEqualTo("حداء");
+        assertThat(BillingMail.method("mada", "1111")).isEqualTo("مدى •••• 1111");
+        assertThat(BillingMail.money(22885)).isEqualTo("228.85 ريال");
+    }
+
+    @Test
+    void bankTransferReceiptAndOneDueEmailPerInvoice() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "ANNUAL"));
+        TenantContext.run(office, () -> mail.due(inv));
+        java.sql.Timestamp first = TenantContext.call(office, () -> jdbc.sql("select due_emailed_at from invoices where id = ?")
+                .param(inv.id()).query(java.sql.Timestamp.class).single());
+        assertThat(first).isNotNull();
+        TenantContext.run(office, () -> mail.due(inv));
+        assertThat(TenantContext.call(office, () -> jdbc.sql("select due_emailed_at from invoices where id = ?")
+                .param(inv.id()).query(java.sql.Timestamp.class).single())).isEqualTo(first);
+
+        assertThat(TenantContext.call(office, () -> billing.markPaidByOperator(inv.id(), "TRX-778899"))).isTrue();
+        Map<String, Object> r = TenantContext.call(office, () -> billing.receipt(inv.id()));
+        assertThat(r.get("paidMethod")).isEqualTo("MANUAL");
+        assertThat(r.get("paidReference")).isEqualTo("TRX-778899");
+    }
+
     private List<String> kinds() {
         return TenantContext.call(office, () -> jdbc.sql("select kind from office_alerts").query(String.class).list());
     }

@@ -29,4 +29,14 @@ class EmailTest {
         assertThat(Email.greet(null)).isEqualTo("مرحباً،");
         assertThat(Mailer.mask("faisal@gmail.com")).isEqualTo("fa***@gmail.com");
     }
+
+    @Test
+    void invoiceLinesAreATableAndPlainLines() {
+        Email e = new Email("إيصال", Email.greet("فيصل"), List.of("وصلنا دفعتك."), null, null, null,
+                List.of(new Email.Line("الضريبة", "29.85 ريال"), new Email.Line("الإجمالي", "228.85 <ريال>", true)));
+        assertThat(e.html()).contains("<table role=\"presentation\"").contains("الضريبة").contains("228.85 &lt;ريال&gt;")
+                .contains("font-size:17px;font-weight:bold");
+        assertThat(e.text()).contains("الضريبة: 29.85 ريال\nالإجمالي: 228.85 <ريال>");
+        assertThat(email.lines()).isEmpty();
+    }
 }

@@ -24,9 +24,11 @@ public class BillingJobs {
     private final BillingService billing;
     private final OfficeAlerts alerts;
     private final BillingProperties props;
+    private final BillingMail mail;
 
     public BillingJobs(JdbcClient jdbc, Subscription subscription, BillingService billing, OfficeAlerts alerts,
-                       BillingProperties props) {
+                       BillingProperties props, BillingMail mail) {
+        this.mail = mail;
         this.jdbc = jdbc;
         this.subscription = subscription;
         this.billing = billing;
@@ -97,9 +99,12 @@ public class BillingJobs {
         }
     }
 
+    /** The renewal invoice (reused while unpaid), emailed to the owners once. */
     private BillingService.Invoice renewal(UUID office, Subscription.State s) {
         try {
-            return billing.checkout(office, s.plan(), s.cycle());
+            BillingService.Invoice inv = billing.checkout(office, s.plan(), s.cycle());
+            mail.due(inv);
+            return inv;
         } catch (RuntimeException e) {
             log.warn("Renewal invoice for office {} not created: {}", office, e.getMessage());
             return null;

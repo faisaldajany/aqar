@@ -25,6 +25,9 @@ export type OpsDetail = Omit<OpsOffice, "users"> & {
   usage: { conversations: number; included: number; overage: number };
   audit: OpsAudit[];
   templates?: TemplateRow[];
+  /** Where the office is in the WhatsApp setup guide. */
+  waSetup?: { done: number; total: number; current: string | null; phone: string | null; readyOn: string | null; hasBusinessApp: boolean | null;
+    steps: { key: string; label: string; done: boolean }[] };
 };
 
 export type OpsOverview = {

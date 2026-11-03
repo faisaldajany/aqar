@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "../session";
 import { TemplateStatus, type TemplateRow } from "@/components/TemplateStatus";
+import { FirstMessageStep, WhatsAppSetupGuide, type WaSetup } from "@/components/WhatsAppSetup";
 
 type Config = { mode: "mock" | "cloud"; appId: string; configId: string; graphVersion: string };
 
@@ -31,6 +32,22 @@ export default function WhatsAppPage() {
   const [busy, setBusy] = useState(false);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [setup, setSetup] = useState<WaSetup | null>(null);
+  const [setupFailed, setSetupFailed] = useState(false);
+
+  useEffect(() => {
+    api<WaSetup>("/whatsapp/setup").then(setSetup).catch(() => setSetupFailed(true));
+  }, [me.whatsapp.connected]);
+
+  // Connected and waiting for the first customer message: check every few seconds while the page is open.
+  const waitingForMessage = me.whatsapp.connected && setup?.current === "test";
+  useEffect(() => {
+    if (!waitingForMessage) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") api<WaSetup>("/whatsapp/setup").then(setSetup).catch(() => undefined);
+    }, 6000);
+    return () => clearInterval(t);
+  }, [waitingForMessage]);
 
   useEffect(() => {
     if (me.whatsapp.connected) api<TemplateRow[]>("/whatsapp/templates").then(setTemplates).catch(() => undefined);
@@ -125,29 +142,35 @@ export default function WhatsAppPage() {
           <p><span className="mono">{me.whatsapp.displayPhone}</span> · {me.whatsapp.verifiedName}</p>
           <p className="small muted">يبقى المسوّقون يردون من تطبيق واتساب للأعمال، ويتوقف الوكيل في أي محادثة يرد فيها أحدهم.</p>
         </div>
+        {setup && <FirstMessageStep state={setup} />}
         <TemplateStatus rows={templates} busy={syncing} onSync={syncTemplates} />
       </>
     );
   }
 
-  return (
-    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h1>اربط رقم واتساب المكتب</h1>
-      <p className="muted">يعمل الوكيل على رقمكم وتطبيق واتساب للأعمال نفسيهما. قبل البدء:</p>
-      <ul className="small">
-        <li>أن يكون الرقم على تطبيق <b>واتساب للأعمال</b> منذ 7 أيام على الأقل.</li>
-        <li>ألا يكون مربوطاً بمنصة أو روبوت آخر.</li>
-        <li>أن يكون الجوال معك لمسح رمز QR من التطبيق.</li>
-      </ul>
-      {config?.mode === "mock" ? (
-        <div className="row">
-          <button className="btn primary" disabled={busy} onClick={() => finish(null)}>ربط تجريبي</button>
-          <span className="small muted">وضع التطوير: لا اتصال بـ Meta.</span>
-        </div>
-      ) : (
-        <button className="btn primary" disabled={busy || !config} onClick={connectWithMeta}>اربط عبر Meta</button>
-      )}
-      {error && <p className="err" role="alert">{error}</p>}
+  const button = config?.mode === "mock" ? (
+    <div className="row">
+      <button className="btn primary" disabled={busy} onClick={() => finish(null)}>ربط تجريبي</button>
+      <span className="small muted">وضع التطوير: لا اتصال بـ Meta.</span>
     </div>
+  ) : (
+    <button className="btn primary" disabled={busy || !config} onClick={connectWithMeta}>اربط عبر Meta</button>
+  );
+
+  if (!setup) {
+    // Without the guide (it failed to load), connecting still works.
+    return (
+      <div className="card wasetup">
+        <h1>اربط رقم واتساب المكتب</h1>
+        {setupFailed ? button : <p className="muted">جارٍ التحميل…</p>}
+        {error && <p className="err" role="alert">{error}</p>}
+      </div>
+    );
+  }
+  return (
+    <>
+      <WhatsAppSetupGuide state={setup} onChange={setSetup} connect={button} />
+      {error && <p className="err" role="alert">{error}</p>}
+    </>
   );
 }

@@ -32,6 +32,7 @@ import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.office.OfficeAlerts;
 import sa.waslah.agent.tenant.TenantContext;
 import sa.waslah.agent.whatsapp.WaTemplates;
+import sa.waslah.agent.whatsapp.WhatsAppSetup;
 
 /**
  * The operator console for the Hidaa team (portal /ops): every office and its users, subscriptions, the FAL review,
@@ -77,10 +78,12 @@ public class OpsController {
     private final Mailer mailer;
     private final WaTemplates templates;
     private final PaymentGateways gateways;
+    private final WhatsAppSetup waSetup;
 
     public OpsController(JdbcClient jdbc, OpsAuth ops, PlanLimits plans, OfficeAlerts alerts, BillingService billing,
                          PromoService promos, PasswordResetService resets, SessionGuard sessions, Mailer mailer,
-                         WaTemplates templates, PaymentGateways gateways) {
+                         WaTemplates templates, PaymentGateways gateways, WhatsAppSetup waSetup) {
+        this.waSetup = waSetup;
         this.gateways = gateways;
         this.templates = templates;
         this.jdbc = jdbc;
@@ -189,6 +192,8 @@ public class OpsController {
             PlanLimits.Usage u = plans.usageThisMonth();
             o.put("usage", Map.of("conversations", u.conversations(), "included", u.included(), "overage", u.overage()));
             o.put("templates", templates.statuses());
+            // Where the office is in the WhatsApp setup, for support calls ("I'm stuck at…").
+            o.put("waSetup", waSetup.state());
         });
         o.put("audit", auditRows(id, 50));
         return o;

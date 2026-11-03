@@ -61,6 +61,12 @@ public class Subscription {
                 .params(plan.name(), cycle, Timestamp.from(from), months).update();
     }
 
+    /** A refunded period: paid-until moves back by the months it bought, not before now. */
+    public void takeBack(int months) {
+        jdbc.sql("update offices set paid_until = greatest(now(), paid_until - make_interval(months => ?)) where paid_until is not null")
+                .param(months).update();
+    }
+
     public void setStatus(String status) {
         jdbc.sql("update offices set subscription_status = ?").param(status).update();
     }

@@ -205,8 +205,11 @@ export type Billing = {
 };
 export type Invoice = {
   id: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP"; plan: string | null; cycle: string | null;
-  description: string; subtotalHalalas: number; vatHalalas: number; totalHalalas: number; status: "DUE" | "PAID" | "VOID";
+  description: string; subtotalHalalas: number; vatHalalas: number; totalHalalas: number; status: "DUE" | "PAID" | "VOID" | "REFUNDED";
   payUrl: string | null; createdAt: string; paidAt: string | null; discountHalalas: number; promoCode: string | null;
+  refundedHalalas: number; refundedAt: string | null;
+  /** The provider's reason for the last declined attempt on the payment page. */
+  lastFailureReason: string | null; lastFailureAt: string | null;
 };
 export type OfficeSettings = {
   name: string; falLicense: string; falStatus: "PENDING_REVIEW" | "VERIFIED" | "REJECTED"; falNote: string | null;

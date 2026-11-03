@@ -7,13 +7,16 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 /**
  * Moyasar hosted invoices (https://docs.moyasar.com): POST /v1/invoices returns {id, status, url};
- * GET /v1/invoices/{id} tells us whether it is paid. Basic auth with the secret key as the username.
+ * GET /v1/invoices/{id} tells us whether it is paid (or expired); GET /v1/payments/{id} gives one payment attempt
+ * (failed, refunded). Basic auth with the secret key as the username.
  */
 public class MoyasarGateway implements PaymentGateway {
 
@@ -74,5 +77,30 @@ public class MoyasarGateway implements PaymentGateway {
     public boolean isPaid(String providerRef) {
         JsonNode r = http.get().uri("/invoices/{id}", providerRef).retrieve().body(JsonNode.class);
         return r != null && "paid".equalsIgnoreCase(r.path("status").asText());
+    }
+
+    /** GET /v1/payments/{id}: status, amount, refunded, invoice_id and source.message (the bank's or Moyasar's reason). */
+    @Override
+    public Optional<Payment> payment(String paymentId) {
+        if (paymentId == null || paymentId.isBlank()) return Optional.empty();
+        try {
+            JsonNode r = http.get().uri("/payments/{id}", paymentId).retrieve().body(JsonNode.class);
+            if (r == null || !r.hasNonNull("id")) return Optional.empty();
+            String message = r.path("source").path("message").asText(null);
+            return Optional.of(new Payment(r.get("id").asText(), r.path("status").asText(""), r.path("amount").asLong(),
+                    r.path("refunded").asLong(), r.path("invoice_id").asText(null), message));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public String invoiceStatus(String providerRef) {
+        try {
+            JsonNode r = http.get().uri("/invoices/{id}", providerRef).retrieve().body(JsonNode.class);
+            return r == null ? null : r.path("status").asText(null);
+        } catch (HttpClientErrorException.NotFound e) {
+            return null;
+        }
     }
 }

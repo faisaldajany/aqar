@@ -85,7 +85,7 @@ public class OpsReportsController {
         Map<YearMonth, Map<String, BigDecimal>> months = new LinkedHashMap<>();
         for (int i = 11; i >= 0; i--) {
             Map<String, BigDecimal> m = new LinkedHashMap<>();
-            for (String k : List.of("SUBSCRIPTION", "OVERAGE", "SETUP", "vat")) m.put(k, BigDecimal.ZERO);
+            for (String k : List.of("SUBSCRIPTION", "OVERAGE", "SETUP", "vat", "refunds")) m.put(k, BigDecimal.ZERO);
             months.put(now.minusMonths(i), m);
         }
         Instant since = now.minusMonths(11).atDay(1).atStartOfDay(RIYADH).toInstant();
@@ -98,7 +98,8 @@ public class OpsReportsController {
             mrr = mrr.add(o.monthlyRevenue());
             List<Map<String, Object>> rows = TenantContext.call(o.id(), () -> jdbc.sql("""
                             select id, number, kind, plan, cycle, description, subtotal_halalas, vat_halalas, total_halalas,
-                                   status, provider, created_at, paid_at, discount_halalas, promo_code
+                                   status, provider, created_at, paid_at, discount_halalas, promo_code,
+                                   refunded_halalas, refunded_at, last_failure_reason, last_failure_at
                             from invoices order by created_at desc limit 200""")
                     .query((rs, n) -> {
                         Map<String, Object> m = new LinkedHashMap<>();
@@ -119,6 +120,15 @@ public class OpsReportsController {
                         m.put("paidAt", iso(rs.getTimestamp(13)));
                         m.put("discount", sar(rs.getLong(14)));
                         m.put("promoCode", rs.getString(15));
+                        m.put("refunded", sar(rs.getLong(16)));
+                        m.put("refundedAt", iso(rs.getTimestamp(17)));
+                        // Ex-VAT part of the refund, for the month it was refunded in.
+                        long total = rs.getLong(9);
+                        long refundedSub = total <= 0 ? 0 : Math.round(rs.getLong(16) * (double) rs.getLong(7) / total);
+                        m.put("refundedSubtotal", sar(refundedSub));
+                        m.put("refundedVat", sar(rs.getLong(16) - refundedSub));
+                        m.put("lastFailureReason", rs.getString(18));
+                        m.put("lastFailureAt", iso(rs.getTimestamp(19)));
                         // Paid with Moyasar test cards (an internal office): shown, never counted as revenue.
                         m.put("test", PaymentGateways.TEST.equals(rs.getString(11)) || o.internal());
                         return m;
@@ -129,14 +139,23 @@ public class OpsReportsController {
                     unpaid = unpaid.add((BigDecimal) r.get("total"));
                     unpaidCount++;
                 }
-                if ("PAID".equals(r.get("status")) && r.get("paidAt") != null) {
+                // Collected in the month it was paid; a refund comes off in the month it was refunded (a credit note).
+                if (("PAID".equals(r.get("status")) || "REFUNDED".equals(r.get("status"))) && r.get("paidAt") != null) {
                     Instant paid = Instant.parse((String) r.get("paidAt"));
-                    if (paid.isBefore(since)) continue;
-                    Map<String, BigDecimal> m = months.get(YearMonth.from(paid.atZone(RIYADH)));
-                    if (m == null) continue;
-                    String kind = (String) r.get("kind");
-                    if (m.containsKey(kind)) m.merge(kind, (BigDecimal) r.get("subtotal"), BigDecimal::add);
-                    m.merge("vat", (BigDecimal) r.get("vat"), BigDecimal::add);
+                    Map<String, BigDecimal> m = paid.isBefore(since) ? null : months.get(YearMonth.from(paid.atZone(RIYADH)));
+                    if (m != null) {
+                        String kind = (String) r.get("kind");
+                        if (m.containsKey(kind)) m.merge(kind, (BigDecimal) r.get("subtotal"), BigDecimal::add);
+                        m.merge("vat", (BigDecimal) r.get("vat"), BigDecimal::add);
+                    }
+                }
+                if (r.get("refundedAt") != null) {
+                    Instant at = Instant.parse((String) r.get("refundedAt"));
+                    Map<String, BigDecimal> m = at.isBefore(since) ? null : months.get(YearMonth.from(at.atZone(RIYADH)));
+                    if (m != null) {
+                        m.merge("refunds", (BigDecimal) r.get("refundedSubtotal"), BigDecimal::add);
+                        m.merge("vat", ((BigDecimal) r.get("refundedVat")).negate(), BigDecimal::add);
+                    }
                 }
             }
             invoices.addAll(rows);
@@ -150,7 +169,8 @@ public class OpsReportsController {
             row.put("subscriptions", m.get("SUBSCRIPTION"));
             row.put("overage", m.get("OVERAGE"));
             row.put("setup", m.get("SETUP"));
-            row.put("total", m.get("SUBSCRIPTION").add(m.get("OVERAGE")).add(m.get("SETUP")));
+            row.put("refunds", m.get("refunds"));
+            row.put("total", m.get("SUBSCRIPTION").add(m.get("OVERAGE")).add(m.get("SETUP")).subtract(m.get("refunds")));
             row.put("vat", m.get("vat"));
             monthList.add(row);
         });

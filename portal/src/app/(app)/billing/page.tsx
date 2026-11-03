@@ -53,6 +53,21 @@ function BillingView() {
     }
   }
 
+  /** «ادفع»: asks for the invoice's page, so an expired one (Moyasar pages last 7 days) is replaced first. */
+  async function pay(i: Invoice) {
+    setBusy(i.id);
+    setError("");
+    try {
+      const inv = await api<Invoice>(`/billing/invoices/${i.id}/pay`, { method: "POST" });
+      if (inv.status === "DUE" && inv.payUrl) window.location.href = inv.payUrl;
+      else await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "تعذّر فتح صفحة الدفع.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function applyPromo(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const code = String(new FormData(e.currentTarget).get("promo") ?? "").trim();
@@ -84,6 +99,9 @@ function BillingView() {
 
   if (!b) return <p className="muted">{error || "جارٍ التحميل…"}</p>;
   const [label, cls] = SUB_LABELS[b.status];
+  // A declined attempt in the last two days, still unpaid: say why, right at the top.
+  const declined = invoices.find((i) => i.status === "DUE" && i.lastFailureReason && i.lastFailureAt
+    && Date.now() - new Date(i.lastFailureAt).getTime() < 2 * 86_400_000);
 
   return (
     <>
@@ -98,6 +116,12 @@ function BillingView() {
         {b.suspended && <p className="err" role="alert">حساب المكتب موقوف من فريق حداء والوكيل لا يرد. تواصل معنا على support@hidaaco.com.</p>}
       </div>
 
+      {declined && (
+        <div className="banner bad" role="alert">
+          <span>لم تكتمل آخر محاولة دفع للفاتورة <bdi className="mono">{declined.number}</bdi>: {failureText(declined.lastFailureReason!)}. جرّب بطاقة أخرى أو تواصل مع بنكك، ثم ادفع من جديد.</span>
+          <button type="button" className="btn" disabled={!!busy} onClick={() => void pay(declined)}>ادفع</button>
+        </div>
+      )}
       {b.paymentMode === "TEST" && (
         <div className="banner" role="status">
           <span><b>حساب داخلي لفريق حداء:</b> الدفع هنا تجريبي عبر Moyasar ببطاقات الاختبار (مثل 4111 1111 1111 1111)، ولا يُخصم أي مبلغ.</span>
@@ -178,8 +202,13 @@ function BillingView() {
                   <td className="mono small">{i.number}</td>
                   <td className="small">{i.description}</td>
                   <td>{sar(i.totalHalalas)} ريال</td>
-                  <td>{i.status === "PAID" ? <span className="pill p-ok">مدفوعة</span> : i.status === "DUE" ? <span className="pill p-warn">مستحقة</span> : <span className="pill p-idle">ملغاة</span>}</td>
-                  <td>{i.status === "DUE" && i.payUrl && <a className="btn" href={i.payUrl}>ادفع</a>}</td>
+                  <td>
+                    <InvoiceStatus i={i} />
+                    {i.status === "DUE" && i.lastFailureReason && <><br /><span className="small err">رُفضت آخر محاولة: {failureText(i.lastFailureReason)}</span></>}
+                  </td>
+                  <td>{i.status === "DUE" && i.totalHalalas > 0 && (
+                    <button className="btn" disabled={!!busy} onClick={() => pay(i)}>{busy === i.id ? "جارٍ الفتح…" : "ادفع"}</button>
+                  )}</td>
                 </tr>
               ))}
             </tbody>
@@ -188,4 +217,29 @@ function BillingView() {
       </div>
     </>
   );
+}
+
+function InvoiceStatus({ i }: { i: Invoice }) {
+  if (i.status === "REFUNDED") return <span className="pill p-idle">مستردة</span>;
+  if (i.status === "PAID") {
+    return (
+      <>
+        <span className="pill p-ok">مدفوعة</span>
+        {i.refundedHalalas > 0 && <><br /><span className="small muted">استُرد {sar(i.refundedHalalas)} ريال</span></>}
+      </>
+    );
+  }
+  if (i.status === "DUE") return <span className="pill p-warn">مستحقة</span>;
+  return <span className="pill p-idle">ملغاة</span>;
+}
+
+/** Moyasar's reasons are short English codes or sentences; the common ones in Arabic. */
+function failureText(reason: string): string {
+  const r = reason.toLowerCase();
+  if (r.includes("insufficient")) return "الرصيد غير كافٍ";
+  if (r.includes("expired")) return "البطاقة منتهية";
+  if (r.includes("3d") || r.includes("authentication")) return "لم يكتمل التحقق من البنك";
+  if (r.includes("declined") || r.includes("do not honor") || r.includes("rejected")) return "رفضها البنك";
+  if (r.includes("country")) return "البطاقة من دولة غير مقبولة";
+  return reason;
 }

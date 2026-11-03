@@ -147,8 +147,12 @@ public class BillingMail {
         if (inv.discountHalalas() > 0) {
             l.add(new Email.Line("الخصم" + (inv.promoCode() == null ? "" : " (" + inv.promoCode() + ")"), "− " + money(inv.discountHalalas())));
         }
-        l.add(new Email.Line("المبلغ قبل الضريبة", money(inv.subtotalHalalas())));
-        l.add(new Email.Line("ضريبة القيمة المضافة " + props.vatPercent() + "٪", money(inv.vatHalalas())));
+        // No VAT lines while Hidaa adds no VAT (not registered yet).
+        if (inv.vatHalalas() > 0) {
+            l.add(new Email.Line("المبلغ قبل الضريبة", money(inv.subtotalHalalas())));
+            l.add(new Email.Line("ضريبة القيمة المضافة " + Math.round(inv.vatHalalas() * 100.0 / Math.max(1, inv.subtotalHalalas())) + "٪",
+                    money(inv.vatHalalas())));
+        }
         l.add(new Email.Line(paid ? "المدفوع" : "الإجمالي المستحق", money(inv.totalHalalas()), true));
         return l;
     }

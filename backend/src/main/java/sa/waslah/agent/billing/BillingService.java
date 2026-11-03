@@ -88,9 +88,12 @@ public class BillingService {
         String promoCode = discount > 0 ? promo.get().promo().code() : null;
 
         // Reuse an unpaid invoice for the same choice (the same discount, the same gateway) instead of piling up new ones.
+        // …and the same VAT: an invoice made before the VAT rate changed is not handed out again.
+        long subtotalNow = gross - discount;
+        long vatNow = Math.round(subtotalNow * props.vatPercent() / 100.0);
         Optional<Invoice> open = jdbc.sql(SELECT + " where kind = 'SUBSCRIPTION' and status = 'DUE' and plan = ? and cycle = ? "
-                        + "and discount_halalas = ? and provider = ? and " + PAGE_STILL_GOOD + " order by created_at desc limit 1")
-                .params(plan.name(), cycle, discount, gateways.forOffice(officeId).name()).query(BillingService::map).optional();
+                        + "and discount_halalas = ? and vat_halalas = ? and provider = ? and " + PAGE_STILL_GOOD + " order by created_at desc limit 1")
+                .params(plan.name(), cycle, discount, vatNow, gateways.forOffice(officeId).name()).query(BillingService::map).optional();
         if (open.isPresent() && open.get().payUrl() != null) return open.get();
 
         String desc = "اشتراك حداء — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)")
@@ -199,7 +202,7 @@ public class BillingService {
         Invoice inv = create(officeId, "OVERAGE", u.plan().name(), null, desc, monthStart, next.minusDays(1),
                 halalas(u.overageSar()), 0, null, null, true);
         alerts.raise(officeId, "INVOICE_DUE", inv.id(), "فاتورة المحادثات الإضافية لشهر " + monthStart.toString().substring(0, 7)
-                + " جاهزة: " + sar(inv.totalHalalas()) + " ريال شامل الضريبة.", "invoice-" + inv.id());
+                + " جاهزة: " + sar(inv.totalHalalas()) + " ريال" + (inv.vatHalalas() > 0 ? " شامل الضريبة." : "."), "invoice-" + inv.id());
         mail.due(inv);
         return Optional.of(inv);
     }

@@ -10,7 +10,7 @@ export default function ConfirmEmailPage() {
   return <Suspense fallback={null}><Confirm /></Suspense>;
 }
 
-/** The link from the "تأكيد البريد" email: confirms a company (hidaaco.com) address, which turns on test payments. */
+/** The link from the verification email (the email also has a 6-digit code for /verify-email). */
 function Confirm() {
   const token = useSearchParams().get("token") ?? "";
   const [state, setState] = useState<"working" | "done" | "error">(token ? "working" : "error");
@@ -32,16 +32,16 @@ function Confirm() {
         {state === "working" && <p className="muted">جارٍ تأكيد البريد…</p>}
         {state === "done" && (
           <>
-            <h1>تم تأكيد البريد</h1>
-            <p>حساب مكتبك حساب داخلي لفريق حداء: الاشتراك يُدفع ببطاقات الاختبار ولا يُخصم مبلغ حقيقي.</p>
-            <Link className="btn primary" href="/billing">صفحة الاشتراك</Link>
+            <h1>تم تأكيد بريدك</h1>
+            <p>شكراً. يمكنك الآن متابعة تجهيز وكيلك.</p>
+            <Link className="btn primary" href="/dashboard">ادخل إلى حداء</Link>
           </>
         )}
         {state === "error" && (
           <>
             <h1>لم يتم التأكيد</h1>
             <p>{error}</p>
-            <Link className="btn" href="/billing">اطلب رابطاً جديداً من صفحة الاشتراك</Link>
+            <Link className="btn" href="/verify-email">أدخل الرمز أو اطلب رسالة جديدة</Link>
           </>
         )}
       </div>

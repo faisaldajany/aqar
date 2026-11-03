@@ -29,7 +29,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      setMe(await api<Me>("/me"));
+      const m = await api<Me>("/me");
+      if (m.user.emailVerified === false) {
+        router.replace("/verify-email");
+        return;
+      }
+      setMe(m);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) router.replace("/login");
       else setError("تعذّر الاتصال بالخادم.");

@@ -33,7 +33,7 @@ function SignupForm() {
           promoCode: String(f.get("promoCode") ?? "").trim() || null,
         },
       });
-      router.replace("/whatsapp");
+      router.replace("/verify-email");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "تعذّر إنشاء الحساب.");
     } finally {

@@ -96,7 +96,7 @@ public class PasswordResetService {
         if (newPassword == null || newPassword.length() < MIN_LENGTH || newPassword.length() > 128) {
             throw ApiException.badRequest("weak_password", "كلمة المرور من 8 أحرف على الأقل.");
         }
-        record Claimed(UUID userId, String email) {
+        record Claimed(UUID userId, String email, boolean byEmail) {
         }
         // Using the link and checking it are one statement: two requests with the same link cannot both get through.
         Optional<Claimed> claimed = token == null || token.isBlank() ? Optional.empty() : jdbc.sql("""
@@ -104,9 +104,9 @@ public class PasswordResetService {
                         from users u
                         where r.token_hash = ? and r.used_at is null and r.expires_at > now()
                           and u.id = r.user_id and u.disabled_at is null
-                        returning r.user_id, u.email""")
+                        returning r.user_id, u.email, r.created_by = 'USER'""")
                 .param(sha256(token.trim()))
-                .query((rs, n) -> new Claimed(rs.getObject(1, UUID.class), rs.getString(2)))
+                .query((rs, n) -> new Claimed(rs.getObject(1, UUID.class), rs.getString(2), rs.getBoolean(3)))
                 .optional();
         if (claimed.isEmpty()) {
             throw ApiException.badRequest("reset_invalid", "الرابط غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.");
@@ -115,6 +115,10 @@ public class PasswordResetService {
         // The application's clock, like the session's issue time it is compared with (SessionGuard).
         jdbc.sql("update users set password_hash = ?, password_changed_at = ? where id = ?")
                 .params(passwords.encode(newPassword), Timestamp.from(Instant.now()), userId).update();
+        // A link the user asked for arrived by email, so the address is theirs (operator links may go by WhatsApp).
+        if (claimed.get().byEmail()) {
+            jdbc.sql("update users set email_confirmed_at = coalesce(email_confirmed_at, now()) where id = ?").param(userId).update();
+        }
         // Every outstanding link for this user stops working, not only this one.
         jdbc.sql("update password_resets set used_at = now() where user_id = ? and used_at is null").param(userId).update();
         sessions.evictUser(userId);

@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [days, setDays] = useState<7 | 30 | 90>(30);
   const [ins, setIns] = useState<Insights | null>(null);
   const [loadingIns, setLoadingIns] = useState(false);
+  const [deals, setDeals] = useState<Deals | null>(null);
 
   useEffect(() => {
     setLoadingIns(true);
@@ -63,6 +64,7 @@ export default function Dashboard() {
     api<Usage>("/usage").then(setUsage).catch(() => undefined);
     api<Stats>("/stats").then(setStats).catch(() => undefined);
     api<Onboarding>("/onboarding").then(setOnb).catch(() => undefined);
+    api<Deals>("/customers/summary").then(setDeals).catch(() => undefined);
   }, []);
 
   async function dismiss(id: string) {
@@ -170,11 +172,11 @@ export default function Dashboard() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: loadingIns ? 0.6 : 1, transition: "opacity .2s" }}>
           <section className="kpis" aria-label={`أرقام آخر ${ins.days} يوماً`}>
-            <Link href="/inbox" className="kpi">
+            <Link href="/customers" className="kpi">
               <div className="kpi-top"><b>{num(ins.totals.inquiries)}</b><Delta now={ins.totals.inquiries} before={ins.previous.inquiries} /></div>
               <span>استفسار جديد</span>
             </Link>
-            <Link href="/inbox" className="kpi">
+            <Link href="/customers?temperature=HOT" className="kpi">
               <div className="kpi-top"><b>{num(ins.totals.serious)}</b><Delta now={ins.totals.serious} before={ins.previous.serious} /></div>
               <span>عميل جاد (عرف ميزانيته وطريقة الدفع)</span>
             </Link>
@@ -195,6 +197,8 @@ export default function Dashboard() {
               <span>متوسط سرعة رد الوكيل</span>
             </div>
           </section>
+
+          {deals && <DealsCard d={deals} />}
 
           <section className="card" aria-labelledby="daily-h">
             <h2 id="daily-h">الاستفسارات يوماً بيوم</h2>
@@ -281,5 +285,43 @@ export default function Dashboard() {
         )}
       </div>
     </>
+  );
+}
+
+type Deals = {
+  stages: Record<"NEW" | "CONTACTED" | "VIEWING" | "WON" | "LOST", number>;
+  thisMonth: { deals: number; value: number }; lastMonth: { deals: number; value: number }; everWon: boolean;
+};
+
+/** Deals the office marked closed in قائمة العملاء: what Hidaa brought in this month. */
+function DealsCard({ d }: { d: Deals }) {
+  const open = d.stages.NEW + d.stages.CONTACTED + d.stages.VIEWING;
+  if (!d.everWon) {
+    return (
+      <section className="card nextstep" aria-label="الصفقات">
+        <div>
+          <h3>الصفقات</h3>
+          <p className="small muted">علّم العميل «تمت الصفقة» في قائمة العملاء، لترى هنا كم صفقة جاءت من محادثات حداء وقيمتها.</p>
+        </div>
+        <Link href="/customers" className="btn">قائمة العملاء</Link>
+      </section>
+    );
+  }
+  const money = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)} مليون` : Math.round(n).toLocaleString("en-US"));
+  return (
+    <section className="kpis" aria-label="الصفقات">
+      <Link href="/customers?stage=WON" className="kpi">
+        <div className="kpi-top"><b>{num(d.thisMonth.deals)}</b><Delta now={d.thisMonth.deals} before={d.lastMonth.deals} /></div>
+        <span>صفقة هذا الشهر{d.lastMonth.deals ? `، ${d.lastMonth.deals} الشهر الماضي` : ""}</span>
+      </Link>
+      <Link href="/customers?stage=WON" className="kpi">
+        <b>{d.thisMonth.value > 0 ? money(d.thisMonth.value) : "—"}</b>
+        <span>ريال قيمة صفقات الشهر</span>
+      </Link>
+      <Link href="/customers" className="kpi">
+        <b>{num(open)}</b>
+        <span>عميل لم يُحسم بعد ({d.stages.VIEWING} عاينوا)</span>
+      </Link>
+    </section>
   );
 }

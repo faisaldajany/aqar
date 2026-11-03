@@ -285,3 +285,28 @@ details > summary { cursor: pointer; }
 .waiting { display: flex; align-items: center; gap: 8px; }
 .pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); animation: pulse 1.4s ease-in-out infinite; flex: none; }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+/* customers */
+.custfilters { display: flex; flex-direction: column; gap: 10px; }
+.custgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; align-items: end; }
+@media (max-width: 720px) { .custgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.custlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: opacity .2s; }
+.custrow { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(180px, 1.6fr) minmax(150px, 1fr) minmax(150px, .9fr); gap: 6px 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.custrow:last-child { border-bottom: 0; }
+.custrow .who, .custrow .need, .custrow .stagecell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.custrow .name { font-weight: 700; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custrow .name:hover { text-decoration: underline; }
+.custrow .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.custrow select.stage { min-height: 36px; padding-block: 5px; font-weight: 600; font-size: .88rem; }
+.custrow select.stage.s-contacted { border-color: var(--accent); }
+.custrow select.stage.s-viewing { border-color: var(--warn); }
+.custrow select.stage.s-won { border-color: var(--ok); background-color: var(--ok-bg); color: var(--ok); }
+.custrow select.stage.s-lost { color: var(--muted); }
+.stagedetail { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.stagedetail input { min-height: 36px; padding-block: 6px; }
+@media (max-width: 860px) {
+  .custrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .custrow .need { grid-column: 1 / -1; grid-row: 2; }
+  .custrow .meta { grid-column: 1 / -1; grid-row: 3; }
+  .custrow .stagecell { grid-column: 2; grid-row: 1; }
+}

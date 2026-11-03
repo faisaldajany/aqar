@@ -108,6 +108,19 @@ Needs Hidaa/legal:
 - [ ] **FAL review**: new offices show "فال قيد التحقق" in /ops. Check each number with REGA's
       "الاستعلام عن رخص فال" and record the result on the office page (a rejection with a note alerts the office).
       No public REGA API was found.
+- [x] **Revenue and invoices** (/ops → الإيرادات والفواتير): monthly recurring revenue, collected per month, every
+      invoice, and «تسجيل دفعة» for bank transfers (the reference goes to the audit log).
+- [x] **Usage and cost** (/ops → الاستخدام والتكلفة): conversations, replies, errors and estimated Gemini cost per office
+      against what it pays, and the signup funnel with the offices that stopped at each step. Check the token prices
+      (`LLM_PRICE_INPUT_USD`, `LLM_PRICE_OUTPUT_USD`) against the model you run.
+- [x] **Reply quality** (/ops → مراجعة الردود): every customer conversation is checked by rules (agent errors and
+      fallback replies, slow or missing replies, repeated or very long replies, a customer asking for a person without a
+      handoff, a complaint); «ابدأ المراجعة» has Gemini grade a sample against the listings the agent's tools returned.
+      Open a conversation to read it with the agent's tool calls. Export CSV (Excel) or JSON Lines. Customers are masked
+      (a code instead of number and name; phone numbers, emails, IDs and IBANs in messages blanked), and every view,
+      review and export is in the audit log.
+- [ ] **Terms**: say that Hidaa may review de-identified conversations to improve the service (Hidaa is the offices'
+      processor under PDPL; the reviews and exports above rely on this).
 - [x] **Promo codes** (/ops → أكواد الخصم): percent, fixed SAR or extra trial days; limits by plan, cycle, dates,
       uses and new customers; signup link `https://hidaaco.com/signup?promo=CODE`.
 - [ ] Aqar: a listings feed partnership (portal's "اطلب ربط عقار" requests are stored in

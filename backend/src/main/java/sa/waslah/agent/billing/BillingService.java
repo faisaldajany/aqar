@@ -129,6 +129,28 @@ public class BillingService {
         return find(invoiceId).orElseThrow();
     }
 
+    /**
+     * The Hidaa team recorded a payment made outside the payment page (e.g. a bank transfer): the invoice is paid and
+     * applied as if paid online. Returns false if it was already paid.
+     */
+    public boolean markPaidByOperator(UUID invoiceId) {
+        Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
+        if ("PAID".equals(inv.status())) return false;
+        boolean changed = tx.execute(status -> {
+            promos.lockOffice();
+            boolean c = markPaid(inv);
+            if (c) jdbc.sql("update invoices set provider = coalesce(provider, 'MANUAL') where id = ?").param(inv.id()).update();
+            return c;
+        });
+        if (changed && "OVERAGE".equals(inv.kind())) {
+            Subscription.State s = subscription.state();
+            if ("PAST_DUE".equals(s.status()) && s.paidUntil() != null && s.paidUntil().isAfter(Instant.now())) {
+                subscription.setStatus("ACTIVE");
+            }
+        }
+        return changed;
+    }
+
     /** Marks a DUE (or voided, if the provider took the money anyway) invoice paid, once, and applies it. */
     private boolean markPaid(Invoice inv) {
         int changed = jdbc.sql("update invoices set status = 'PAID', paid_at = now() where id = ? and status in ('DUE', 'VOID')")

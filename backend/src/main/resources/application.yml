@@ -118,6 +118,11 @@ waslah:
     template-language: ${REPORT_TEMPLATE_LANG:ar}
   # Platform operator console (/admin/*): reviews FAL licenses across offices. Blank disables it.
   admin-token: ${ADMIN_TOKEN:}
+  # Estimated AI cost in /ops → الاستخدام: the model's list price per million tokens (USD), converted to SAR.
+  ops:
+    llm-input-usd-per-million: ${LLM_PRICE_INPUT_USD:0.10}
+    llm-output-usd-per-million: ${LLM_PRICE_OUTPUT_USD:0.40}
+    usd-to-sar: 3.75
   privacy:
     # PDPL data minimisation: chat content older than this is deleted (conversation counts are kept).
     message-retention-days: ${MESSAGE_RETENTION_DAYS:730}

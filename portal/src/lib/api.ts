@@ -167,6 +167,14 @@ export type Stats = {
   inquiriesToday: number; inquiriesWeek: number; qualifiedWeek: number; bookingsToday: number; bookedWeek: number;
   openHandoffs: number; afterHoursWeek: number; medianReplyMs: number | null;
 };
+export type InsightCounts = { inquiries: number; serious: number; bookings: number; handoffs: number };
+export type Demand = { name: string; requests: number; listings: number };
+export type Insights = {
+  days: 7 | 30 | 90; from: string; series: (InsightCounts & { date: string })[]; totals: InsightCounts; previous: InsightCounts;
+  medianReplyMs: number | null; hours: { byHour: number[]; afterHours: number; messages: number };
+  leads: number; temperature: Record<"HOT" | "WARM" | "COLD", number>; purpose: Record<"SALE" | "RENT", number>;
+  topDistricts: Demand[]; topTypes: Demand[];
+};
 export const TEMP_LABELS: Record<string, [string, string]> = { HOT: ["جاد", "p-bad"], WARM: ["مهتم", "p-warn"], COLD: ["استكشاف", "p-idle"] };
 export const PURPOSE_LABELS: Record<string, string> = { SALE: "شراء", BUY: "شراء", RENT: "إيجار" };
 

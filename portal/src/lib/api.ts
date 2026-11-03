@@ -1,7 +1,14 @@
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  /** For invalid input: a message for each wrong field, keyed by the field's name in the request. */
+  constructor(public status: number, public code: string, message: string, public fields: Record<string, string> = {}) {
     super(message);
   }
+}
+
+/** ٠١٢٣ and ۰۱۲۳ (Arabic and Persian keyboards) as 0123. */
+export function latinDigits(s: string): string {
+  return s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
 }
 
 /** Calls the Spring API through the same-origin /api proxy; the session cookie rides along. */
@@ -18,7 +25,8 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const text = await res.text();
   const data = text ? JSON.parse(text) : undefined;
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? "حدث خطأ غير متوقع. حاول مرة أخرى.");
+    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? "حدث خطأ غير متوقع. حاول مرة أخرى.",
+      data?.fields && typeof data.fields === "object" ? data.fields : {});
   }
   return data as T;
 }

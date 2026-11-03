@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.common.ClientIp;
+import sa.waslah.agent.common.Digits;
 import sa.waslah.agent.common.RateLimiter;
 
 @RestController
@@ -25,11 +26,17 @@ public class AuthController {
 
     public record SignupRequest(
             @NotBlank @Size(max = 120) String officeName,
-            @NotBlank @Pattern(regexp = "^[0-9\\s-]{8,16}$") String falLicense,
+            @NotBlank @Pattern(regexp = "^[0-9\\s-]+$", message = "«رقم رخصة فال»: أرقام فقط، من 7 إلى 12 رقماً.") String falLicense,
             @NotBlank @Size(max = 120) String fullName,
             @NotBlank @Email String email,
             @NotBlank @Size(min = 8, max = 128) String password,
             @Size(max = 40) String promoCode) {
+
+        /** Arabic keyboards type ١٢٣, and a pasted number often carries invisible direction marks. */
+        public SignupRequest {
+            if (falLicense != null) falLicense = Digits.latin(falLicense).replaceAll("\\p{Cf}", "").trim();
+            if (email != null) email = email.trim();
+        }
     }
 
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {

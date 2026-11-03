@@ -29,6 +29,9 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
     static final String LINE = "#E1E4EC";
     static final String BG = "#F5F6F9";
     static final String FONT = "Tahoma, 'Segoe UI', Arial, sans-serif";
+    /** The code box and the button share one size and sit centred under the message. */
+    static final int BLOCK_WIDTH = 260;
+    static final int BLOCK_HEIGHT = 60;
 
     /** "مرحباً فيصل،" from a full name, or "مرحباً،" when there is none. */
     public static String greet(String fullName) {
@@ -53,20 +56,20 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
         for (String para : paragraphs) body.append(p(esc(para), ""));
         if (code != null) {
             body.append("""
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 10px 0;">
-                      <tr><td dir="ltr" align="center" bgcolor="%s" style="padding:14px 24px;border:1px solid %s;border-radius:10px;font-family:Menlo,Consolas,'Courier New',monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:%s;">%s</td></tr>
+                    <table role="presentation" align="center" width="%d" cellpadding="0" cellspacing="0" border="0" style="margin:8px auto 0 auto;width:%dpx;max-width:100%%;">
+                      <tr><td dir="ltr" align="center" bgcolor="%s" style="height:%dpx;border:1px solid %s;border-radius:10px;font-family:Menlo,Consolas,'Courier New',monospace;font-size:28px;line-height:%dpx;font-weight:bold;letter-spacing:8px;padding-left:8px;color:%s;text-align:center;">%s</td></tr>
                     </table>
-                    """.formatted(BG, LINE, NIGHT, esc(code)));
+                    """.formatted(BLOCK_WIDTH, BLOCK_WIDTH, BG, BLOCK_HEIGHT - 2, LINE, BLOCK_HEIGHT - 2, NIGHT, esc(code)));
         }
         if (button != null) {
             String url = esc(button.url());
             body.append("""
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 8px 0;">
+                    <table role="presentation" align="center" width="%d" cellpadding="0" cellspacing="0" border="0" style="margin:14px auto 8px auto;width:%dpx;max-width:100%%;">
                       <tr><td align="center" bgcolor="%s" style="border-radius:10px;">
-                        <a href="%s" target="_blank" style="display:inline-block;padding:13px 28px;font-family:%s;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:10px;">%s</a>
+                        <a href="%s" target="_blank" style="display:block;height:%dpx;line-height:%dpx;font-family:%s;font-size:17px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:10px;text-align:center;">%s</a>
                       </td></tr>
                     </table>
-                    """.formatted(NIGHT, url, FONT, esc(button.label())));
+                    """.formatted(BLOCK_WIDTH, BLOCK_WIDTH, NIGHT, url, BLOCK_HEIGHT, BLOCK_HEIGHT, FONT, esc(button.label())));
         }
         if (note != null) {
             body.append("<p style=\"margin:20px 0 0 0;padding-top:16px;border-top:1px solid %s;font-family:%s;font-size:13px;line-height:1.8;color:%s;\">%s</p>"

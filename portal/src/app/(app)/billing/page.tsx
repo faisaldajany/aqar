@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, fmt, riyadhDay, sar, SUB_LABELS, type Billing, type Invoice } from "@/lib/api";
@@ -206,9 +207,12 @@ function BillingView() {
                     <InvoiceStatus i={i} />
                     {i.status === "DUE" && i.lastFailureReason && <><br /><span className="small err">رُفضت آخر محاولة: {failureText(i.lastFailureReason)}</span></>}
                   </td>
-                  <td>{i.status === "DUE" && i.totalHalalas > 0 && (
-                    <button className="btn" disabled={!!busy} onClick={() => pay(i)}>{busy === i.id ? "جارٍ الفتح…" : "ادفع"}</button>
-                  )}</td>
+                  <td>
+                    {i.status === "DUE" && i.totalHalalas > 0 && (
+                      <button className="btn" disabled={!!busy} onClick={() => pay(i)}>{busy === i.id ? "جارٍ الفتح…" : "ادفع"}</button>
+                    )}
+                    {(i.status === "PAID" || i.status === "REFUNDED") && i.totalHalalas > 0 && <Link className="btn" href={`/receipt/${i.id}`}>الإيصال</Link>}
+                  </td>
                 </tr>
               ))}
             </tbody>

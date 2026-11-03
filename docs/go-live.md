@@ -66,6 +66,9 @@ A self-visit rejection is free text only, so it reaches the customer only inside
       not ZATCA-compliant tax invoices (no QR/UUID/cryptographic stamp, not reported to ZATCA).
       Options: issue the tax invoice from an accounting system already integrated with Fatoora
       (e.g. Qoyod, Zoho Books, Daftra) triggered on each `PAID` invoice, or integrate directly later.
+      Owners already get Hidaa-branded emails (invoice due, payment receipt with card and Moyasar reference,
+      refund) and a printable receipt at /receipt/{id}; these say «إيصال دفع», not «فاتورة ضريبية». The cleared
+      ZATCA invoice PDF can be attached to the same receipt email once a provider is chosen.
 
 ## 5. Hosting in Saudi Arabia — [blocker]
 

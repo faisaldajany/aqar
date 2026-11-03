@@ -329,3 +329,32 @@ details > summary { cursor: pointer; }
 .today li:last-child { border-bottom: 0; }
 .today .t { font-weight: 700; font-variant-numeric: tabular-nums; }
 .attn { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* receipt */
+.receipt-wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 14px; }
+.receipt-actions { display: flex; justify-content: space-between; gap: 8px; }
+.receipt { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px 28px 20px; display: flex; flex-direction: column; gap: 18px; }
+.receipt header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
+.receipt .r-head { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.receipt h1 { font-size: 1.35rem; }
+.receipt h2 { font-size: .78rem; color: var(--muted); font-family: var(--f-body); font-weight: 600; margin-bottom: 4px; }
+.r-test { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: .88rem; }
+.r-parties { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; font-size: .9rem; line-height: 1.8; }
+@media (max-width: 640px) { .r-parties { grid-template-columns: 1fr; } .receipt { padding: 20px 16px; } }
+.r-items { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.r-items th { text-align: start; font-size: .78rem; color: var(--muted); font-weight: 600; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.r-items th:last-child, .r-items td.num { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.r-items td { padding: 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.r-items tfoot td { border-bottom: 0; padding: 6px 0; }
+.r-items tfoot tr.total td { font-size: 1.1rem; font-weight: 700; padding-top: 10px; border-top: 2px solid var(--ink); }
+.r-pay { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: .9rem; }
+.r-pay dt { color: var(--muted); } .r-pay dd { margin: 0; }
+.receipt footer { border-top: 1px solid var(--line); padding-top: 12px; text-align: center; }
+@page { size: A4; margin: 14mm; }
+@media print {
+  html, body { background: #fff !important; width: auto !important; min-width: 0 !important; }
+  .noprint { display: none !important; }
+  .receipt-wrap { padding: 0; max-width: 100%; width: 100%; margin: 0; }
+  .receipt { border: 0; padding: 0; color: #000; }
+  .r-test { border: 1px solid #c90; }
+}

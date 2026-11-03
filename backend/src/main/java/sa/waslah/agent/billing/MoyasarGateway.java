@@ -86,10 +86,35 @@ public class MoyasarGateway implements PaymentGateway {
         try {
             JsonNode r = http.get().uri("/payments/{id}", paymentId).retrieve().body(JsonNode.class);
             if (r == null || !r.hasNonNull("id")) return Optional.empty();
-            String message = r.path("source").path("message").asText(null);
-            return Optional.of(new Payment(r.get("id").asText(), r.path("status").asText(""), r.path("amount").asLong(),
-                    r.path("refunded").asLong(), r.path("invoice_id").asText(null), message));
+            return Optional.of(payment(r));
         } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
+    }
+
+    static Payment payment(JsonNode r) {
+        JsonNode src = r.path("source");
+        String type = src.path("type").asText("");
+        String method = src.hasNonNull("company") ? src.path("company").asText()
+                : switch (type) { case "applepay" -> "applepay"; case "samsungpay" -> "samsungpay"; case "stcpay" -> "stcpay"; default -> null; };
+        String digits = src.path("number").asText("").replaceAll("\\D", "");
+        return new Payment(r.path("id").asText(), r.path("status").asText(""), r.path("amount").asLong(), r.path("refunded").asLong(),
+                r.path("invoice_id").asText(null), src.path("message").asText(null), method,
+                digits.length() >= 4 ? digits.substring(digits.length() - 4) : null, src.path("reference_number").asText(null));
+    }
+
+    /** GET /v1/invoices/{id}: the payment in its payments list that went through. */
+    @Override
+    public Optional<Payment> paidPayment(String providerRef) {
+        try {
+            JsonNode r = http.get().uri("/invoices/{id}", providerRef).retrieve().body(JsonNode.class);
+            if (r == null) return Optional.empty();
+            for (JsonNode p : r.path("payments")) {
+                String st = p.path("status").asText("");
+                if (st.equals("paid") || st.equals("captured") || st.equals("refunded")) return Optional.of(payment(p));
+            }
+            return Optional.empty();
+        } catch (RuntimeException e) {
             return Optional.empty();
         }
     }

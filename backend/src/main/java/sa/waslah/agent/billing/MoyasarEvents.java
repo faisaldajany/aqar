@@ -42,9 +42,11 @@ public class MoyasarEvents {
     private final OfficeAlerts alerts;
     private final JdbcClient jdbc;
     private final String team;
+    private final BillingMail mail;
 
     public MoyasarEvents(BillingService billing, PaymentGateways gateways, Mailer mailer, OfficeAlerts alerts, JdbcClient jdbc,
-                         @Value("${waslah.support.forward-to:}") String team) {
+                         @Value("${waslah.support.forward-to:}") String team, BillingMail mail) {
+        this.mail = mail;
         this.billing = billing;
         this.gateways = gateways;
         this.mailer = mailer;
@@ -171,6 +173,7 @@ public class MoyasarEvents {
                 : "استُرد " + amount + " من الفاتورة " + inv.number() + ". اشتراكك مستمر كما هو.";
         officeMsg += " يصل المبلغ إلى وسيلة الدفع نفسها خلال 5 إلى 14 يوم عمل حسب البنك.";
         alerts.raise(office, "REFUND", inv.id(), officeMsg, "refund-" + inv.id() + "-" + r.refundedHalalas());
+        mail.refunded(r);
         String name = jdbc.sql("select name from offices").query(String.class).optional().orElse("");
         String paidUntil = jdbc.sql("select to_char(paid_until at time zone 'Asia/Riyadh', 'YYYY-MM-DD') from offices")
                 .query(String.class).optional().orElse(null);

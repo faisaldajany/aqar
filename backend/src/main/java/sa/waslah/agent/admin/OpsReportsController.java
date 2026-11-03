@@ -192,7 +192,7 @@ public class OpsReportsController {
         if (p == null || p.officeId() == null) throw ApiException.badRequest("no_office", "المكتب مطلوب.");
         String note = p.note() == null || p.note().isBlank() ? null : p.note().trim();
         if (note == null) throw ApiException.badRequest("no_note", "اكتب مرجع التحويل أو ملاحظة للسجل.");
-        boolean changed = TenantContext.call(p.officeId(), () -> billing.markPaidByOperator(id));
+        boolean changed = TenantContext.call(p.officeId(), () -> billing.markPaidByOperator(id, note));
         BillingService.Invoice inv = TenantContext.call(p.officeId(), () -> billing.find(id)).orElseThrow();
         if (changed) {
             jdbc.sql("insert into ops_audit (action, office_id, target, detail, ip_hash) values ('INVOICE_PAID', ?, ?, ?, ?)")

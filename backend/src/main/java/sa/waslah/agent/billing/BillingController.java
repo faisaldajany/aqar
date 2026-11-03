@@ -11,11 +11,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.common.RateLimiter;
@@ -176,11 +179,18 @@ public class BillingController {
     }
 
     /**
-     * Moyasar's payment notification. The body only tells us which invoice to re-check; the paid status
-     * itself always comes from Moyasar's API, so a forged notification cannot mark anything paid.
+     * Moyasar's payment notification: the invoice's callback, or the dashboard webhook (event payment_paid, with the
+     * payment in "data" and its invoice in data.invoice_id). The body only tells us which invoice to re-check; the paid
+     * status itself always comes from Moyasar's API, so a forged notification cannot mark anything paid. With
+     * MOYASAR_WEBHOOK_SECRET set, a notification without the right token is turned away (see {@link MoyasarWebhookAuth}).
      */
     @PostMapping("/webhooks/moyasar")
-    Map<String, Object> moyasar(@RequestBody JsonNode body) {
+    ResponseEntity<Map<String, Object>> moyasar(@RequestBody JsonNode body,
+                                                @RequestParam(name = "token", required = false) String token) {
+        if (!MoyasarWebhookAuth.allowed(props.moyasarWebhookSecret(), body, token)) {
+            log.warn("Moyasar notification turned away: missing or wrong secret token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false));
+        }
         List<String> refs = new ArrayList<>();
         for (JsonNode n : List.of(body.path("id"), body.path("invoice_id"), body.path("data").path("id"),
                 body.path("data").path("invoice_id"))) {
@@ -195,9 +205,11 @@ public class BillingController {
                 } catch (RuntimeException e) {
                     log.warn("Moyasar notification for {} not processed: {}", ref, e.getMessage());
                 }
-                return Map.of("ok", true);
+                return ResponseEntity.ok(Map.of("ok", true));
             }
         }
-        return Map.of("ok", false);
+        // Not one of our invoices (another event, or another app on the same Moyasar account): acknowledged, so
+        // Moyasar does not keep retrying it.
+        return ResponseEntity.ok(Map.of("ok", false));
     }
 }

@@ -45,6 +45,10 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 - [ ] Switch to `sk_live_…` in `MOYASAR_SECRET_KEY`, and keep the test key in `MOYASAR_TEST_SECRET_KEY`: the team's own
       offices (owner email on hidaaco.com, confirmed from the emailed link) keep paying with test cards; every other
       office pays for real.
+- [ ] Webhook in Moyasar → Settings → Webhooks, in test mode and again in live mode: URL
+      `https://app.hidaaco.com/webhooks/moyasar`, method POST, event `PAYMENT_PAID` only, Secret Token = the
+      `moyasar-webhook-secret` secret (`MOYASAR_WEBHOOK_SECRET` on hidaa-api). Each invoice's own callback carries a
+      token derived from the same secret, so both kinds of notification are checked.
 - [ ] Renewal is a new hosted invoice each period (no stored cards). Saved-card auto-charge is a later
       improvement (Moyasar tokenization).
 

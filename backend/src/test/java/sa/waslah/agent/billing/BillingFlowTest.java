@@ -111,6 +111,17 @@ class BillingFlowTest extends IntegrationTest {
     }
 
     @Test
+    void dashboardWebhookFindsTheInvoiceInsideThePayment() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        ((MockPaymentGateway) gateway).pay(inv.providerRef());
+        // Shape of Moyasar's dashboard webhook: the event's own id, and the payment (with its invoice) in "data".
+        var res = rest.postForEntity("/webhooks/moyasar", Map.of("id", "evt_" + inv.providerRef(), "type", "payment_paid",
+                "live", false, "data", Map.of("id", "pay_123", "status", "paid", "invoice_id", inv.providerRef())), Map.class);
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(TenantContext.call(office, () -> billing.find(inv.id()).orElseThrow().status())).isEqualTo("PAID");
+    }
+
+    @Test
     void trialEndsThenAgentStops() {
         TenantContext.run(office, () -> jdbc.sql("update offices set trial_ends_at = now() + interval '2 days'").update());
         TenantContext.run(office, () -> jobs.runFor(office, Instant.now()));

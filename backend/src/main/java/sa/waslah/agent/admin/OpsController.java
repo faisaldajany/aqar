@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.auth.PasswordResetService;
 import sa.waslah.agent.auth.SessionGuard;
 import sa.waslah.agent.billing.BillingService;
+import sa.waslah.agent.billing.PaymentGateways;
 import sa.waslah.agent.billing.PlanLimits;
 import sa.waslah.agent.billing.PromoService;
 import sa.waslah.agent.common.ApiException;
@@ -75,10 +76,12 @@ public class OpsController {
     private final SessionGuard sessions;
     private final Mailer mailer;
     private final WaTemplates templates;
+    private final PaymentGateways gateways;
 
     public OpsController(JdbcClient jdbc, OpsAuth ops, PlanLimits plans, OfficeAlerts alerts, BillingService billing,
                          PromoService promos, PasswordResetService resets, SessionGuard sessions, Mailer mailer,
-                         WaTemplates templates) {
+                         WaTemplates templates, PaymentGateways gateways) {
+        this.gateways = gateways;
         this.templates = templates;
         this.jdbc = jdbc;
         this.ops = ops;
@@ -134,7 +137,7 @@ public class OpsController {
             if (Boolean.TRUE.equals(o.get("whatsappConnected"))) whatsapp++;
             conversations += (Integer) o.get("conversationsThisMonth");
             if (("ACTIVE".equals(o.get("subscription")) || "PAST_DUE".equals(o.get("subscription")))
-                    && !Boolean.TRUE.equals(o.get("suspended"))) {
+                    && !Boolean.TRUE.equals(o.get("suspended")) && !"TEST".equals(o.get("paymentMode"))) {
                 PlanLimits.Plan p = PlanLimits.Plan.valueOf((String) o.get("plan"));
                 mrr = mrr.add("ANNUAL".equals(o.get("cycle"))
                         ? p.annualSar.divide(BigDecimal.valueOf(12), 0, RoundingMode.HALF_UP) : p.monthlySar);
@@ -475,6 +478,7 @@ public class OpsController {
                     r.put("listings", rs.getInt(15));
                     r.put("promoCode", rs.getString(16));
                     r.putAll(users);
+                    r.put("paymentMode", gateways.mode(office).name());
                     return r;
                 })
                 .optional()

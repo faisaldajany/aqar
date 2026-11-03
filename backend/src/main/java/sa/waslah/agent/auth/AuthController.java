@@ -41,14 +41,20 @@ public class AuthController {
     public record ResetRequest(@NotBlank String token, @NotBlank @Size(min = 8, max = 128) String password) {
     }
 
+    public record ConfirmRequest(@NotBlank String token) {
+    }
+
     static final Duration WINDOW = Duration.ofMinutes(15);
 
     private final AuthService auth;
     private final SessionTokens tokens;
     private final RateLimiter limits;
     private final PasswordResetService resets;
+    private final EmailConfirmationService confirmations;
 
-    public AuthController(AuthService auth, SessionTokens tokens, RateLimiter limits, PasswordResetService resets) {
+    public AuthController(AuthService auth, SessionTokens tokens, RateLimiter limits, PasswordResetService resets,
+                          EmailConfirmationService confirmations) {
+        this.confirmations = confirmations;
         this.auth = auth;
         this.tokens = tokens;
         this.limits = limits;
@@ -60,6 +66,8 @@ public class AuthController {
         limits.check("signup:" + ClientIp.hash(http, "auth"), 10, Duration.ofHours(1));
         AuthService.SignedIn s = auth.signup(new AuthService.Signup(
                 r.officeName(), r.falLicense(), r.fullName(), r.email(), r.password(), r.promoCode()));
+        // A company (hidaaco.com) address gets a confirmation link; once confirmed, the office pays in test mode.
+        confirmations.sendIfInternal(s.userId());
         return withSession(s);
     }
 
@@ -109,6 +117,14 @@ public class AuthController {
         String email = resets.reset(r.token(), r.password()).trim().toLowerCase(Locale.ROOT);
         limits.reset("login-email:" + email);
         limits.reset(loginKey(email, ClientIp.hash(http, "auth")));
+        return Map.of("ok", true);
+    }
+
+    /** The link from the confirmation email. */
+    @PostMapping("/confirm-email")
+    Map<String, Object> confirmEmail(@Valid @RequestBody ConfirmRequest r, HttpServletRequest http) {
+        limits.check("confirm:" + ClientIp.hash(http, "auth"), 20, Duration.ofHours(1));
+        confirmations.confirm(r.token());
         return Map.of("ok", true);
     }
 

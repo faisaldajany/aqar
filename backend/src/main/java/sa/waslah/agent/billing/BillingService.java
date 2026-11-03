@@ -31,7 +31,7 @@ public class BillingService {
     }
 
     private final JdbcClient jdbc;
-    private final PaymentGateway gateway;
+    private final PaymentGateways gateways;
     private final BillingProperties props;
     private final Subscription subscription;
     private final PlanLimits plans;
@@ -39,12 +39,12 @@ public class BillingService {
     private final PromoService promos;
     private final TransactionTemplate tx;
 
-    public BillingService(JdbcClient jdbc, PaymentGateway gateway, BillingProperties props, Subscription subscription,
+    public BillingService(JdbcClient jdbc, PaymentGateways gateways, BillingProperties props, Subscription subscription,
                           PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx) {
         this.promos = promos;
         this.tx = tx;
         this.jdbc = jdbc;
-        this.gateway = gateway;
+        this.gateways = gateways;
         this.props = props;
         this.subscription = subscription;
         this.plans = plans;
@@ -76,10 +76,10 @@ public class BillingService {
         UUID promoId = discount > 0 ? promo.get().promo().id() : null;
         String promoCode = discount > 0 ? promo.get().promo().code() : null;
 
-        // Reuse an unpaid invoice for the same choice (and the same discount) instead of piling up new ones.
+        // Reuse an unpaid invoice for the same choice (the same discount, the same gateway) instead of piling up new ones.
         Optional<Invoice> open = jdbc.sql(SELECT + " where kind = 'SUBSCRIPTION' and status = 'DUE' and plan = ? and cycle = ? "
-                        + "and discount_halalas = ? and created_at > now() - interval '6 days' order by created_at desc limit 1")
-                .params(plan.name(), cycle, discount).query(BillingService::map).optional();
+                        + "and discount_halalas = ? and provider = ? and created_at > now() - interval '6 days' order by created_at desc limit 1")
+                .params(plan.name(), cycle, discount, gateways.forOffice(officeId).name()).query(BillingService::map).optional();
         if (open.isPresent() && open.get().payUrl() != null) return open.get();
 
         String desc = "اشتراك حداء — باقة " + plan.arabicName + ("ANNUAL".equals(cycle) ? " (سنوي)" : " (شهري)")
@@ -118,7 +118,7 @@ public class BillingService {
     public Invoice confirm(UUID invoiceId) {
         Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
         if ("PAID".equals(inv.status()) || inv.providerRef() == null) return inv;
-        if (!gateway.isPaid(inv.providerRef())) return inv;
+        if (!gateways.isPaid(inv.provider(), inv.providerRef())) return inv;
         boolean changed = markPaid(inv);
         if (changed && "OVERAGE".equals(inv.kind())) {
             Subscription.State s = subscription.state();
@@ -197,7 +197,7 @@ public class BillingService {
 
     /** Development only: pays a mock invoice. */
     public Invoice mockPay(UUID invoiceId) {
-        if (!(gateway instanceof MockPaymentGateway mock)) {
+        if (!(gateways.main() instanceof MockPaymentGateway mock)) {
             throw ApiException.notFound("not_found", "غير متاح.");
         }
         Invoice inv = find(invoiceId).orElseThrow(() -> ApiException.notFound("no_invoice", "الفاتورة غير موجودة."));
@@ -224,6 +224,7 @@ public class BillingService {
             String callback = props.apiBaseUrl() == null || props.apiBaseUrl().isBlank() ? null
                     : props.apiBaseUrl() + "/webhooks/moyasar";
             try {
+                PaymentGateway gateway = gateways.forOffice(officeId);
                 PaymentGateway.Checkout c = gateway.create(subtotal + vat, description + " — " + number, id.toString(), success, callback);
                 jdbc.sql("update invoices set provider = ?, provider_ref = ?, pay_url = ? where id = ?")
                         .params(gateway.name(), c.providerRef(), c.url(), id).update();

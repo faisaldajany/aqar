@@ -39,10 +39,15 @@ public class BillingController {
     private final sa.waslah.agent.config.WaslahProperties app;
     private final PromoService promos;
     private final RateLimiter limits;
+    private final PaymentGateways gateways;
+    private final sa.waslah.agent.auth.EmailConfirmationService confirmations;
 
     public BillingController(BillingService billing, Subscription subscription, PlanLimits plans, BillingProperties props,
-                             sa.waslah.agent.config.WaslahProperties app, PromoService promos, RateLimiter limits) {
+                             sa.waslah.agent.config.WaslahProperties app, PromoService promos, RateLimiter limits,
+                             PaymentGateways gateways, sa.waslah.agent.auth.EmailConfirmationService confirmations) {
         this.limits = limits;
+        this.gateways = gateways;
+        this.confirmations = confirmations;
         this.app = app;
         this.promos = promos;
         this.billing = billing;
@@ -62,6 +67,10 @@ public class BillingController {
         out.put("trialEndsAt", s.trialEndsAt().toString());
         out.put("trialDaysLeft", s.trialDaysLeft(now));
         out.put("paidUntil", s.paidUntil() == null ? null : s.paidUntil().toString());
+        // TEST: internal office, pays with Moyasar test cards. INTERNAL_UNCONFIRMED: owner email on the company domain,
+        // not confirmed yet. LIVE: everyone else.
+        PaymentGateways.Mode mode = gateways.mode(TenantContext.require());
+        out.put("paymentMode", mode == PaymentGateways.Mode.TEST && !gateways.testModeAvailable() ? "LIVE" : mode.name());
         out.put("serving", s.serving(now));
         out.put("vatPercent", props.vatPercent());
         out.put("provider", props.moyasar() ? "moyasar" : "mock");
@@ -102,6 +111,16 @@ public class BillingController {
         }
         out.put("plans", list);
         return out;
+    }
+
+    /** Sends (again) the link that confirms the signed-in user's company email. 3 an hour. */
+    @PostMapping("/api/billing/confirm-email")
+    Map<String, Object> resendConfirmation(@org.springframework.security.core.annotation.AuthenticationPrincipal
+                                           org.springframework.security.oauth2.jwt.Jwt jwt) {
+        UUID user = UUID.fromString(jwt.getSubject());
+        limits.check("confirm-send:" + user, 3, Duration.ofHours(1));
+        boolean sent = confirmations.sendIfInternal(user);
+        return Map.of("sent", sent);
     }
 
     /** 10 tries an hour per office, so codes cannot be guessed by trying many. */

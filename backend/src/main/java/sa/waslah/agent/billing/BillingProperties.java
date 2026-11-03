@@ -9,10 +9,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param apiBaseUrl        public URL of this backend, for Moyasar's payment notification
  * @param vatPercent        Saudi VAT added on top of plan prices (prices in the pricing doc exclude VAT)
  * @param graceDays         days after a missed renewal before the agent stops
+ * @param moyasarTestSecretKey sk_test_… used for internal offices (see {@link PaymentGateways}); blank = none
+ * @param internalEmailDomain  the company's email domain; offices whose owner confirmed an address on it are internal
  */
 @ConfigurationProperties("waslah.billing")
 public record BillingProperties(String provider, String moyasarSecretKey, String portalBaseUrl, String apiBaseUrl,
-                                int vatPercent, int graceDays) {
+                                int vatPercent, int graceDays, String moyasarTestSecretKey, String internalEmailDomain) {
 
     public boolean moyasar() {
         return "moyasar".equalsIgnoreCase(provider);

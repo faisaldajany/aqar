@@ -78,6 +78,8 @@ export default function OpsOfficePage() {
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h1 style={{ margin: 0 }}>{o.name}</h1>
         <div className="row">
+          {o.paymentMode === "TEST" && <span className="pill p-acc" title="بريد مؤكد على نطاق حداء: يدفع ببطاقات الاختبار ولا يُحسب في الإيرادات">داخلي (دفع تجريبي)</span>}
+          {o.paymentMode === "INTERNAL_UNCONFIRMED" && <span className="pill p-warn" title="بريد على نطاق حداء لم يُؤكد بعد: الدفع حقيقي">بريد حداء غير مؤكد</span>}
           {o.suspended && <span className="pill p-bad">موقوف</span>}
           <span className={`pill ${subCls}`}>{subLabel}</span>
           <span className="pill p-idle">{PLAN_NAMES[o.plan]}{o.cycle === "ANNUAL" ? " سنوي" : ""}</span>

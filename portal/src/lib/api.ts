@@ -192,6 +192,8 @@ export type Billing = {
   status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"; plan: Plan["id"]; cycle: "MONTHLY" | "ANNUAL";
   trialEndsAt: string; trialDaysLeft: number; paidUntil: string | null; serving: boolean; vatPercent: number;
   provider: string; mockPayments: boolean; plans: Plan[]; suspended: boolean; promo: BillingPromo | null; applied?: string;
+  /** TEST: internal (Hidaa team) office paying with Moyasar test cards; INTERNAL_UNCONFIRMED: company email not confirmed yet. */
+  paymentMode?: "LIVE" | "TEST" | "INTERNAL_UNCONFIRMED";
 };
 export type Invoice = {
   id: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP"; plan: string | null; cycle: string | null;

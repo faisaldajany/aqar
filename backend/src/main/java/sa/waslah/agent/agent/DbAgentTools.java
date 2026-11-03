@@ -282,11 +282,16 @@ class DbAgentTools implements AgentTools {
     }
 
     private void insertHandoff(String reason, String summary, UUID marketerId, UUID listingId) {
-        jdbc.sql("""
-                insert into handoffs (office_id, conversation_id, marketer_id, reason, summary, listing_id)
-                values (?, ?, ?::uuid, ?, ?, ?::uuid)""")
-                .params(officeId, conversationId, marketerId, reason, summary, listingId)
-                .update();
+        UUID id = jdbc.sql("""
+                insert into handoffs (office_id, conversation_id, marketer_id, reason, summary, listing_id, assigned_at)
+                values (?, ?, ?::uuid, ?, ?, ?::uuid, case when ?::uuid is null then null else now() end) returning id""")
+                .params(officeId, conversationId, marketerId, reason, summary, listingId, marketerId)
+                .query(UUID.class).single();
+        // Who had it and when: marketer performance, and moving it on if nobody answers in time.
+        if (marketerId != null) {
+            jdbc.sql("insert into handoff_assignments (office_id, handoff_id, marketer_id) values (?, ?, ?)")
+                    .params(officeId, id, marketerId).update();
+        }
     }
 
     private record Lead(String purpose, String propertyType, String districts, BigDecimal budgetMax,

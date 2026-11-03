@@ -31,19 +31,35 @@ public class MarketerStore {
                 .param(id).query(MarketerStore::map).optional();
     }
 
-    /** The active marketer covering this district, else the first active marketer. */
+    /**
+     * Who gets a new customer: among the active marketers covering this district (or all active ones if none does),
+     * the one with the fewest open handoffs, then the one who got a handoff longest ago, so work is shared.
+     */
     public Optional<Marketer> forDistrict(String district) {
+        return forDistrict(district, List.of());
+    }
+
+    /** The same, leaving out these marketers (the ones a handoff has already been with). */
+    public Optional<Marketer> forDistrict(String district, List<UUID> exclude) {
+        String skip = "{" + String.join(",", exclude.stream().map(UUID::toString).toList()) + "}";
         if (district != null && !district.isBlank()) {
-            Optional<Marketer> m = jdbc.sql("""
-                    select id, name, wa_phone, districts, active from marketers
-                    where active and exists (select 1 from unnest(districts) d where ar_norm(d) = ar_norm(?))
-                    order by created_at limit 1""")
-                    .param(district).query(MarketerStore::map).optional();
-            if (m.isPresent()) {
-                return m;
-            }
+            Optional<Marketer> m = pick("and exists (select 1 from unnest(m.districts) d where ar_norm(d) = ar_norm(:district))",
+                    district, skip);
+            if (m.isPresent()) return m;
         }
-        return active().stream().findFirst();
+        return pick("", null, skip);
+    }
+
+    private Optional<Marketer> pick(String where, String district, String skip) {
+        return jdbc.sql("""
+                        select m.id, m.name, m.wa_phone, m.districts, m.active from marketers m
+                        where m.active and not (m.id = any(cast(:skip as uuid[])))""" + " " + where + """
+                        order by (select count(*) from handoffs h where h.marketer_id = m.id and h.status = 'OPEN'),
+                                 (select max(coalesce(h.assigned_at, h.created_at)) from handoffs h where h.marketer_id = m.id) nulls first,
+                                 m.created_at
+                        limit 1""")
+                .param("skip", skip).param("district", district)
+                .query(MarketerStore::map).optional();
     }
 
     public void deactivate(UUID id) {

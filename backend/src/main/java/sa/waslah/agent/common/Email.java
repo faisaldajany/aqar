@@ -66,9 +66,9 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
                         <a href="%s" target="_blank" style="display:inline-block;padding:13px 28px;font-family:%s;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:10px;">%s</a>
                       </td></tr>
                     </table>
-                    <p style="margin:16px 0 0 0;font-family:%s;font-size:12px;line-height:1.7;color:%s;">إذا لم يعمل الزر، انسخ هذا الرابط في المتصفح:</p>
-                    <p dir="ltr" style="margin:2px 0 0 0;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:%s;word-break:break-all;text-align:left;">%s</p>
-                    """.formatted(NIGHT, url, FONT, esc(button.label()), FONT, MUTED, MUTED, url));
+                    <p style="margin:16px 0 0 0;font-family:%s;font-size:12px;line-height:1.7;color:%s;">إذا لم يعمل الزر، اضغط هذا الرابط:</p>
+                    <p dir="ltr" style="margin:2px 0 0 0;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.6;word-break:break-all;text-align:left;"><a href="%s" target="_blank" style="color:%s;text-decoration:underline;">%s</a></p>
+                    """.formatted(NIGHT, url, FONT, esc(button.label()), FONT, MUTED, url, SADU, url));
         }
         if (note != null) {
             body.append("<p style=\"margin:20px 0 0 0;padding-top:16px;border-top:1px solid %s;font-family:%s;font-size:13px;line-height:1.8;color:%s;\">%s</p>"

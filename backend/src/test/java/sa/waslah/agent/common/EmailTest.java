@@ -17,6 +17,7 @@ class EmailTest {
         String html = email.html();
         assertThat(html).contains("<html lang=\"ar\" dir=\"rtl\">").contains("حداء").contains("مرحباً فيصل،")
                 .contains("href=\"https://app.hidaaco.com/reset?token=a_b-c&amp;x=1\"")
+                .contains(">https://app.hidaaco.com/reset?token=a_b-c&amp;x=1</a>")
                 .contains("فقرة &lt;b&gt;غير موثوقة&lt;/b&gt; &amp; رمز")
                 .contains("support@hidaaco.com")
                 .doesNotContain("<b>غير");

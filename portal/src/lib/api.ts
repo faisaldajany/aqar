@@ -5,6 +5,11 @@ export class ApiError extends Error {
   }
 }
 
+/** "عميل واحد", "عميلان", "5 عملاء", "12 عميلاً". */
+export function customersAr(n: number): string {
+  return n === 1 ? "عميل واحد" : n === 2 ? "عميلان" : n >= 3 && n <= 10 ? `${n} عملاء` : `${n} عميلاً`;
+}
+
 /** ٠١٢٣ and ۰۱۲۳ (Arabic and Persian keyboards) as 0123. */
 export function latinDigits(s: string): string {
   return s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))

@@ -40,9 +40,10 @@ class WaTemplatesTest extends IntegrationTest {
     }
 
     @Test
-    void connectingCreatesTheFourTemplatesAndOnlyApprovedOnesAreSent() {
+    void connectingCreatesTheTemplatesAndOnlyApprovedOnesAreSent() {
         List<Map<String, Object>> rows = TenantContext.call(office, () -> templates.statuses());
-        assertThat(rows).extracting(r -> r.get("kind")).containsExactlyInAnyOrder("HANDOFF", "REMINDER", "FOLLOWUP", "REPORT");
+        assertThat(rows).extracting(r -> r.get("kind"))
+                .containsExactlyInAnyOrder("HANDOFF", "REMINDER", "FOLLOWUP", "REPORT", "NEW_LISTING", "CHECKIN");
         assertThat(rows).allMatch(r -> "PENDING".equals(r.get("status")));
         assertThat(TenantContext.call(office, () -> templates.resolve(account, WaTemplates.Kind.REPORT))).isEmpty();
 

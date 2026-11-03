@@ -95,6 +95,11 @@ public class ConversationStore {
         jdbc.sql("update conversations set agent_paused_until = null where id = ?").param(conversationId).update();
     }
 
+    /** The customer answered «إيقاف»: no more listing messages or check-ins (replies to them still work). */
+    public void optOut(UUID contactId) {
+        jdbc.sql("update contacts set marketing_opt_out_at = coalesce(marketing_opt_out_at, now()) where id = ?").param(contactId).update();
+    }
+
     public void touchOutbound(UUID conversationId, Instant at) {
         jdbc.sql("update conversations set last_message_at = greatest(last_message_at, ?) where id = ?")
                 .params(Timestamp.from(at), conversationId).update();

@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { api, ApiError, daysUntil, fmt, type AqarDraft, type Listing, type ListingForm } from "@/lib/api";
+import { api, ApiError, customersAr, daysUntil, fmt, type AqarDraft, type Listing, type ListingForm } from "@/lib/api";
 import ImportWizard from "./ImportWizard";
 import ListingFormView from "./ListingFormView";
 
@@ -19,6 +20,7 @@ export default function ListingsPage() {
   const [mode, setMode] = useState<Mode>({ kind: "list" });
   const [filter, setFilter] = useState<"all" | "issues" | "nocard">("all");
   const [error, setError] = useState("");
+  const [waiting, setWaiting] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -26,6 +28,8 @@ export default function ListingsPage() {
     } catch {
       setError("تعذّر تحميل العقارات.");
     }
+    // Customers each listing fits who have not been told about it yet.
+    api<Record<string, number>>("/listings/matches").then(setWaiting).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export default function ListingsPage() {
   if (mode.kind === "new") return <ListingFormView initial={mode.initial} onDone={back} />;
   if (mode.kind === "edit") return <ListingFormView id={mode.listing.id} initial={mode.listing} onDone={back} />;
 
+  const totalWaiting = Object.values(waiting).reduce((t, n) => t + n, 0);
   const shown = listings.filter((l) =>
     filter === "issues" ? daysUntil(l.licenseExpiry) <= 7 : filter === "nocard" ? !(l.latitude != null) || l.uploadedPhotos + l.photoUrls.length === 0 : true);
 
@@ -64,6 +69,11 @@ export default function ListingsPage() {
         </div>
       </div>
       {error && <p className="err">{error}</p>}
+      {totalWaiting > 0 && (
+        <div className="banner" role="status">
+          <span><b>{customersAr(totalWaiting)}</b> {totalWaiting === 1 ? "سأل" : "سألوا"} عن عقار مثل عقاراتك ولم {totalWaiting === 1 ? "يصله" : "يصلهم"} بعد. اضغط «يطابق» بجانب العقار لترسله لهم برسالة واحدة.</span>
+        </div>
+      )}
       <div className="tabs" role="tablist">
         {([["all", `الكل (${listings.length})`], ["issues", "تراخيص تحتاج تحديث"], ["nocard", "بلا موقع أو صور"]] as const).map(([k, label]) => (
           <button key={k} className="tab" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}>{label}</button>
@@ -78,7 +88,12 @@ export default function ListingsPage() {
             <tbody>
               {shown.map((l) => (
                 <tr key={l.id} style={{ opacity: l.status === "ACTIVE" ? 1 : 0.6 }}>
-                  <td><b>{l.title}</b><div className="small muted">{l.district} · {l.propertyType}{l.areaSqm ? ` · ${fmt(l.areaSqm)} م²` : ""}{l.vacant ? "" : " · مسكون"}</div></td>
+                  <td>
+                    <b>{l.title}</b><div className="small muted">{l.district} · {l.propertyType}{l.areaSqm ? ` · ${fmt(l.areaSqm)} م²` : ""}{l.vacant ? "" : " · مسكون"}</div>
+                    {l.status === "ACTIVE" && waiting[l.id] > 0 && (
+                      <Link href={`/listings/${l.id}/matches`} className="pill p-acc" style={{ marginTop: 4 }}>يطابق {customersAr(waiting[l.id])}</Link>
+                    )}
+                  </td>
                   <td>{l.purpose === "SALE" ? "بيع" : "إيجار"}</td>
                   <td>{fmt(l.price)}{l.purpose === "RENT" && <span className="small muted"> سنوياً</span>}</td>
                   <td><span className="mono">{l.adLicense}</span><br />{licensePill(l)}</td>

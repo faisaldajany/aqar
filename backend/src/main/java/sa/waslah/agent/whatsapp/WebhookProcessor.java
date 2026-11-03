@@ -114,6 +114,9 @@ public class WebhookProcessor {
         ConversationStore.ConversationRef conv = store.upsertConversation(officeId, contactId, accountId, at, true);
         Optional<UUID> messageId = store.insertMessage(officeId, conv.id(), m.path("id").asText(), "IN",
                 Sender.CUSTOMER, c.type(), c.body(), c.mediaId(), "received", Instant.now());
+        if (messageId.isPresent() && "text".equals(c.type()) && sa.waslah.agent.conversation.CustomerOutreach.isStop(c.body())) {
+            store.optOut(contactId);
+        }
         if (messageId.isEmpty() || !conv.agentActive(Instant.now())) {
             return Optional.empty();
         }

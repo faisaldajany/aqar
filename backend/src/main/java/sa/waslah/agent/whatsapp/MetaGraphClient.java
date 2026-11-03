@@ -94,12 +94,18 @@ public class MetaGraphClient {
      */
     public TemplateState createTemplate(String wabaId, String token, String name, String language, String body,
                                         List<String> example) {
+        return createTemplate(wabaId, token, name, language, body, example, "UTILITY");
+    }
+
+    /** @param category UTILITY or MARKETING */
+    public TemplateState createTemplate(String wabaId, String token, String name, String language, String body,
+                                        List<String> example, String category) {
         Map<String, Object> component = Map.of("type", "BODY", "text", body, "example", Map.of("body_text", List.of(example)));
         try {
             JsonNode res = http.post().uri("/{waba}/message_templates", wabaId)
                     .headers(h -> h.setBearerAuth(token))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("name", name, "language", language, "category", "UTILITY", "components", List.of(component)))
+                    .body(Map.of("name", name, "language", language, "category", category, "components", List.of(component)))
                     .retrieve().body(JsonNode.class);
             return new TemplateState(res == null ? null : res.path("id").asText(null), name,
                     res == null ? "PENDING" : res.path("status").asText("PENDING"), null);

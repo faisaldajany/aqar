@@ -1,12 +1,14 @@
 "use client";
 
-export type TemplateRow = { kind: "HANDOFF" | "REMINDER" | "FOLLOWUP" | "REPORT"; name: string; status: string; reason?: string | null; updatedAt: string };
+export type TemplateRow = { kind: "HANDOFF" | "REMINDER" | "FOLLOWUP" | "REPORT" | "NEW_LISTING" | "CHECKIN"; name: string; status: string; reason?: string | null; updatedAt: string };
 
 const KINDS: Record<TemplateRow["kind"], string> = {
   HANDOFF: "تنبيه المسوّق بعميل جديد",
   REMINDER: "تذكير العميل بموعد المعاينة",
   FOLLOWUP: "سؤال العميل بعد المعاينة",
   REPORT: "التقرير اليومي على جوالك",
+  NEW_LISTING: "عقار جديد يناسب طلب عميل سابق (تسويقي)",
+  CHECKIN: "متابعة عميل توقف عن الرد (تسويقي)",
 };
 
 const STATUS: Record<string, [string, string]> = {

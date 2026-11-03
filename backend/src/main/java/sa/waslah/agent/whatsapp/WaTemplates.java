@@ -45,16 +45,32 @@ public class WaTemplates {
         REPORT("hidaa_daily_report_v1",
                 "تقرير {{1}} ليوم {{2}} من حداء: استفسارات {{3}}، عملاء جادون {{4}}، مواعيد حُجزت {{5}}، مواعيد الغد {{6}}، "
                         + "تحويلات {{7}}، رسائل بعد الدوام {{8}}. التفاصيل في لوحة حداء.",
-                List.of("مكتب الأفق", "الأحد 2 نوفمبر", "14", "5", "3", "2", "1", "6"));
+                List.of("مكتب الأفق", "الأحد 2 نوفمبر", "14", "5", "3", "2", "1", "6")),
+        /** A new listing that fits what a past customer asked for. Marketing: Meta charges it as such. */
+        NEW_LISTING("hidaa_new_listing_v1",
+                "أهلاً {{1}}، وصلنا عقار قد يناسب طلبك: {{2}} في {{3}} بسعر {{4}}. رد على هذه الرسالة ونرسل لك التفاصيل "
+                        + "أو نحجز لك موعد معاينة. لإيقاف هذه الرسائل أرسل «إيقاف».",
+                List.of("أبو فهد", "فيلا درج داخلي", "النرجس", "1,900,000 ريال"), "MARKETING"),
+        /** A serious customer who stopped replying. */
+        CHECKIN("hidaa_checkin_v1",
+                "أهلاً {{1}}، ما زلت تبحث عن {{2}}؟ رد على هذه الرسالة ونرسل لك أحدث ما لدينا. لإيقاف هذه الرسائل أرسل «إيقاف».",
+                List.of("أبو فهد", "فيلا للشراء في النرجس"), "MARKETING");
 
         public final String templateName;
         public final String body;
         public final List<String> example;
+        /** UTILITY or MARKETING, as Meta classifies it. */
+        public final String category;
 
         Kind(String templateName, String body, List<String> example) {
+            this(templateName, body, example, "UTILITY");
+        }
+
+        Kind(String templateName, String body, List<String> example, String category) {
             this.templateName = templateName;
             this.body = body;
             this.example = example;
+            this.category = category;
         }
     }
 
@@ -91,7 +107,7 @@ public class WaTemplates {
             }
             try {
                 String token = accounts.credentials(acct).accessToken();
-                MetaGraphClient.TemplateState t = meta.createTemplate(acct.wabaId(), token, k.templateName, LANGUAGE, k.body, k.example);
+                MetaGraphClient.TemplateState t = meta.createTemplate(acct.wabaId(), token, k.templateName, LANGUAGE, k.body, k.example, k.category);
                 upsert(acct, k, t.status(), t.id(), t.rejectedReason());
             } catch (RuntimeException e) {
                 log.warn("Template {} not created for account {}: {}", k.templateName, acct.id(), e.getMessage());
@@ -167,6 +183,7 @@ public class WaTemplates {
             case REMINDER -> props.agent().reminderTemplate();
             case FOLLOWUP -> props.agent().followUpTemplate();
             case REPORT -> report.template();
+            case NEW_LISTING, CHECKIN -> null; // only the office's own approved templates
         };
         if (configured == null || configured.isBlank()) return Optional.empty();
         String lang = kind == Kind.REPORT ? report.templateLanguage() : props.agent().handoffTemplateLanguage();

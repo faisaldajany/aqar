@@ -21,6 +21,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
                 "waslah.booking.job-initial-delay-ms=86400000",
                 "waslah.rate-limits.enabled=false",
                 "waslah.admin-token=test-admin-token-0123456789",
+                // Production adds no VAT until Hidaa is registered; the tests keep the VAT path covered.
+                "waslah.billing.vat-percent=15",
                 // Tests sign up many accounts without reading their email; EmailVerificationTest turns this on.
                 "waslah.email-verification.required=false"
         })

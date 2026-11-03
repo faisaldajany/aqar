@@ -119,7 +119,9 @@ waslah:
     portal-base-url: ${PORTAL_BASE_URL:http://localhost:3000}
     # Public URL of this API for Moyasar's payment notification (blank = rely on the customer returning to the portal).
     api-base-url: ${API_BASE_URL:}
-    vat-percent: ${VAT_PERCENT:15}
+    # Hidaa is not VAT-registered yet, so no VAT is added. Set VAT_PERCENT=15 from the day the registration applies
+    # (with ZATCA e-invoicing, go-live §4), and change the "no VAT" wording on the home, terms and refund pages.
+    vat-percent: ${VAT_PERCENT:0}
     grace-days: ${BILLING_GRACE_DAYS:7}
   report:
     # Approved WhatsApp template for the daily manager report (feature 8), sent from the office's own number

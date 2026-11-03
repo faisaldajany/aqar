@@ -60,7 +60,10 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 - [ ] Plans (home page, Oct 2026): البداية 199 / الأساسي 499 / النمو 999 SAR a month for 100 / 500 / 2,000
       conversations; 0.50 SAR per extra conversation (البداية hands new conversations to the office instead).
-      The site says prices exclude VAT and the code adds `VAT_PERCENT=15`; set it to 0 if that changes.
+      Hidaa is not VAT-registered yet, so no VAT is added (`VAT_PERCENT` defaults to 0) and the home, terms
+      and refund pages say prices are final without VAT. Registration becomes mandatory once taxable sales pass
+      (or are expected to pass) SAR 375,000 in 12 months; voluntary from SAR 187,500. From the day it applies:
+      `VAT_PERCENT=15`, `SELLER_VAT_NUMBER`, those three pages' wording, and ZATCA e-invoicing (below).
 - [ ] Growth plan: more than one WhatsApp number per office is not built yet (the page shows 1).
 - [ ] VAT registration and **ZATCA e-invoicing (Fatoora)**. Today the portal shows invoice records,
       not ZATCA-compliant tax invoices (no QR/UUID/cryptographic stamp, not reported to ZATCA).

@@ -118,7 +118,7 @@ export default function OpsRevenuePage() {
               <td><span className="mono">{i.number}</span><br /><span className="small muted">{KIND[i.kind]}{i.provider === "MANUAL" ? " · دفعة يدوية" : ""}</span></td>
               <td><Link href={`/ops/offices/${i.officeId}`}>{i.office}</Link></td>
               <td className="small">{i.description}{i.discount > 0 && <><br /><span className="muted">خصم {sar(i.discount)}{i.promoCode ? ` (${i.promoCode})` : ""}</span></>}</td>
-              <td className="num">{sar(i.total)}<br /><span className="small muted">منها ضريبة {sar(i.vat)}</span></td>
+              <td className="num">{sar(i.total)}{i.vat > 0 && <><br /><span className="small muted">منها ضريبة {sar(i.vat)}</span></>}</td>
               <td>
                 <StatusPill s={i.status} />{i.test && <><br /><span className="pill p-acc">تجريبية</span></>}
                 {i.refunded > 0 && <><br /><span className="small muted">استُرد {sar(i.refunded)}{i.refundedAt ? ` في ${day(i.refundedAt)}` : ""}</span></>}

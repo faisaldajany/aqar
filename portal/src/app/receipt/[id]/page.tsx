@@ -104,8 +104,10 @@ export default function ReceiptPage() {
             {i.discountHalalas > 0 && <tr><td>خصم{i.promoCode ? ` (${i.promoCode})` : ""}</td><td className="num">− {money(i.discountHalalas)}</td></tr>}
           </tbody>
           <tfoot>
-            <tr><td>المبلغ قبل الضريبة</td><td className="num">{money(i.subtotalHalalas)}</td></tr>
-            <tr><td>ضريبة القيمة المضافة {r.vatPercent}٪</td><td className="num">{money(i.vatHalalas)}</td></tr>
+            {i.vatHalalas > 0 && <>
+              <tr><td>المبلغ قبل الضريبة</td><td className="num">{money(i.subtotalHalalas)}</td></tr>
+              <tr><td>ضريبة القيمة المضافة {Math.round((i.vatHalalas * 100) / Math.max(1, i.subtotalHalalas))}٪</td><td className="num">{money(i.vatHalalas)}</td></tr>
+            </>}
             <tr className="total"><td>{paid ? "المدفوع" : "الإجمالي المستحق"}</td><td className="num">{money(i.totalHalalas)}</td></tr>
             {i.refundedHalalas > 0 && <tr><td>المسترد</td><td className="num">− {money(i.refundedHalalas)}</td></tr>}
           </tfoot>

@@ -280,6 +280,18 @@ class BillingFlowTest extends IntegrationTest {
     }
 
     @Test
+    void anInvoiceMadeAtAnotherVatRateIsNotReused() {
+        BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        assertThat(TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY")).id()).isEqualTo(inv.id());
+        // As if made before the rate changed (e.g. 15% before registration was dropped).
+        TenantContext.run(office, () -> jdbc.sql("update invoices set vat_halalas = 0, total_halalas = subtotal_halalas where id = ?")
+                .param(inv.id()).update());
+        BillingService.Invoice fresh = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
+        assertThat(fresh.id()).isNotEqualTo(inv.id());
+        assertThat(fresh.vatHalalas()).isEqualTo(7_485);
+    }
+
+    @Test
     void oldPageIsReplacedEvenWithoutANotification() {
         BillingService.Invoice inv = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
         TenantContext.run(office, () -> jdbc.sql("update invoices set pay_url_expires_at = now() - interval '1 day' where id = ?")

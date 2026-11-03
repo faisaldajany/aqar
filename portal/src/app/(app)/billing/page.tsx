@@ -172,7 +172,7 @@ function BillingView() {
               <p>
                 {discounted != null && <><s className="muted">{fmt(price)}</s>{" "}</>}
                 <b style={{ fontSize: 28 }}>{fmt(discounted != null ? Number(discounted) : price)}</b> ريال {cycle === "ANNUAL" ? "سنوياً" : "شهرياً"}{" "}
-                <span className="small muted">+ ضريبة {b.vatPercent}٪</span>
+                {b.vatPercent > 0 && <span className="small muted">+ ضريبة {b.vatPercent}٪</span>}
               </p>
               {discounted != null && b.promo && <p className="small" style={{ margin: 0 }}>بعد خصم {b.promo.code}{b.promo.durationPeriods ? ` (لأول ${b.promo.durationPeriods === 1 ? "دفعة" : b.promo.durationPeriods + " دفعات"})` : ""}</p>}
               <ul className="small" style={{ margin: 0, paddingInlineStart: 18 }}>
@@ -196,7 +196,7 @@ function BillingView() {
         <h2>الفواتير</h2>
         {invoices.length === 0 ? <p className="small muted">لا فواتير بعد.</p> : (
           <div className="tbl"><table>
-            <thead><tr><th>الرقم</th><th>الوصف</th><th>المبلغ شامل الضريبة</th><th>الحالة</th><th /></tr></thead>
+            <thead><tr><th>الرقم</th><th>الوصف</th><th>{b.vatPercent > 0 ? "المبلغ شامل الضريبة" : "المبلغ"}</th><th>الحالة</th><th /></tr></thead>
             <tbody>
               {invoices.map((i) => (
                 <tr key={i.id}>

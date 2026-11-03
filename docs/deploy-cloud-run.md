@@ -86,7 +86,7 @@ gcloud run services update hidaa-api --region us-central1 \
   --update-secrets MOYASAR_SECRET_KEY=moyasar-secret-key:latest --update-env-vars BILLING_PROVIDER=moyasar
 ```
 
-WhatsApp templates need no settings: Hidaa creates its four templates on each office's own WhatsApp account
+WhatsApp templates need no settings: Hidaa creates its templates on each office's own WhatsApp account
 when the office connects, and tracks Meta's review (WhatsApp page and /ops). The old `AGENT_*_TEMPLATE` and
 `REPORT_TEMPLATE` variables still work as a fallback for Hidaa's own number.
 

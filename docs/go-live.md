@@ -19,7 +19,7 @@ Owner: Faisal. Details and API points to verify: [meta-integration.md](meta-inte
       `smb_message_echoes`, `smb_app_state_sync`, `history`, `account_update`.
 - [ ] Run one real office number end-to-end on staging (`WA_MODE=cloud`) and tick the 7 "confirm" items in meta-integration.md.
 - [x] **Message templates**: created automatically on each office's own WhatsApp account when it connects
-      (built; see meta-integration.md → Message templates). To do: watch the first office's four templates reach
+      (built; see meta-integration.md → Message templates). To do: watch the first office's templates reach
       **معتمد** on its WhatsApp page or in /ops, and adjust the wording if Meta rejects one.
 
 Note: a booking confirmation (including an approved self-visit) sent after the 24-hour window falls back

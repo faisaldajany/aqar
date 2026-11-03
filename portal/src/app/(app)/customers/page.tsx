@@ -177,7 +177,53 @@ function Customers() {
       {data && data.total > data.customers.length && (
         <p className="small muted">يظهر أول {data.customers.length} من {data.total}. ضيّق البحث، أو نزّل الملف لترى الكل.</p>
       )}
+      <FollowUps />
     </>
+  );
+}
+
+type FollowUpState = { days: number | null; sentLast30Days: number; templateStatus: string | null };
+
+/** The automatic check-in with serious customers who stopped replying. */
+function FollowUps() {
+  const [s, setS] = useState<FollowUpState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { api<FollowUpState>("/customers/followups").then(setS).catch(() => undefined); }, []);
+  if (!s) return null;
+
+  async function change(v: string) {
+    setBusy(true);
+    setError("");
+    try {
+      setS(await api<FollowUpState>("/customers/followups", { method: "PUT", json: { days: v ? Number(v) : null } }));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "تعذّر الحفظ.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card" aria-labelledby="fu-h" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="followups">
+        <div>
+          <h2 id="fu-h">المتابعة التلقائية</h2>
+          <p className="small muted" style={{ margin: 0 }}>
+            رسالة واحدة للعميل الجاد أو المهتم إذا توقف عن الرد: «ما زلت تبحث عن …؟». بين 10 صباحاً و8 مساءً، ولا تُرسل إذا تولّى أحد المحادثة أو عنده موعد قادم.
+          </p>
+        </div>
+        <select aria-label="المتابعة التلقائية" value={s.days ?? ""} disabled={busy} onChange={(e) => void change(e.target.value)}>
+          <option value="">متوقفة</option>
+          {[2, 3, 5, 7, 14].map((d) => <option key={d} value={d}>بعد {d === 2 ? "يومين" : d <= 10 ? `${d} أيام` : `${d} يوماً`} من التوقف</option>)}
+        </select>
+      </div>
+      {s.days != null && s.templateStatus !== "APPROVED" && (
+        <p className="small" role="status">تبدأ الرسائل بعد أن تعتمد Meta قالب «المتابعة» على رقمكم{s.templateStatus === "REJECTED" ? " (رُفض: راجع صفحة ربط واتساب)" : " (عادة خلال دقائق إلى ساعات)"}.</p>
+      )}
+      {s.sentLast30Days > 0 && <p className="small muted">أُرسلت {s.sentLast30Days} متابعة في آخر 30 يوماً.</p>}
+      {error && <p className="err" role="alert">{error}</p>}
+    </section>
   );
 }
 

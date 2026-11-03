@@ -35,8 +35,8 @@
 ## Message templates (per office)
 
 With coexistence each office brings its own WhatsApp Business account, and a template approved on one account
-cannot be sent from another. So after Embedded Signup, Hidaa calls `POST /{waba-id}/message_templates` four times
-(category `UTILITY`, language `ar`) with the office's token:
+cannot be sent from another. So after Embedded Signup, Hidaa calls `POST /{waba-id}/message_templates` once per
+template (language `ar`) with the office's token:
 
 | Kind | Name | Parameters |
 |---|---|---|
@@ -44,6 +44,12 @@ cannot be sent from another. So after Embedded Signup, Hidaa calls `POST /{waba-
 | Viewing reminder / confirmation outside the window | `hidaa_reminder_v1` | customer, listing, day and time |
 | Post-visit follow-up | `hidaa_followup_v1` | customer, listing |
 | Daily report to the owner | `hidaa_daily_report_v1` | office, date, 6 numbers |
+| New listing for a past customer it fits (`MARKETING`) | `hidaa_new_listing_v1` | customer, listing, district, price |
+| Check-in with a serious customer who went quiet (`MARKETING`) | `hidaa_checkin_v1` | customer, what they want |
+
+The first four are `UTILITY`. The two `MARKETING` ones are sent only when the office chooses (العقارات → «يطابق»,
+and العملاء → المتابعة التلقائية), are charged by Meta as marketing on the office's account, and stop for a customer
+who replies «إيقاف».
 
 Wording lives in `WaTemplates.Kind`. Meta usually reviews in minutes. Status is refreshed every 3 hours
 (job `templates`), before a send when it is older than 10 minutes, and from the WhatsApp page or /ops ("تحديث").

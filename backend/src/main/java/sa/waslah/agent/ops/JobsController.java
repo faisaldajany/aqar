@@ -36,11 +36,14 @@ public class JobsController {
     private final PrivacyService privacy;
     private final SupportService support;
     private final WaTemplates templates;
+    private final sa.waslah.agent.conversation.CustomerOutreach outreach;
     private final String token;
 
     public JobsController(BookingJobs bookings, LicenseGuardJob licenses, BillingJobs billing, DailyReport reports,
                           PrivacyService privacy, SupportService support, WaTemplates templates,
+                          sa.waslah.agent.conversation.CustomerOutreach outreach,
                           @Value("${waslah.jobs.token:}") String token) {
+        this.outreach = outreach;
         this.templates = templates;
         this.bookings = bookings;
         this.licenses = licenses;
@@ -60,7 +63,10 @@ public class JobsController {
         long start = System.currentTimeMillis();
         switch (name) {
             case "bookings" -> bookings.tick();          // every 5 minutes: reminders and follow-ups
-            case "daily-report" -> reports.hourly();     // hourly: each office's report at its chosen hour
+            case "daily-report" -> {                     // hourly: each office's report at its chosen hour,
+                reports.hourly();                        // and check-ins with quiet customers (daytime only)
+                outreach.hourly();
+            }
             case "license-guard" -> licenses.daily();    // 06:00 Riyadh
             case "billing" -> billing.daily();           // 07:00 Riyadh
             case "retention" -> privacy.retention();     // 03:30 Riyadh

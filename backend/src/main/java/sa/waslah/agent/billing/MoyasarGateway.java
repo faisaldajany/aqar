@@ -18,12 +18,23 @@ import org.springframework.web.client.RestClient;
 public class MoyasarGateway implements PaymentGateway {
 
     private final RestClient http;
+    private final String name;
 
     public MoyasarGateway(String secretKey) {
-        this(secretKey, "https://api.moyasar.com/v1");
+        this(secretKey, "https://api.moyasar.com/v1", "moyasar");
+    }
+
+    /** The same gateway with a test key, recorded on invoices under its own name so they are checked with that key. */
+    public static MoyasarGateway testMode(String testSecretKey) {
+        return new MoyasarGateway(testSecretKey, "https://api.moyasar.com/v1", PaymentGateways.TEST);
     }
 
     MoyasarGateway(String secretKey, String baseUrl) {
+        this(secretKey, baseUrl, "moyasar");
+    }
+
+    MoyasarGateway(String secretKey, String baseUrl, String name) {
+        this.name = name;
         if (secretKey == null || secretKey.isBlank()) {
             throw new IllegalStateException("waslah.billing.moyasar-secret-key is required when provider=moyasar");
         }
@@ -37,7 +48,7 @@ public class MoyasarGateway implements PaymentGateway {
 
     @Override
     public String name() {
-        return "moyasar";
+        return name;
     }
 
     @Override

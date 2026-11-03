@@ -68,7 +68,7 @@ export default function OpsOffices() {
             const [falLabel, falCls] = FAL_LABELS[o.falStatus];
             return (
               <tr key={o.id}>
-                <td><Link href={`/ops/offices/${o.id}`}><b>{o.name}</b></Link><br /><span className="small muted" dir="ltr">{o.ownerEmail}</span></td>
+                <td><Link href={`/ops/offices/${o.id}`}><b>{o.name}</b></Link>{o.paymentMode === "TEST" && <> <span className="pill p-acc">داخلي</span></>}<br /><span className="small muted" dir="ltr">{o.ownerEmail}</span></td>
                 <td>{o.suspended ? <span className="pill p-bad">موقوف</span> : <span className={`pill ${cls}`}>{label}</span>}
                   {o.subscription === "TRIAL" && <><br /><span className="small muted">حتى {day(o.trialEndsAt)}</span></>}
                   {o.paidUntil && o.subscription !== "TRIAL" && <><br /><span className="small muted">حتى {day(o.paidUntil)}</span></>}

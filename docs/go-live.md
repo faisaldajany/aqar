@@ -42,7 +42,9 @@ A self-visit rejection is free text only, so it reaches the customer only inside
       the invoice turns **مدفوعة** and the subscription **فعّال**. The code calls `POST /v1/invoices`
       (`amount`, `currency`, `description`, `success_url`, `back_url`, `callback_url`, `expired_at`,
       `metadata`) and reads `id`, `url`, `status` — confirm these names against Moyasar's API reference.
-- [ ] Switch to `sk_live_…`.
+- [ ] Switch to `sk_live_…` in `MOYASAR_SECRET_KEY`, and keep the test key in `MOYASAR_TEST_SECRET_KEY`: the team's own
+      offices (owner email on hidaaco.com, confirmed from the emailed link) keep paying with test cards; every other
+      office pays for real.
 - [ ] Renewal is a new hosted invoice each period (no stored cards). Saved-card auto-charge is a later
       improvement (Moyasar tokenization).
 

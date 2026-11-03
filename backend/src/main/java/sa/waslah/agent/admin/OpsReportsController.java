@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.billing.BillingService;
+import sa.waslah.agent.billing.PaymentGateways;
 import sa.waslah.agent.billing.PlanLimits;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.common.ClientIp;
@@ -42,11 +43,13 @@ public class OpsReportsController {
     public record ManualPayment(UUID officeId, String note) {
     }
 
-    record Office(UUID id, String name, String status, PlanLimits.Plan plan, String cycle, boolean suspended, Instant createdAt) {
+    /** {@code internal}: a Hidaa team account (confirmed company email, pays in test mode); left out of revenue and the funnel. */
+    record Office(UUID id, String name, String status, PlanLimits.Plan plan, String cycle, boolean suspended, Instant createdAt,
+                  boolean internal) {
 
-        /** What the office pays per month on its plan now: 0 unless subscribed (annual counts as a twelfth). */
+        /** What the office pays per month on its plan now: 0 unless subscribed (annual counts as a twelfth), or internal. */
         BigDecimal monthlyRevenue() {
-            if (suspended || !("ACTIVE".equals(status) || "PAST_DUE".equals(status))) return BigDecimal.ZERO;
+            if (internal || suspended || !("ACTIVE".equals(status) || "PAST_DUE".equals(status))) return BigDecimal.ZERO;
             return "ANNUAL".equals(cycle) ? plan.annualSar.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP) : plan.monthlySar;
         }
     }
@@ -54,17 +57,19 @@ public class OpsReportsController {
     private final JdbcClient jdbc;
     private final OpsAuth ops;
     private final BillingService billing;
+    private final PaymentGateways gateways;
     private final BigDecimal inputUsdPerMillion;
     private final BigDecimal outputUsdPerMillion;
     private final BigDecimal usdToSar;
 
-    public OpsReportsController(JdbcClient jdbc, OpsAuth ops, BillingService billing,
+    public OpsReportsController(JdbcClient jdbc, OpsAuth ops, BillingService billing, PaymentGateways gateways,
                                 @Value("${waslah.ops.llm-input-usd-per-million:0.10}") BigDecimal inputUsdPerMillion,
                                 @Value("${waslah.ops.llm-output-usd-per-million:0.40}") BigDecimal outputUsdPerMillion,
                                 @Value("${waslah.ops.usd-to-sar:3.75}") BigDecimal usdToSar) {
         this.jdbc = jdbc;
         this.ops = ops;
         this.billing = billing;
+        this.gateways = gateways;
         this.inputUsdPerMillion = inputUsdPerMillion;
         this.outputUsdPerMillion = outputUsdPerMillion;
         this.usdToSar = usdToSar;
@@ -114,9 +119,12 @@ public class OpsReportsController {
                         m.put("paidAt", iso(rs.getTimestamp(13)));
                         m.put("discount", sar(rs.getLong(14)));
                         m.put("promoCode", rs.getString(15));
+                        // Paid with Moyasar test cards (an internal office): shown, never counted as revenue.
+                        m.put("test", PaymentGateways.TEST.equals(rs.getString(11)) || o.internal());
                         return m;
                     }).list());
             for (Map<String, Object> r : rows) {
+                if (Boolean.TRUE.equals(r.get("test"))) continue;
                 if ("DUE".equals(r.get("status"))) {
                     unpaid = unpaid.add((BigDecimal) r.get("total"));
                     unpaidCount++;
@@ -269,7 +277,7 @@ public class OpsReportsController {
         int signedUp = 0, whatsapp = 0, listings = 0, conversation = 0, paid = 0;
         List<Map<String, Object>> stuck = new ArrayList<>();
         for (Office o : offices()) {
-            if (o.createdAt().isBefore(since)) continue;
+            if (o.createdAt().isBefore(since) || o.internal()) continue;
             signedUp++;
             boolean[] s = TenantContext.call(o.id(), () -> new boolean[]{
                     exists("select 1 from wa_accounts where verified_name is distinct from 'مكتب تجريبي'"),
@@ -315,7 +323,8 @@ public class OpsReportsController {
             TenantContext.call(id, () -> jdbc.sql("""
                             select name, subscription_status, plan, billing_cycle, suspended_at, created_at from offices""")
                     .query((rs, n) -> new Office(id, rs.getString(1), rs.getString(2), PlanLimits.Plan.valueOf(rs.getString(3)),
-                            rs.getString(4), rs.getTimestamp(5) != null, rs.getTimestamp(6).toInstant()))
+                            rs.getString(4), rs.getTimestamp(5) != null, rs.getTimestamp(6).toInstant(),
+                            gateways.mode(id) == PaymentGateways.Mode.TEST))
                     .optional()).ifPresent(out::add);
         }
         return out;

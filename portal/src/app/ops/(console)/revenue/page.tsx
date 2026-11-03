@@ -112,7 +112,7 @@ export default function OpsRevenuePage() {
               <td><Link href={`/ops/offices/${i.officeId}`}>{i.office}</Link></td>
               <td className="small">{i.description}{i.discount > 0 && <><br /><span className="muted">خصم {sar(i.discount)}{i.promoCode ? ` (${i.promoCode})` : ""}</span></>}</td>
               <td className="num">{sar(i.total)}<br /><span className="small muted">منها ضريبة {sar(i.vat)}</span></td>
-              <td><StatusPill s={i.status} /></td>
+              <td><StatusPill s={i.status} />{i.test && <><br /><span className="pill p-acc">تجريبية</span></>}</td>
               <td className="small">{day(i.createdAt)}{i.paidAt && <><br /><span className="muted">دُفعت {day(i.paidAt)}</span></>}</td>
               <td>
                 {i.status !== "PAID" && i.kind !== "COMP" && (paying === i.id ? (
@@ -131,6 +131,7 @@ export default function OpsRevenuePage() {
           ))}
         </tbody>
       </table></div>
+      <p className="small muted">الفواتير «التجريبية» لحسابات فريق حداء الداخلية (بريد مؤكد على نطاق hidaaco.com): تُدفع ببطاقات اختبار Moyasar ولا تدخل في الإيرادات.</p>
       <p className="small muted">«تسجيل دفعة» لما يُدفع خارج صفحة الدفع (تحويل بنكي): تصبح الفاتورة مدفوعة ويُفعّل الاشتراك كأنه دُفع إلكترونياً، ويُحفظ المرجع في سجل العمليات.</p>
     </>
   );

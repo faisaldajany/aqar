@@ -9,6 +9,8 @@ export type OpsOffice = {
   trialEndsAt: string; paidUntil: string | null; createdAt: string; suspended: boolean; suspendedReason: string | null;
   ownerPhone: string | null; whatsappConnected: boolean; listings: number; promoCode: string | null;
   users: number; lastLoginAt: string | null; ownerEmail: string | null; conversationsThisMonth: number;
+  /** TEST = internal Hidaa team office (confirmed company email): pays with Moyasar test cards, not counted as revenue. */
+  paymentMode?: "LIVE" | "TEST" | "INTERNAL_UNCONFIRMED";
 };
 
 export type OpsUser = {
@@ -45,6 +47,8 @@ export type OpsInvoice = {
   id: string; officeId: string; office: string; number: string; kind: "SUBSCRIPTION" | "OVERAGE" | "SETUP" | "COMP";
   plan: string | null; cycle: string | null; description: string; subtotal: number; vat: number; total: number;
   status: "DUE" | "PAID" | "VOID"; provider: string | null; createdAt: string; paidAt: string | null; discount: number; promoCode: string | null;
+  /** Paid with Moyasar test cards (internal office): shown, not counted. */
+  test: boolean;
 };
 
 export type OpsRevenue = {

@@ -16,6 +16,17 @@ function BillingView() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirmMsg, setConfirmMsg] = useState("");
+
+  async function resendConfirmation() {
+    setConfirmMsg("");
+    try {
+      const r = await api<{ sent: boolean }>("/billing/confirm-email", { method: "POST" });
+      setConfirmMsg(r.sent ? "أرسلنا رابط التأكيد إلى بريدك." : "البريد مؤكد من قبل، أو ليس على نطاق حداء.");
+    } catch (e) {
+      setConfirmMsg(e instanceof ApiError ? e.message : "تعذّر الإرسال. حاول لاحقاً.");
+    }
+  }
 
   const load = useCallback(async () => {
     const [x, inv] = await Promise.all([api<Billing>("/billing"), api<Invoice[]>("/billing/invoices")]);
@@ -86,6 +97,18 @@ function BillingView() {
         </p>
         {b.suspended && <p className="err" role="alert">حساب المكتب موقوف من فريق حداء والوكيل لا يرد. تواصل معنا على support@hidaaco.com.</p>}
       </div>
+
+      {b.paymentMode === "TEST" && (
+        <div className="banner" role="status">
+          <span><b>حساب داخلي لفريق حداء:</b> الدفع هنا تجريبي عبر Moyasar ببطاقات الاختبار (مثل 4111 1111 1111 1111)، ولا يُخصم أي مبلغ.</span>
+        </div>
+      )}
+      {b.paymentMode === "INTERNAL_UNCONFIRMED" && (
+        <div className="banner" role="status">
+          <span>بريدك على نطاق حداء. أكّده من الرابط الذي أرسلناه ليصبح الدفع تجريبياً؛ قبل ذلك يكون الدفع حقيقياً.{confirmMsg && ` ${confirmMsg}`}</span>
+          <button type="button" className="btn" onClick={() => void resendConfirmation()}>أرسل رابط التأكيد</button>
+        </div>
+      )}
 
       <div className="card">
         {b.promo ? (

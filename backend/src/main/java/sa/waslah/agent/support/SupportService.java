@@ -183,13 +183,6 @@ public class SupportService {
     }
 
     private static String ipHash(HttpServletRequest r) {
-        String fwd = r.getHeader("X-Forwarded-For");
-        String ip = fwd != null && !fwd.isBlank() ? fwd.split(",")[0].trim() : r.getRemoteAddr();
-        try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(("hidaa-support|" + ip).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(d, 0, 12);
-        } catch (Exception e) {
-            return "unknown";
-        }
+        return sa.waslah.agent.common.ClientIp.hash(r, "hidaa-support");
     }
 }

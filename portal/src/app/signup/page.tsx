@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
 export default function SignupPage() {
+  return <Suspense fallback={null}><SignupForm /></Suspense>;
+}
+
+function SignupForm() {
   const router = useRouter();
+  const promo = useSearchParams().get("promo") ?? "";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -25,6 +30,7 @@ export default function SignupPage() {
           fullName: f.get("fullName"),
           email: f.get("email"),
           password: f.get("password"),
+          promoCode: String(f.get("promoCode") ?? "").trim() || null,
         },
       });
       router.replace("/whatsapp");
@@ -55,6 +61,9 @@ export default function SignupPage() {
         </label>
         <label className="f" htmlFor="password">كلمة المرور <span className="small muted">8 أحرف على الأقل</span>
           <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} />
+        </label>
+        <label className="f" htmlFor="promoCode">كود الخصم <span className="small muted">اختياري</span>
+          <input id="promoCode" name="promoCode" type="text" dir="ltr" maxLength={40} autoComplete="off" defaultValue={promo} />
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         <button className="btn primary" disabled={busy}>{busy ? "جارٍ الإنشاء…" : "أنشئ الحساب"}</button>

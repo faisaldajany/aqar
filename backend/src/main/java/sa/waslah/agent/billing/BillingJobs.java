@@ -64,16 +64,21 @@ public class BillingJobs {
             }
             case "ACTIVE" -> {
                 if (s.paidUntil() != null && !s.paidUntil().isAfter(now)) {
-                    subscription.setStatus("PAST_DUE");
-                    String url = renewalUrl(office, s);
-                    alerts.raise(office, "RENEWAL_DUE", null,
-                            "حان تجديد الاشتراك. لديكم " + props.graceDays() + " أيام قبل توقف الوكيل."
-                                    + (url == null ? "" : " ادفع من صفحة الاشتراك."),
-                            "renewal-" + s.paidUntil());
+                    BillingService.Invoice renewal = renewal(office, s);
+                    // A 100% promo period renews by itself: nothing to pay, nothing overdue.
+                    if (renewal == null || !"PAID".equals(renewal.status())) {
+                        subscription.setStatus("PAST_DUE");
+                        alerts.raise(office, "RENEWAL_DUE", null,
+                                "حان تجديد الاشتراك. لديكم " + props.graceDays() + " أيام قبل توقف الوكيل."
+                                        + (renewal == null ? "" : " ادفع من صفحة الاشتراك."),
+                                "renewal-" + s.paidUntil());
+                    }
                 } else if (s.paidUntil() != null && Duration.between(now, s.paidUntil()).toDays() < 3) {
-                    renewalUrl(office, s);
-                    alerts.raise(office, "RENEWAL_SOON", null, "يتجدد الاشتراك خلال أيام. فاتورة التجديد في صفحة الاشتراك.",
-                            "renewal-soon-" + s.paidUntil());
+                    BillingService.Invoice renewal = renewal(office, s);
+                    if (renewal == null || !"PAID".equals(renewal.status())) {
+                        alerts.raise(office, "RENEWAL_SOON", null, "يتجدد الاشتراك خلال أيام. فاتورة التجديد في صفحة الاشتراك.",
+                                "renewal-soon-" + s.paidUntil());
+                    }
                 }
             }
             case "PAST_DUE" -> {
@@ -92,9 +97,9 @@ public class BillingJobs {
         }
     }
 
-    private String renewalUrl(UUID office, Subscription.State s) {
+    private BillingService.Invoice renewal(UUID office, Subscription.State s) {
         try {
-            return billing.checkout(office, s.plan(), s.cycle()).payUrl();
+            return billing.checkout(office, s.plan(), s.cycle());
         } catch (RuntimeException e) {
             log.warn("Renewal invoice for office {} not created: {}", office, e.getMessage());
             return null;

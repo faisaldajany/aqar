@@ -1,6 +1,7 @@
 package sa.waslah.agent.billing;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -10,12 +11,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.tenant.TenantContext;
 
 @RestController
@@ -26,15 +29,22 @@ public class BillingController {
     public record CheckoutRequest(String plan, String cycle) {
     }
 
+    public record PromoRequest(String code) {
+    }
+
     private final BillingService billing;
     private final Subscription subscription;
     private final PlanLimits plans;
     private final BillingProperties props;
     private final sa.waslah.agent.config.WaslahProperties app;
+    private final PromoService promos;
+    private final RateLimiter limits;
 
     public BillingController(BillingService billing, Subscription subscription, PlanLimits plans, BillingProperties props,
-                             sa.waslah.agent.config.WaslahProperties app) {
+                             sa.waslah.agent.config.WaslahProperties app, PromoService promos, RateLimiter limits) {
+        this.limits = limits;
         this.app = app;
+        this.promos = promos;
         this.billing = billing;
         this.subscription = subscription;
         this.plans = plans;
@@ -56,6 +66,24 @@ public class BillingController {
         out.put("vatPercent", props.vatPercent());
         out.put("provider", props.moyasar() ? "moyasar" : "mock");
         out.put("mockPayments", !props.moyasar() && app.devToolsEnabled());
+        out.put("suspended", s.suspendedAt() != null);
+        Optional<PromoService.Applied> promo = promos.current();
+        if (promo.isPresent()) {
+            PromoService.Applied a = promo.get();
+            Map<String, Object> pm = new LinkedHashMap<>();
+            pm.put("code", a.promo().code());
+            pm.put("kind", a.promo().kind());
+            pm.put("summary", a.promo().summary());
+            pm.put("percentOff", a.promo().percentOff());
+            pm.put("amountOffSar", a.promo().amountOffHalalas() == null ? null : BillingService.sar(a.promo().amountOffHalalas()));
+            pm.put("durationPeriods", a.promo().durationPeriods());
+            pm.put("periodsUsed", a.periodsUsed());
+            pm.put("remainingPeriods", a.remainingPeriods());
+            pm.put("usedUp", a.usedUp());
+            out.put("promo", pm);
+        } else {
+            out.put("promo", null);
+        }
         List<Map<String, Object>> list = new ArrayList<>();
         for (PlanLimits.Plan p : PlanLimits.Plan.values()) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -67,10 +95,36 @@ public class BillingController {
             m.put("marketers", p.marketers);
             m.put("whatsappNumbers", p.whatsappNumbers);
             m.put("overageSar", p.overagePerConversationSar);
+            // Prices after the office's discount, when it applies to this plan and cycle; null otherwise.
+            m.put("discountedMonthlySar", discounted(promo, p, "MONTHLY", p.monthlySar));
+            m.put("discountedAnnualSar", discounted(promo, p, "ANNUAL", p.annualSar));
             list.add(m);
         }
         out.put("plans", list);
         return out;
+    }
+
+    /** 10 tries an hour per office, so codes cannot be guessed by trying many. */
+    @PostMapping("/api/billing/promo")
+    Map<String, Object> applyPromo(@RequestBody PromoRequest r) {
+        limits.check("promo:" + TenantContext.require(), 10, Duration.ofHours(1));
+        PromoService.Promo p = promos.apply(r == null ? null : r.code());
+        Map<String, Object> out = state();
+        out.put("applied", p.summary());
+        return out;
+    }
+
+    @DeleteMapping("/api/billing/promo")
+    Map<String, Object> removePromo() {
+        promos.remove();
+        return state();
+    }
+
+    private String discounted(Optional<PromoService.Applied> promo, PlanLimits.Plan plan, String cycle, java.math.BigDecimal price) {
+        if (promo.isEmpty()) return null;
+        long gross = BillingService.halalas(price);
+        long off = promos.discountHalalas(promo.get(), plan, cycle, gross);
+        return off == 0 ? null : BillingService.sar(gross - off);
     }
 
     @PostMapping("/api/billing/checkout")

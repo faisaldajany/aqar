@@ -18,6 +18,7 @@ import sa.waslah.agent.tenant.TenantFilter;
 public class SessionTokens {
 
     static final Duration TTL = Duration.ofHours(12);
+    static final String ISSUED_MS = "iat_ms";
 
     private final JwtEncoder encoder;
     private final WaslahProperties props;
@@ -36,6 +37,8 @@ public class SessionTokens {
                 .expiresAt(now.plus(TTL))
                 .claim(TenantFilter.OFFICE_CLAIM, officeId.toString())
                 .claim("role", role)
+                // "iat" is whole seconds; the exact time lets SessionGuard tell a session from a password change.
+                .claim(ISSUED_MS, now.toEpochMilli())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

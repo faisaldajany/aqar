@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "../session";
+import { TemplateStatus, type TemplateRow } from "@/components/TemplateStatus";
 
 type Config = { mode: "mock" | "cloud"; appId: string; configId: string; graphVersion: string };
 
@@ -28,6 +29,23 @@ export default function WhatsAppPage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    if (me.whatsapp.connected) api<TemplateRow[]>("/whatsapp/templates").then(setTemplates).catch(() => undefined);
+  }, [me.whatsapp.connected]);
+
+  async function syncTemplates() {
+    setSyncing(true);
+    try {
+      setTemplates(await api<TemplateRow[]>("/whatsapp/templates/sync", { method: "POST" }));
+    } catch {
+      // the list stays as it was
+    } finally {
+      setSyncing(false);
+    }
+  }
   const info = useRef<SignupInfo>({ coexistence: true });
 
   useEffect(() => {
@@ -101,11 +119,14 @@ export default function WhatsAppPage() {
 
   if (me.whatsapp.connected) {
     return (
-      <div className="card">
-        <h1>رقم واتساب مربوط</h1>
-        <p><span className="mono">{me.whatsapp.displayPhone}</span> · {me.whatsapp.verifiedName}</p>
-        <p className="small muted">يبقى المسوّقون يردون من تطبيق واتساب للأعمال، ويتوقف الوكيل في أي محادثة يرد فيها أحدهم.</p>
-      </div>
+      <>
+        <div className="card">
+          <h1>رقم واتساب مربوط</h1>
+          <p><span className="mono">{me.whatsapp.displayPhone}</span> · {me.whatsapp.verifiedName}</p>
+          <p className="small muted">يبقى المسوّقون يردون من تطبيق واتساب للأعمال، ويتوقف الوكيل في أي محادثة يرد فيها أحدهم.</p>
+        </div>
+        <TemplateStatus rows={templates} busy={syncing} onSync={syncTemplates} />
+      </>
     );
   }
 

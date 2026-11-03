@@ -49,14 +49,16 @@ public class BookingJobs {
         }
     }
 
-    /** Must run under the office's tenant. */
+    /** Must run under the office's tenant. A suspended office sends nothing to its customers. */
     public void runFor(UUID office, Instant now) {
+        boolean suspended = jdbc.sql("select suspended_at is not null from offices").query(Boolean.class).optional().orElse(false);
+        if (suspended) return;
         LocalDate today = LocalDate.now(SlotEngine.RIYADH);
         for (BookingStore.Booking b : bookings.dueReminders(now)) {
             String when = SlotEngine.dayLabel(b.startsAt(), today) + " الساعة " + SlotEngine.time(b.startsAt().atZone(SlotEngine.RIYADH).toLocalTime());
             String text = "تذكير: موعد " + ("SELF_VISIT".equals(b.mode()) ? "زيارتك الذاتية" : "معاينتك") + " لـ" + b.listingTitle()
                     + " في " + b.listingDistrict() + " " + when + ". لو احتجت تغيّر الموعد رد على هذه الرسالة.";
-            boolean sent = service.sendToCustomer(b.conversationId(), text, props.agent().reminderTemplate(),
+            boolean sent = service.sendToCustomer(b.conversationId(), text, sa.waslah.agent.whatsapp.WaTemplates.Kind.REMINDER,
                     List.of(name(b), b.listingTitle(), when));
             bookings.markReminded(b.id());
             if (!sent) {
@@ -67,7 +69,8 @@ public class BookingJobs {
         for (BookingStore.Booking b : bookings.dueFollowUps(now)) {
             String text = "هلا " + name(b) + "، كيف كانت زيارتك لـ" + b.listingTitle()
                     + "؟ إذا أعجبك أحوّلك للمسوّق يكمل معك، وإذا تبي أقترح عليك عقارات ثانية قريبة منه.";
-            service.sendToCustomer(b.conversationId(), text, props.agent().followUpTemplate(), List.of(name(b), b.listingTitle()));
+            service.sendToCustomer(b.conversationId(), text, sa.waslah.agent.whatsapp.WaTemplates.Kind.FOLLOWUP,
+                    List.of(name(b), b.listingTitle()));
             bookings.markFollowedUp(b.id());
         }
     }

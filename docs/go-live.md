@@ -16,17 +16,11 @@ Owner: Faisal. Details and API points to verify: [meta-integration.md](meta-inte
       and `whatsapp_business_messaging`.
 - [ ] Embedded Signup configuration with **WhatsApp Business app onboarding (coexistence)** → `META_CONFIG_ID`.
 - [ ] Webhook: `https://app.hidaaco.com/webhooks/whatsapp`, verify token `WA_VERIFY_TOKEN`, fields `messages`,
-      `smb_message_echoes`, `smb_app_state_sync`.
+      `smb_message_echoes`, `smb_app_state_sync`, `history`, `account_update`.
 - [ ] Run one real office number end-to-end on staging (`WA_MODE=cloud`) and tick the 7 "confirm" items in meta-integration.md.
-- [ ] **Message templates** (category Utility, language `ar`). Until approved, the matching message is
-      kept in the portal and the office is alerted instead. Parameters must be in this order:
-
-| Env var | Sent to | Suggested body | Params |
-|---|---|---|---|
-| `AGENT_HANDOFF_TEMPLATE` | marketer | عميل جديد يحتاجك: {{1}} — {{2}} افتح المحادثة في واتساب المكتب. | customer, 3-line summary |
-| `AGENT_REMINDER_TEMPLATE` | customer | أهلاً {{1}}، تذكير بموعد معاينة {{2}} {{3}}. للتغيير رد على هذه الرسالة. | name, listing, day+time |
-| `AGENT_FOLLOWUP_TEMPLATE` | customer | أهلاً {{1}}، كيف كانت زيارتك لـ{{2}}؟ يسعدنا نساعدك في الخطوة الجاية. | name, listing |
-| `REPORT_TEMPLATE` | office owner | تقرير {{1}} ليوم {{2}}: استفسارات {{3}}، عملاء جادون {{4}}، مواعيد حُجزت {{5}}، مواعيد الغد {{6}}، تحويلات {{7}}، رسائل بعد الدوام {{8}}. | office, date, 6 numbers |
+- [x] **Message templates**: created automatically on each office's own WhatsApp account when it connects
+      (built; see meta-integration.md → Message templates). To do: watch the first office's four templates reach
+      **معتمد** on its WhatsApp page or in /ops, and adjust the wording if Meta rejects one.
 
 Note: a booking confirmation (including an approved self-visit) sent after the 24-hour window falls back
 to the reminder template; if that is not approved yet, the office gets a "confirmation not sent" alert.
@@ -65,15 +59,17 @@ A self-visit rejection is free text only, so it reaches the customer only inside
 
 ## 5. Hosting in Saudi Arabia — [blocker]
 
-Chosen: Google Cloud, Dammam (`me-central2`), Cloud Run with scale to zero. Step by step: [deploy-cloud-run.md](deploy-cloud-run.md).
+Live: Google Cloud `us-central1` (Dammam needs CNTXT), Cloud Run with scale to zero, IPv4 + IPv6.
+Step by step: [deploy-cloud-run.md](deploy-cloud-run.md). Moving to a Saudi region is a PDPL decision (§6).
 The single-VM option below (`deploy/docker-compose.prod.yml`) remains as an alternative.
 
 - [ ] Pick a provider with a Saudi region (e.g. Google Cloud Dammam, Oracle Cloud Jeddah/Riyadh,
       Alibaba Cloud Riyadh, STC Cloud). One VM (2 vCPU, 4 GB) is enough for the first ~50 offices.
-- [ ] Mailbox `support@hidaaco.com` (support form messages are forwarded there; shown on the site) and an SMTP sender for
-      `no-reply@hidaaco.com`: set `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and add the provider's SPF/DKIM
-      DNS records so the forwards don't land in spam. Until then messages are kept and listed at
-      `/admin/support`, and they are sent automatically once mail works (retried for 3 days).
+- [ ] Mail (Spacemail): mailboxes `support@hidaaco.com` (support form forwards there; shown on the site) and
+      `no-reply@hidaaco.com` (sender). Set `MAIL_HOST=mail.spacemail.com`, `MAIL_PORT=465`, `MAIL_SSL=true`,
+      `MAIL_STARTTLS=false`, `MAIL_USERNAME=no-reply@hidaaco.com`, secret `MAIL_PASSWORD`; add Spacemail's DKIM
+      record. **Password reset emails need this**; until then use "رابط كلمة مرور" in /ops. Support messages are
+      kept and listed in /ops → رسائل الدعم, and sent automatically once mail works (retried for 3 days).
       Meta verification and Moyasar also ask for an email on the domain; `support@hidaaco.com` or `faisal@hidaaco.com` is enough.
 - [ ] DNS `A` record for `DOMAIN` (`app.hidaaco.com`; point `hidaaco.com` at the website) → VM. Caddy issues TLS automatically.
 - [ ] Deploy:
@@ -84,7 +80,8 @@ The single-VM option below (`deploy/docker-compose.prod.yml`) remains as an alte
 - [ ] **Off-site backups**: the `backup` service writes an encrypted dump nightly at 02:00 to the
       `backups` volume. Add a cron on the VM to copy it to object storage in the same region, and do one
       restore drill: `gpg -d file.sql.gz.gpg | gunzip | psql`.
-- [ ] Uptime check on `https://app.hidaaco.com/` and alerting on container restarts.
+- [ ] Alerts: `bash deploy/cloudrun/monitoring.sh` (uptime check on hidaaco.com, alert on API 5xx, email to
+      support@hidaaco.com).
 - [ ] Error tracking: create a Sentry project (EU or self-hosted per §6) and set `SENTRY_DSN`. PII is
       off by default (`send-default-pii: false`).
 - [ ] Metrics: `/actuator/prometheus` on the internal port 8081 if you run Prometheus/Grafana.
@@ -104,21 +101,34 @@ Needs Hidaa/legal:
 
 ## 7. Operations — [launch]
 
-- [ ] **FAL review**: new offices show "قيد التحقق". Check each number against REGA's broker register
-      and record the result:
-      ```bash
-      curl -H "X-Admin-Token: $ADMIN_TOKEN" https://app.hidaaco.com/admin/offices
-      curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
-        -d '{"status":"VERIFIED"}' https://app.hidaaco.com/admin/offices/<office-id>/fal
-      ```
-      (REJECTED with a `note` alerts the office.) No public REGA API was found; if one becomes
-      available, automate it in `AdminController`.
+- [x] **Admin console** at https://app.hidaaco.com/ops (admin key from Secret Manager `admin-token`): offices,
+      users, FAL review, trial days, free months, plan changes, suspend/reactivate, disable user, password reset
+      links, promo codes, support messages, WhatsApp template status, audit log. Scripts can still call
+      `/admin/offices` with the `X-Admin-Token` header.
+- [ ] **FAL review**: new offices show "فال قيد التحقق" in /ops. Check each number with REGA's
+      "الاستعلام عن رخص فال" and record the result on the office page (a rejection with a note alerts the office).
+      No public REGA API was found.
+- [x] **Promo codes** (/ops → أكواد الخصم): percent, fixed SAR or extra trial days; limits by plan, cycle, dates,
+      uses and new customers; signup link `https://hidaaco.com/signup?promo=CODE`.
 - [ ] Aqar: a listings feed partnership (portal's "اطلب ربط عقار" requests are stored in
       `aqar_feed_requests`). Until then offices use Excel/CSV or paste a listing link.
 - [ ] Home page placeholders to fill when ready: commercial registration / freelance document number, support WhatsApp number, demo WhatsApp number (buttons go to sign-up until then). Privacy policy and terms are drafts: have counsel review them.
 - [ ] Support channel (a Hidaa WhatsApp number) shown in the portal footer.
 
-## 8. Deliberately not built yet (per the pricing doc)
+## 8. Security built in
+
+- Sign-in, signup, password reset, promo codes and the admin key are rate-limited (in memory; the API runs as one
+  instance). Wrong passwords: 10 per email from one address, 50 per email, 50 per address, per 15 minutes, so a
+  stranger cannot lock an owner out from one address. IPv6 callers are counted by their /64 network.
+- Disabling a user, suspending an office or changing a password ends existing sessions on the next request.
+  A suspended office's agent, reminders, follow-ups and daily report stop until it is reactivated.
+- Password reset links are one-time (claimed atomically), stored hashed, valid 1 hour (24 hours when created in /ops).
+- Admin key: at least 24 characters (setup.sh makes 48). Changing it (`admin-token` secret, then redeploy) ends every
+  /ops session. Wrong keys: 5 per 15 minutes per address, for the login form and the `X-Admin-Token` header together.
+- Pages send HSTS, no-framing, nosniff, referrer and permissions headers and a minimal CSP. A stricter CSP
+  (script sources) can follow once WhatsApp Embedded Signup has been tested end-to-end with it.
+
+## 9. Deliberately not built yet (per the pricing doc)
 
 - Voice notes: the agent replies asking for text. Add transcription after the market test.
 - Growth-only features: build when two paying offices ask.

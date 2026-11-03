@@ -19,7 +19,9 @@ spring:
       app_password: ${DB_APP_PASSWORD:waslah_app}
   jackson:
     default-property-inclusion: non_null
-  # Outgoing email (support form forwarding). Blank MAIL_HOST = messages are kept in the database only.
+  # Outgoing email (support form forwarding, password reset links). Blank MAIL_HOST = nothing is emailed:
+  # support messages are kept in the database, and reset links are only available from the operator console.
+  # Spacemail: MAIL_HOST=mail.spacemail.com MAIL_PORT=465 MAIL_SSL=true. STARTTLS providers: port 587, MAIL_SSL=false.
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}
@@ -27,7 +29,8 @@ spring:
     password: ${MAIL_PASSWORD:}
     properties:
       mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:true}
+      mail.smtp.ssl.enable: ${MAIL_SSL:false}
       mail.smtp.connectiontimeout: 10000
       mail.smtp.timeout: 10000
   servlet:

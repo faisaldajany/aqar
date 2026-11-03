@@ -19,6 +19,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import sa.waslah.agent.auth.SessionGuard;
+import sa.waslah.agent.auth.SessionTokens;
 import sa.waslah.agent.tenant.TenantFilter;
 
 @Configuration
@@ -27,18 +29,21 @@ public class SecurityConfig {
     public static final String SESSION_COOKIE = "waslah_session";
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder, SessionGuard sessionGuard,
+                                            SessionTokens sessionTokens) throws Exception {
         http
                 // JSON API behind a same-origin proxy with a SameSite=Lax cookie; no form posts.
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/public/**", "/internal/jobs/**").permitAll()
+                        // /admin/** and /api/ops/** check the operator key or session themselves (OpsAuth).
+                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/ops/**", "/api/public/**", "/internal/jobs/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(bearerTokenResolver())
                         .jwt(jwt -> jwt.decoder(jwtDecoder)))
-                .addFilterAfter(new TenantFilter(), BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(new TenantFilter(), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new SessionGuard.Filter(sessionGuard, sessionTokens), TenantFilter.class);
         return http.build();
     }
 
@@ -46,7 +51,8 @@ public class SecurityConfig {
     BearerTokenResolver bearerTokenResolver() {
         return request -> {
             String path = request.getRequestURI();
-            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/") || path.startsWith("/api/public/") || path.startsWith("/internal/")) {
+            if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/")
+                    || path.startsWith("/api/ops/") || path.startsWith("/api/public/") || path.startsWith("/internal/")) {
                 return null;
             }
             String header = request.getHeader("Authorization");

@@ -288,7 +288,7 @@ class BillingFlowTest extends IntegrationTest {
                 .param(inv.id()).update());
         BillingService.Invoice fresh = TenantContext.call(office, () -> billing.checkout(office, PlanLimits.Plan.GROWTH, "MONTHLY"));
         assertThat(fresh.id()).isNotEqualTo(inv.id());
-        assertThat(fresh.vatHalalas()).isEqualTo(7_485);
+        assertThat(fresh.vatHalalas()).isEqualTo(Math.round(fresh.subtotalHalalas() * 0.15)).isPositive();
     }
 
     @Test

@@ -83,7 +83,7 @@ public record Email(String preheader, String greeting, List<String> paragraphs, 
                       </td></tr>
                       <tr><td align="center" style="padding:18px 6px 0 6px;font-family:%3$s;font-size:12px;line-height:1.8;color:%8$s;" dir="rtl">
                         فريق حداء · <a href="mailto:support@hidaaco.com" style="color:%8$s;">support@hidaaco.com</a><br>
-                        وكيل واتساب لمكاتب العقار · <a href="https://hidaaco.com" style="color:%8$s;">hidaaco.com</a>
+                        وكيل لمكاتب العقار · <a href="https://hidaaco.com" style="color:%8$s;">hidaaco.com</a>
                       </td></tr>
                     </table>
                   </td></tr>

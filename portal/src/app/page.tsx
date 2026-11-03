@@ -3,7 +3,7 @@ import { HOME_HTML } from "./home-html";
 import { HomeInteractions } from "./HomeInteractions";
 
 export const metadata: Metadata = {
-  title: "حداء — وكيل واتساب لمكاتب العقار",
+  title: "حداء — وكيل لمكاتب العقار",
   description: "كل رسالة ما ترد عليها، عميل يكلم مكتب ثاني. حداء يرد على عملائك في واتساب 24 ساعة، من عقاراتك أنت، يحجز المعاينة ويسلمك العميل جاهز.",
 };
 

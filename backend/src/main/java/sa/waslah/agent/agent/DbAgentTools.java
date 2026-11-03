@@ -113,11 +113,10 @@ class DbAgentTools implements AgentTools {
     private final List<String> errors = new ArrayList<>();
 
     private JsonNode search(JsonNode a) {
-        List<ListingStore.Listing> found = listings.search(new ListingStore.Query(
-                text(a, "purpose"), text(a, "property_type"), text(a, "district"),
-                number(a, "max_price"), number(a, "min_price"),
-                a.hasNonNull("min_rooms") ? a.path("min_rooms").asInt() : null, 3));
-        ObjectNode out = json.createObjectNode().put("count", found.size());
+        SearchPlan.Result<ListingStore.Listing> result = SearchPlan.run(SearchPlan.Request.from(a), listings::search);
+        List<ListingStore.Listing> found = result.listings();
+        ObjectNode out = json.createObjectNode().put("count", found.size()).put("match", result.match().name());
+        if (result.area() != null) out.put("area", result.area().arabicName);
         ArrayNode arr = out.putArray("listings");
         for (ListingStore.Listing l : found) {
             licenses.add(l.adLicense());
@@ -137,8 +136,8 @@ class DbAgentTools implements AgentTools {
             o.put("photos", l.uploadedPhotos() + l.photoUrls().size());
             o.put("has_video", l.videoUrl() != null);
         }
-        if (found.isEmpty()) {
-            out.put("note", "لا توجد عقارات مطابقة حالياً");
+        if (result.note() != null) {
+            out.put("note", result.note());
         }
         return out;
     }

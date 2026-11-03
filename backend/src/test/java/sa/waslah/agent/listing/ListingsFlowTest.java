@@ -72,6 +72,41 @@ class ListingsFlowTest extends IntegrationTest {
     }
 
     @Test
+    void searchByDistrictListExclusionAndArea() {
+        TenantContext.run(office, () -> {
+            add("شقة الملقا", "حي الملقا", 65000, 160, "7200500001");
+            add("شقة القيروان", "القيروان", 48000, 120, "7200500002");
+            add("شقة الروضة", "الروضة", 42000, 140, "7200500003");
+        });
+        List<String> any = TenantContext.call(office, () -> listings.search(new ListingStore.Query(
+                "RENT", "شقه", List.of("ملقا", "القيروان"), List.of(), null, null, null, null, 10)))
+                .stream().map(ListingStore.Listing::adLicense).toList();
+        assertThat(any).containsExactly("7200500002", "7200500001");
+
+        List<String> nearby = TenantContext.call(office, () -> listings.search(new ListingStore.Query(
+                null, "شقة", RiyadhAreas.Area.NORTH.districts, List.of("الملقا"), null, null, null, null, 10)))
+                .stream().map(ListingStore.Listing::adLicense).toList();
+        assertThat(nearby).containsExactly("7200500002");
+
+        List<String> big = TenantContext.call(office, () -> listings.search(new ListingStore.Query(
+                null, null, List.of(), List.of(), null, null, null, new BigDecimal("150"), 10)))
+                .stream().map(ListingStore.Listing::adLicense).toList();
+        assertThat(big).containsExactly("7200500001");
+
+        // A multi-word type also matches the title: "شقة الملقا" finds the listing titled so.
+        List<String> titled = TenantContext.call(office, () -> listings.search(new ListingStore.Query(
+                null, "شقة الملقا", List.of(), List.of(), null, null, null, null, 10)))
+                .stream().map(ListingStore.Listing::adLicense).toList();
+        assertThat(titled).containsExactly("7200500001");
+    }
+
+    private void add(String title, String district, long price, int area, String license) {
+        listings.upsert(office, new ListingInput(title, district, "شقة", "RENT", BigDecimal.valueOf(price),
+                BigDecimal.valueOf(area), 3, license, LocalDate.now().plusMonths(6), true, null, null, null, null,
+                List.of(), null, "MANUAL", null));
+    }
+
+    @Test
     void csvUploadPreviewCommitAndReimportUpdates() {
         String csv = """
                 الحي,نوع العقار,الغرض,السعر,رقم ترخيص الإعلان,تاريخ انتهاء الترخيص,الموقع

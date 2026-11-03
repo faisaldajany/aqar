@@ -6,7 +6,9 @@
 #
 #   must_call / must_not_call   tool names
 #   reply_any                   final reply contains at least one of these
-#   reply_none                  final reply contains none of these
+#   reply_none                  no reply contains any of these
+#   reply_any_text              a second "contains at least one of" check (e.g. a license AND a word)
+#   search_args                 some search_listings call had these arguments (field: value)
 #   lead                        fields save_lead must have set by the end (field: value)
 #   discloses_bot               first reply says it is an automated assistant
 
@@ -21,6 +23,7 @@ listings:
   - {id: L6, title: شقة تمليك 4 غرف, district: حطين, type: شقة, purpose: SALE, price: 1120000, area: 205, rooms: 4, license: "7200411630", expiry: "2027-04-09", vacant: false}
   - {id: L7, title: شقة غرفتين, district: القيروان, type: شقة, purpose: RENT, price: 48000, area: 120, rooms: 2, license: "7200429955", expiry: "2027-01-18", vacant: true}
   - {id: L8, title: فيلا مودرن, district: الياسمين, type: فيلا, purpose: SALE, price: 2350000, area: 400, rooms: 6, license: "7200433019", expiry: "2027-05-01", vacant: true}
+  - {id: L9, title: شقة عائلية 3 غرف, district: الروضة, type: شقة, purpose: RENT, price: 42000, area: 140, rooms: 3, license: "7200440187", expiry: "2027-06-15", vacant: true}
 
 scenarios:
   # --- Greeting and disclosure ---
@@ -114,6 +117,54 @@ scenarios:
     category: no_match
     turns: ["ابي عمارة كاملة للبيع بالملقا"]
     expect: {must_call: [search_listings]}
+
+  # --- Location: parts of Riyadh, several districts, nearby alternatives ---
+  - id: area-01
+    category: location
+    turns: ["ابي شقة إيجار شمال الرياض"]
+    expect: {search_args: {area: NORTH}, reply_any: ["7200402271", "7200429955"], reply_none: ["7200440187"]}
+  - id: area-02
+    category: location
+    turns: ["عندكم شقق للإيجار شرق الرياض؟"]
+    expect: {search_args: {area: EAST}, reply_any: ["7200440187"], reply_none: ["7200402271", "7200429955"]}
+  - id: area-03
+    category: location
+    turns: ["ابي فيلا جنوب الرياض"]
+    expect: {must_call: [search_listings], must_not_call: [book_viewing], reply_none: ["7200418836", "7200395120", "7200433019"]}
+  - id: nearby-01
+    category: location
+    turns: ["ابغى شقة للإيجار في المروج"]
+    expect: {must_call: [search_listings], reply_any: ["7200402271", "7200429955"], reply_none: ["7200440187"]}
+  - id: nearby-02
+    category: location
+    turns: ["فيلا للبيع بالصحافة حدود مليونين"]
+    expect: {must_call: [search_listings], reply_any: ["7200395120", "7200418836"], reply_none: ["7200433019"]}
+  - id: multi-01
+    category: location
+    turns: ["شقة إيجار في الملقا أو القيروان"]
+    expect: {must_call: [search_listings], reply_any: ["7200402271", "7200429955"], reply_none: ["7200440187"]}
+
+  # --- Budget and size: ranges, monthly rent, slightly over budget, rooms, area ---
+  - id: budget-01
+    category: budget
+    turns: ["شقة إيجار بين 40 و 50 ألف"]
+    expect: {search_args: {min_price: 40000, max_price: 50000}, reply_any: ["7200429955", "7200440187"], reply_none: ["7200402271"]}
+  - id: budget-02
+    category: budget
+    turns: ["ابي شقة إيجار بالملقا بالشهر 5 آلاف"]
+    expect: {search_args: {max_price: 60000}, reply_any: ["7200402271", "7200429955"], reply_any_text: ["سنوي", "بالسنة", "سنة"]}
+  - id: budget-03
+    category: budget
+    turns: ["فيلا بالنرجس حدود مليون وسبعمية"]
+    expect: {search_args: {max_price: 1700000}, reply_any: ["7200395120"], reply_none: ["7200433019"]}
+  - id: rooms-01
+    category: budget
+    turns: ["فيلا بالنرجس 5 غرف"]
+    expect: {search_args: {min_rooms: 5}, reply_any: ["7200418836"], reply_none: ["7200395120"]}
+  - id: size-01
+    category: budget
+    turns: ["عندكم أرض مساحتها 600 متر وفوق؟"]
+    expect: {search_args: {min_area_sqm: 600}, reply_any: ["7200388712"]}
 
   # --- Expired license: the listing must never be offered ---
   - id: expired-01

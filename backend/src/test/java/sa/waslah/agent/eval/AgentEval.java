@@ -32,6 +32,8 @@ import sa.waslah.agent.agent.AgentTools;
 import sa.waslah.agent.agent.ReplyGuard;
 import sa.waslah.agent.agent.llm.GeminiClient;
 import sa.waslah.agent.agent.llm.Llm;
+import sa.waslah.agent.agent.SearchPlan;
+import sa.waslah.agent.listing.ListingStore;
 import sa.waslah.agent.listing.PropertyTypes;
 
 /**
@@ -131,6 +133,16 @@ class AgentEval {
             if (!any.isEmpty() && any.stream().noneMatch(s -> replies.stream().anyMatch(r -> norm(r).contains(norm(s))))) {
                 failures.add("no reply contains any of " + any);
             }
+            List<String> anyText = list(expect, "reply_any_text");
+            if (!anyText.isEmpty() && anyText.stream().noneMatch(s -> replies.stream().anyMatch(r -> norm(r).contains(norm(s))))) {
+                failures.add("no reply contains any of " + anyText);
+            }
+            // search_args: some search_listings call had each of these arguments (numbers compared by value).
+            Map<String, Object> wantArgs = (Map<String, Object>) expect.getOrDefault("search_args", Map.of());
+            wantArgs.forEach((k, v) -> {
+                boolean hit = tools.searchArgs.stream().anyMatch(a -> argMatches(a.path(k), v));
+                if (!hit) failures.add("no search_listings call with " + k + "=" + v + " (got " + tools.searchArgs + ")");
+            });
             for (String s : list(expect, "reply_none")) {
                 for (String r : replies) {
                     if (norm(r).contains(norm(s))) failures.add("reply contains forbidden \"" + s + "\"");
@@ -224,6 +236,7 @@ class AgentEval {
     static class FixtureTools implements AgentTools {
         final List<Listing> listings;
         final List<String> called = new ArrayList<>();
+        final List<JsonNode> searchArgs = new ArrayList<>();
         final List<String> licenses = new ArrayList<>();
         final Map<String, String> lead = new HashMap<>();
         final List<String> slotsIssued = new ArrayList<>();
@@ -233,27 +246,38 @@ class AgentEval {
             this.listings = listings;
         }
 
+        /** Type, or for a multi-word type ("فيلا دوبلكس") type plus title, as in ListingStore.search. */
+        static boolean typeMatches(Listing l, String type) {
+            return ar(l.type()).contains(ar(type))
+                    || (type.trim().contains(" ") && ar(l.type() + " " + l.title()).contains(ar(type)));
+        }
+
+        /** Same rules as ListingStore.search, over the YAML fixture. */
+        List<Listing> search(ListingStore.Query q) {
+            return listings.stream()
+                    .filter(l -> !l.expiry().isBefore(LocalDate.now()))
+                    .filter(l -> q.purpose() == null || l.purpose().equals(q.purpose()))
+                    .filter(l -> q.propertyType() == null || typeMatches(l, PropertyTypes.canonical(q.propertyType())))
+                    .filter(l -> q.districts().isEmpty() || q.districts().stream().anyMatch(d -> ar(l.district()).contains(ar(d))))
+                    .filter(l -> q.excludeDistricts().stream().noneMatch(d -> ar(l.district()).contains(ar(d))))
+                    .filter(l -> q.maxPrice() == null || l.price().compareTo(q.maxPrice()) <= 0)
+                    .filter(l -> q.minPrice() == null || l.price().compareTo(q.minPrice()) >= 0)
+                    .filter(l -> q.minRooms() == null || l.rooms() >= q.minRooms())
+                    .filter(l -> q.minAreaSqm() == null || l.area().compareTo(q.minAreaSqm()) >= 0)
+                    .sorted((x, y) -> x.price().compareTo(y.price()))
+                    .limit(q.limit()).toList();
+        }
+
         @Override
         public JsonNode call(String name, JsonNode a) {
             called.add(name);
             switch (name) {
                 case SEARCH -> {
-                    String purpose = text(a, "purpose");
-                    String type = text(a, "property_type");
-                    String district = text(a, "district");
-                    BigDecimal max = num(a, "max_price"), min = num(a, "min_price");
-                    Integer rooms = a.hasNonNull("min_rooms") ? a.path("min_rooms").asInt() : null;
-                    List<Listing> hits = listings.stream()
-                            .filter(l -> !l.expiry().isBefore(LocalDate.now()))
-                            .filter(l -> purpose == null || l.purpose().equals(purpose))
-                            .filter(l -> type == null || ar(l.type()).contains(ar(PropertyTypes.canonical(type))))
-                            .filter(l -> district == null || ar(l.district()).contains(ar(district)))
-                            .filter(l -> max == null || l.price().compareTo(max) <= 0)
-                            .filter(l -> min == null || l.price().compareTo(min) >= 0)
-                            .filter(l -> rooms == null || l.rooms() >= rooms)
-                            .sorted((x, y) -> x.price().compareTo(y.price()))
-                            .limit(3).toList();
-                    ObjectNode out = JSON.createObjectNode().put("count", hits.size());
+                    searchArgs.add(a);
+                    SearchPlan.Result<Listing> result = SearchPlan.run(SearchPlan.Request.from(a), this::search);
+                    List<Listing> hits = result.listings();
+                    ObjectNode out = JSON.createObjectNode().put("count", hits.size()).put("match", result.match().name());
+                    if (result.area() != null) out.put("area", result.area().arabicName);
                     ArrayNode arr = out.putArray("listings");
                     for (Listing l : hits) {
                         licenses.add(l.license());
@@ -263,7 +287,7 @@ class AgentEval {
                                 .put("license_expiry", l.expiry().toString()).put("occupied", !l.vacant())
                                 .put("has_location", true).put("photos", 3).put("has_video", false);
                     }
-                    if (hits.isEmpty()) out.put("note", "لا توجد عقارات مطابقة حالياً");
+                    if (result.note() != null) out.put("note", result.note());
                     return out;
                 }
                 case SAVE_LEAD -> {
@@ -332,6 +356,18 @@ class AgentEval {
     // ---- helpers -------------------------------------------------------------------------------
 
     /** Java twin of the SQL function ar_norm. */
+    static boolean argMatches(JsonNode got, Object want) {
+        if (got == null || got.isMissingNode() || got.isNull()) return false;
+        if (want instanceof Number n) {
+            try {
+                return new BigDecimal(got.asText().replace(",", "")).compareTo(new BigDecimal(n.toString())) == 0;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return norm(got.asText()).contains(norm(String.valueOf(want)));
+    }
+
     static String ar(String s) {
         String t = s == null ? "" : s.trim().toLowerCase(Locale.ROOT)
                 .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ة', 'ه').replace('ى', 'ي');

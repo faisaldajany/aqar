@@ -58,6 +58,11 @@ public final class ReplyGuard {
     private static final Pattern LEAKED_TOOL_SYNTAX = Pattern.compile(
             "</?tools?>|</?call|default_api|functionCall|tool_code|search_listings|save_lead|get_viewing_slots|book_viewing|cancel_viewing|send_listing_card|handoff_to_marketer",
             Pattern.CASE_INSENSITIVE);
+    /** The model's own notes about the conversation ("المستخدم طلب… الرد:") must never reach a customer. */
+    private static final Pattern LEAKED_REASONING = Pattern.compile(
+            "المستخدم|العميل طلب|الرد\\s*:|قمت بالبحث|تم العرض|انتظر رده|انتظر إجابته|أنتظر رده|the user|user (asked|wants)",
+            Pattern.CASE_INSENSITIVE);
+
     /** "I'll look for you" without actually searching. */
     private static final Pattern SEARCH_PROMISE = Pattern.compile(
             "بدور لك|أدور لك|ادور لك|أبحث لك|ابحث لك|بأبحث|سأبحث|ببحث|بحثت|جاري البحث|بشوف لك|أشوف لك|let me (check|look|search)",
@@ -78,6 +83,8 @@ public final class ReplyGuard {
 
     static final String NO_TOOL_TEXT = "تنبيه داخلي لا يراه العميل: كتبت استدعاء أداة كنص داخل الرد. "
             + "لا تكتب أسماء الأدوات أو صيغتها أبداً؛ استدعِ الأداة استدعاءً فعلياً ثم اكتب للعميل رداً عادياً فقط.";
+    static final String NO_REASONING = "تنبيه داخلي لا يراه العميل: كتبت ملاحظاتك الداخلية (مثل: المستخدم طلب، الرد:) داخل الرد. "
+            + "اكتب للعميل رسالته فقط بصيغة المخاطب، وإن احتجت معلومة عن العقارات فاستدعِ search_listings أولاً.";
     static final String MUST_SEARCH = "تنبيه داخلي لا يراه العميل: لم تستدعِ search_listings في هذا الرد. "
             + "لا تؤكد ولا تنفِ توفر أي عقار قبل البحث. استدعِ search_listings الآن بالمعلومات المتوفرة ثم أعد كتابة ردك.";
     static final String MUST_HANDOFF = "تنبيه داخلي لا يراه العميل: قلت إنك ستحوّل العميل أو إن أحداً سيتواصل معه، "
@@ -98,6 +105,9 @@ public final class ReplyGuard {
         }
         if (LEAKED_TOOL_SYNTAX.matcher(reply).find()) {
             return NO_TOOL_TEXT;
+        }
+        if (LEAKED_REASONING.matcher(reply).find()) {
+            return NO_REASONING;
         }
         boolean searched = toolsCalled.contains(AgentTools.SEARCH);
         if (!searched && AVAILABILITY.matcher(reply).find() && PROPERTY.matcher(reply).find()) {

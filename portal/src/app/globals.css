@@ -254,3 +254,34 @@ details > summary { cursor: pointer; }
 .periods button { border: 0; background: none; padding: 4px 12px; border-radius: 7px; cursor: pointer; font-size: .85rem; color: var(--muted); }
 .periods button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .kpi .kpi-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+/* WhatsApp setup guide */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.wasetup { display: flex; flex-direction: column; gap: 12px; }
+.wasetup p { margin: 0; }
+.wasetup .q { font-size: 1.05rem; margin-top: 4px; }
+.wasetup.ok { border-color: var(--ok); }
+.wasetup.ok h2 { display: flex; align-items: center; gap: 8px; color: var(--ok); font-size: 1.05rem; }
+.wasteps { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; }
+.wasteps > li { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.wasteps > li:not(:last-child)::before { content: ""; position: absolute; inset-inline-start: 13px; top: 30px; bottom: 2px; width: 2px; background: var(--line); }
+.wasteps > li.done:not(:last-child)::before { background: var(--ok); }
+.wasteps .mark { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: .85rem; font-weight: 700; border: 2px solid var(--line); background: var(--surface); color: var(--muted); font-variant-numeric: tabular-nums; }
+.wasteps li.done .mark { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.wasteps li.open .mark { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.wasteps .stepbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 2px; }
+.wasteps .stephead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 24px; }
+.wasteps h2 { font-size: 1rem; margin: 0; }
+.wasteps li.later h2 { color: var(--muted); font-weight: 600; }
+.wasteps li.done h2 { font-weight: 600; }
+.wasteps .stepcontent { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--bg); }
+.wasteps .stepcontent .btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
+.wasteps .stepcontent .row .btn { align-self: auto; }
+.stepform { display: flex; flex-direction: column; gap: 10px; }
+.stepform input[type=date] { max-width: 220px; }
+.stepform input[type=tel] { max-width: 260px; }
+.howto { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; }
+.wasetup details ul { margin: 8px 0 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; }
+.waiting { display: flex; align-items: center; gap: 8px; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); animation: pulse 1.4s ease-in-out infinite; flex: none; }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }

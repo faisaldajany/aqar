@@ -98,7 +98,7 @@ export default function OpsOfficePage() {
             <dt>رخصة فال</dt><dd dir="ltr">{o.falLicense}</dd>
             <dt>التجربة حتى</dt><dd>{day(o.trialEndsAt)}</dd>
             <dt>مدفوع حتى</dt><dd>{day(o.paidUntil)}</dd>
-            <dt>واتساب</dt><dd>{o.whatsappConnected ? "مربوط" : "غير مربوط"}</dd>
+            <dt>واتساب</dt><dd>{o.whatsappConnected ? "مربوط" : "غير مربوط"}{waSetupLine(o.waSetup)}</dd>
             <dt>العقارات</dt><dd>{fmt(o.listings)}</dd>
             <dt>محادثات الشهر</dt><dd>{fmt(o.usage.conversations)} من {fmt(o.usage.included)}{o.usage.overage ? ` (+${o.usage.overage} إضافية)` : ""}</dd>
             <dt>كود الخصم</dt><dd>{o.promo ? `${o.promo.code}: ${o.promo.summary}${o.promo.usedUp ? " (انتهى)" : ` (استُخدم ${o.promo.periodsUsed})`}` : "—"}</dd>
@@ -260,4 +260,12 @@ export default function OpsOfficePage() {
       </div>
     </>
   );
+}
+
+/** "· خطوات الإعداد 3 من 8، متوقف عند: الملف التجاري (الربط من الأحد 9 نوفمبر)". */
+function waSetupLine(w: OpsDetail["waSetup"]): string {
+  if (!w || !w.current) return "";
+  const step = w.steps.find((s) => s.key === w.current)?.label ?? w.current;
+  const ready = w.current === "active" && w.readyOn ? ` (الربط من ${day(w.readyOn)})` : "";
+  return ` · الإعداد ${w.done} من ${w.total}، الخطوة الحالية: ${step}${ready}${w.phone ? ` · ${w.phone}` : ""}`;
 }

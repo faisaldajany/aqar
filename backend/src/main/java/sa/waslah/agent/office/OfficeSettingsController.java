@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.billing.Subscription;
 import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.common.Digits;
 import sa.waslah.agent.report.DailyReport;
 import sa.waslah.agent.tenant.TenantContext;
 
@@ -144,9 +145,9 @@ public class OfficeSettingsController {
      * it against REGA's register (the office keeps working meanwhile, flagged as under review).
      */
     public static String falDigits(String raw) {
-        String d = raw == null ? "" : raw.replaceAll("\\D", "");
+        String d = raw == null ? "" : Digits.latin(raw).replaceAll("\\D", "");
         if (d.length() < 7 || d.length() > 12) {
-            throw ApiException.badRequest("bad_fal", "رقم رخصة فال غير صحيح: أرقام فقط بطول 7 إلى 12 رقماً.");
+            throw ApiException.badRequest("bad_fal", "«رقم رخصة فال»: أرقام فقط، من 7 إلى 12 رقماً.");
         }
         return d;
     }

@@ -43,6 +43,7 @@ public class AuthService {
     }
 
     public SignedIn signup(Signup s) {
+        String fal = sa.waslah.agent.office.OfficeSettingsController.falDigits(s.falLicense()); // checked before anything else
         String email = normalize(s.email());
         boolean taken = jdbc.sql("select exists(select 1 from users where email = ?)")
                 .param(email).query(Boolean.class).single();
@@ -58,7 +59,7 @@ public class AuthService {
         // The office row is under RLS, so it is inserted as that office.
         TenantContext.run(officeId, () -> tx.executeWithoutResult(status -> {
             jdbc.sql("insert into offices (id, name, fal_license) values (?, ?, ?)")
-                    .params(officeId, s.officeName().trim(), sa.waslah.agent.office.OfficeSettingsController.falDigits(s.falLicense()))
+                    .params(officeId, s.officeName().trim(), fal)
                     .update();
             jdbc.sql("""
                     insert into users (id, office_id, email, password_hash, full_name, role)

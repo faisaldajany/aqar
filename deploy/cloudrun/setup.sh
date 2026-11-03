@@ -59,7 +59,9 @@ IMG="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO"
 SA_EMAIL="$SA@$PROJECT_ID.iam.gserviceaccount.com"
 
 step() { printf '\n== %s\n' "$*"; }
-exists() { "$@" >/dev/null 2>&1; }
+# Whether a resource exists. Checked twice: a check that fails for a passing reason (a network blip in Cloud Shell)
+# would otherwise send the script on to create it, and stop with "already exists".
+exists() { "$@" >/dev/null 2>&1 || { sleep 3; "$@" >/dev/null 2>&1; }; }
 rand() { openssl rand -hex "${1:-24}"; }
 
 step "1/9 APIs"

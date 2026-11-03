@@ -73,6 +73,9 @@ label.f > .pill, label.f > span > .pill { align-self: flex-start; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: .92rem; cursor: pointer; }
 .grid2 > *, .grid3 > * { align-self: end; }
 .err { color: var(--bad); font-size: .85rem; }
+label.f > .err { font-weight: 500; }
+input[aria-invalid="true"]:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
+select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--bad); background: var(--bad-bg); }
 .pill { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
 .p-ok { background: var(--ok-bg); color: var(--ok); } .p-warn { background: var(--warn-bg); color: var(--warn); } .p-acc { background: var(--accent-soft); color: var(--accent); }
 

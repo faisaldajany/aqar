@@ -223,6 +223,9 @@ public class BillingService {
             String success = props.portalBaseUrl() + "/billing?invoice=" + id;
             String callback = props.apiBaseUrl() == null || props.apiBaseUrl().isBlank() ? null
                     : props.apiBaseUrl() + "/webhooks/moyasar";
+            if (callback != null && MoyasarWebhookAuth.configured(props.moyasarWebhookSecret())) {
+                callback += "?token=" + MoyasarWebhookAuth.callbackToken(props.moyasarWebhookSecret());
+            }
             try {
                 PaymentGateway gateway = gateways.forOffice(officeId);
                 PaymentGateway.Checkout c = gateway.create(subtotal + vat, description + " — " + number, id.toString(), success, callback);

@@ -109,6 +109,8 @@ waslah:
     # Moyasar test key (sk_test_…) for internal offices: owner email on internal-email-domain, confirmed by a link.
     moyasar-test-secret-key: ${MOYASAR_TEST_SECRET_KEY:}
     internal-email-domain: ${INTERNAL_EMAIL_DOMAIN:hidaaco.com}
+    # The Secret Token of the webhook in Moyasar's dashboard (Settings → Webhooks). Blank = not checked.
+    moyasar-webhook-secret: ${MOYASAR_WEBHOOK_SECRET:}
     portal-base-url: ${PORTAL_BASE_URL:http://localhost:3000}
     # Public URL of this API for Moyasar's payment notification (blank = rely on the customer returning to the portal).
     api-base-url: ${API_BASE_URL:}

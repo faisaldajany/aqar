@@ -11,10 +11,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param graceDays         days after a missed renewal before the agent stops
  * @param moyasarTestSecretKey sk_test_… used for internal offices (see {@link PaymentGateways}); blank = none
  * @param internalEmailDomain  the company's email domain; offices whose owner confirmed an address on it are internal
+ * @param moyasarWebhookSecret the Secret Token typed in Moyasar's dashboard webhook; blank = notifications are not
+ *                             checked (they are harmless either way: the paid status is always asked from Moyasar)
  */
 @ConfigurationProperties("waslah.billing")
 public record BillingProperties(String provider, String moyasarSecretKey, String portalBaseUrl, String apiBaseUrl,
-                                int vatPercent, int graceDays, String moyasarTestSecretKey, String internalEmailDomain) {
+                                int vatPercent, int graceDays, String moyasarTestSecretKey, String internalEmailDomain,
+                                String moyasarWebhookSecret) {
 
     public boolean moyasar() {
         return "moyasar".equalsIgnoreCase(provider);

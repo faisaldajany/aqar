@@ -11,6 +11,7 @@ import { Logo } from "@/components/Logo";
 const NAV: { href: string; label: string; icon: string; group: "work" | "setup" }[] = [
   { href: "/dashboard", label: "الرئيسية", icon: "home", group: "work" },
   { href: "/inbox", label: "المحادثات", icon: "chat", group: "work" },
+  { href: "/customers", label: "العملاء", icon: "person", group: "work" },
   { href: "/handoffs", label: "التحويلات", icon: "handoff", group: "work" },
   { href: "/bookings", label: "المواعيد", icon: "calendar", group: "work" },
   { href: "/try", label: "جرّب الوكيل", icon: "try", group: "work" },

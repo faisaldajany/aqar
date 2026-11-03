@@ -51,6 +51,7 @@ public class PrivacyService {
             for (UUID c : convs) {
                 jdbc.sql("delete from messages where conversation_id = ?").param(c).update();
                 jdbc.sql("delete from leads where conversation_id = ?").param(c).update();
+                jdbc.sql("delete from agent_reviews where conversation_id = ?").param(c).update();
                 jdbc.sql("update agent_runs set tool_calls = '[]'::jsonb, error = null where conversation_id = ?").param(c).update();
                 jdbc.sql("update handoffs set summary = 'محذوف بطلب العميل' where conversation_id = ?").param(c).update();
                 jdbc.sql("update bookings set customer_name = null, note = null, confirmation = null where conversation_id = ?").param(c).update();
@@ -84,6 +85,7 @@ public class PrivacyService {
         int n = jdbc.sql("delete from messages where created_at < ?").param(cutoff).update();
         jdbc.sql("update agent_runs set tool_calls = '[]'::jsonb where created_at < ? and tool_calls <> '[]'::jsonb").param(cutoff).update();
         jdbc.sql("delete from daily_reports where report_date < cast(? as date)").param(cutoff).update();
+        jdbc.sql("delete from agent_reviews where created_at < ?").param(cutoff).update();
         return n;
     }
 }

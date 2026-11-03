@@ -82,11 +82,14 @@ public class WorkspaceController {
         conversations.find(id).orElseThrow(() -> ApiException.notFound("no_conversation", "المحادثة غير موجودة."));
         MarketerStore.Marketer m = marketers.find(a.marketerId())
                 .orElseThrow(() -> ApiException.notFound("no_marketer", "المسوّق غير موجود."));
-        jdbc.sql("""
-                insert into handoffs (office_id, conversation_id, marketer_id, reason, summary, status)
-                values (?, ?, ?, 'ASSIGNED', ?, 'CLAIMED')""")
+        // Handed over by a person who is already on it: claimed from the start.
+        UUID handoff = jdbc.sql("""
+                insert into handoffs (office_id, conversation_id, marketer_id, reason, summary, status, assigned_at, claimed_at)
+                values (?, ?, ?, 'ASSIGNED', ?, 'CLAIMED', now(), now()) returning id""")
                 .params(TenantContext.require(), id, m.id(), a.note() == null || a.note().isBlank() ? "حوّلها المكتب يدوياً" : a.note())
-                .update();
+                .query(UUID.class).single();
+        jdbc.sql("insert into handoff_assignments (office_id, handoff_id, marketer_id) values (?, ?, ?)")
+                .params(TenantContext.require(), handoff, m.id()).update();
         jdbc.sql("update conversations set assigned_marketer_id = ? where id = ?").params(m.id(), id).update();
         conversations.pauseAgent(id, ConversationStore.TAKEN_OVER);
         return Map.of("assigned", m.name());
@@ -107,7 +110,11 @@ public class WorkspaceController {
             case "close" -> "CLOSED";
             default -> throw ApiException.badRequest("bad_action", "إجراء غير معروف.");
         };
-        int n = jdbc.sql("update handoffs set status = ? where id = ?").params(status, id).update();
+        int n = jdbc.sql("""
+                        update handoffs set status = ?,
+                            claimed_at = coalesce(claimed_at, now()),
+                            closed_at = case when ?::text = 'CLOSED' then coalesce(closed_at, now()) else closed_at end
+                        where id = ?""").params(status, status, id).update();
         if (n == 0) throw ApiException.notFound("no_handoff", "التحويل غير موجود.");
         return Map.of("status", status);
     }

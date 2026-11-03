@@ -83,12 +83,12 @@ public class PasswordResetService {
                 .param(e).query((rs, n) -> new Who(rs.getObject(1, UUID.class), rs.getString(2))).optional();
         if (user.isEmpty()) return;
         Link link = create(user.get().id(), false);
-        Email email = new Email("رابط تعيين كلمة مرور جديدة لحسابك في حداء، صالح لمدة ساعة.",
+        Email message = new Email("رابط تعيين كلمة مرور جديدة لحسابك في حداء، صالح لمدة ساعة.",
                 Email.greet(user.get().fullName()),
                 List.of("طلبت إعادة تعيين كلمة المرور لحسابك في حداء. اضغط الزر لتعيين كلمة مرور جديدة. الرابط صالح لمدة ساعة ويُستخدم مرة واحدة."),
                 new Email.Button("تعيين كلمة مرور جديدة", link.url()),
                 "إذا لم تطلب ذلك فتجاهل هذه الرسالة، ولن يتغير شيء في حسابك.");
-        mailThread.execute(() -> mailer.send(e, SUBJECT, email));
+        mailThread.execute(() -> mailer.send(e, SUBJECT, message));
     }
 
     /** Sets the new password if the link is valid, unused and not expired; returns the user's email. */

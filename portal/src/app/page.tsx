@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CompanyLine } from "@/components/CompanyLine";
 import { HOME_HTML } from "./home-html";
 import { HomeInteractions } from "./HomeInteractions";
 
@@ -25,6 +26,7 @@ export default function Home() {
     <>
       <style>{MOTION}</style>
       <div id="home" dangerouslySetInnerHTML={{ __html: HOME_HTML }} />
+      <div className="company-bar"><CompanyLine /></div>
       <HomeInteractions />
     </>
   );

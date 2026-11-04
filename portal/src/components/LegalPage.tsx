@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CompanyLine } from "./CompanyLine";
 import { Logo } from "./Logo";
 
 export function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
         {children}
         <p className="muted small">للاستفسار: <a href="mailto:support@hidaaco.com" dir="ltr">support@hidaaco.com</a> أو <Link href="/contact">نموذج التواصل</Link>.</p>
       </main>
+      <footer><CompanyLine className="muted small" /></footer>
     </div>
   );
 }

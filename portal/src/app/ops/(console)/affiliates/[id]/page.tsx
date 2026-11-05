@@ -83,7 +83,7 @@ export default function OpsAffiliate() {
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h1>{a.fullName} {a.active ? <span className="pill p-ok">فعّال</span> : <span className="pill p-idle">موقوف</span>}</h1>
         <div className="row">
-          <Link className="btn primary" href={`/ops/promos?affiliate=${id}`}>كود جديد لهذا المسوّق</Link>
+          <Link className="btn primary" href={`/ops/promos?affiliate=${id}`}>{page.codes.some((c) => c.active) ? "تعديل كود المسوّق" : "كود جديد لهذا المسوّق"}</Link>
           <button type="button" className="btn" disabled={busy === "invite" || !a.active} onClick={invite}>{a.hasPassword ? "رابط كلمة مرور جديدة" : "أعد إرسال الدعوة"}</button>
           <button type="button" className="btn" disabled={busy === "toggle"} onClick={toggle}>{a.active ? "إيقاف المسوّق" : "تفعيل المسوّق"}</button>
         </div>

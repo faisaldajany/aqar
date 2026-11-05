@@ -39,6 +39,10 @@ export type OpsPromo = {
   id: string; code: string; kind: "PERCENT" | "FIXED" | "TRIAL_DAYS"; summary: string; redemptions: number;
   maxRedemptions: number | null; newCustomersOnly: boolean; startsAt: string | null; expiresAt: string | null;
   active: boolean; note: string | null; createdAt: string; affiliateId: string | null;
+  percentOff: number | null; amountOffHalalas: number | null; trialDays: number | null; durationPeriods: number | null;
+  plans: string[]; cycles: string[];
+  /** The first and last day the code works, as the team typed them (YYYY-MM-DD). */
+  startsOn: string | null; expiresOn: string | null;
 };
 
 export type OpsSupport = {
@@ -135,7 +139,7 @@ export const ACTION_LABELS: Record<string, string> = {
   LOGIN: "دخول للإدارة", FAL_VERIFIED: "توثيق فال", FAL_REJECTED: "رفض فال", TRIAL_EXTENDED: "تمديد التجربة",
   COMP_MONTHS: "أشهر مجانية", PLAN_CHANGED: "تغيير الباقة", SUSPENDED: "إيقاف المكتب", REACTIVATED: "إعادة تفعيل المكتب",
   USER_DISABLED: "إيقاف مستخدم", USER_ENABLED: "تفعيل مستخدم", RESET_LINK: "رابط كلمة مرور", PROMO_CREATED: "كود خصم جديد",
-  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
+  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", PROMO_UPDATED: "تعديل كود", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
   AI_REVIEW: "مراجعة ردود بالذكاء الاصطناعي", CONVERSATION_VIEWED: "فتح محادثة", EXPORT: "تصدير محادثات",
   AFFILIATE_CREATED: "مسوّق جديد", AFFILIATE_UPDATED: "تعديل مسوّق", AFFILIATE_INVITE: "رابط دخول لمسوّق", AFFILIATE_PAYOUT: "تحويل لمسوّق",
 };

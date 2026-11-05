@@ -378,3 +378,4 @@ details > summary { cursor: pointer; }
 @media (max-width: 820px) { .kpis.k4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis.k4 .kpi b { font-size: 20px; } }
 .tbl.pv td.num, .tbl.pv td.nw { white-space: nowrap; }
 .tbl.pv .pill { white-space: nowrap; }
+.card input:disabled, .card select:disabled { opacity: .55; cursor: not-allowed; }

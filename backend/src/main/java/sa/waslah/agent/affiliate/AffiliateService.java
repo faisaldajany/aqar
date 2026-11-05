@@ -284,6 +284,8 @@ public class AffiliateService {
             m.put("newCustomersOnly", p.newCustomersOnly());
             m.put("active", p.active());
             m.put("expiresAt", p.expiresAt() == null ? null : p.expiresAt().toString());
+            // The last day it can be used (expiresAt is the start of the day after).
+            m.put("expiresOn", p.expiresAt() == null ? null : p.expiresAt().atZone(RIYADH).toLocalDate().minusDays(1).toString());
             m.put("redemptions", p.redemptions());
             m.put("maxRedemptions", p.maxRedemptions());
             return m;

@@ -149,12 +149,47 @@ class AffiliateTest extends IntegrationTest {
 
     @Test
     void aMarketersTrialCodeMakesTheOfficeTheirs() {
+        promos.setActive(code.id(), false); // one active code per marketer
         PromoService.Promo trial = promos.create(new PromoService.NewPromo("TR" + tag, "TRIAL_DAYS", null, null, 16, null, List.of(),
                 List.of(), true, null, null, null, null, marketer));
         UUID office = officeWith(trial.code());
         assertThat(list(page(), "clients")).singleElement().satisfies(c -> assertThat(c.get("status")).isEqualTo("TRIAL"));
         pay(office);
         assertThat(totals(page()).get("pendingHalalas")).as("20% of the full 499").isEqualTo(9_980L);
+    }
+
+    @Test
+    void aMarketerHasOneActiveCodeAtATime() {
+        PromoService.NewPromo second = new PromoService.NewPromo("MK2" + tag, "PERCENT", 15, null, null, null, List.of(), List.of(),
+                true, null, null, null, null, marketer);
+        assertThatThrownBy(() -> promos.create(second)).isInstanceOf(ApiException.class).hasMessageContaining(code.code());
+
+        promos.setActive(code.id(), false);
+        PromoService.Promo replacement = promos.create(second);
+        assertThatThrownBy(() -> promos.setActive(code.id(), true)).as("the old one cannot come back while the new one is on")
+                .isInstanceOf(ApiException.class).hasMessageContaining(replacement.code());
+
+        PromoService.Promo plain = promos.create(new PromoService.NewPromo("PL" + tag, "PERCENT", 5, null, null, null, List.of(),
+                List.of(), true, null, null, null, null, null));
+        assertThatThrownBy(() -> promos.update(plain.id(), new PromoService.NewPromo(plain.code(), "PERCENT", 5, null, null, null,
+                List.of(), List.of(), true, null, null, null, null, marketer))).as("nor by giving them another code")
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void anotherMarketerTakesOverTheCodesClients() {
+        UUID office = officeWith(code.code());
+        pay(office);
+        UUID other = affiliates.create(new AffiliateService.NewAffiliate("ثاني " + tag, "o" + tag.toLowerCase() + "@partner.sa", null,
+                BigDecimal.TEN, null, null));
+        promos.update(code.id(), new PromoService.NewPromo(code.code(), "PERCENT", 10, null, null, null, List.of(), List.of(), true,
+                null, null, null, null, other));
+
+        assertThat(list(page(), "clients")).isEmpty();
+        assertThat(totals(page()).get("pendingHalalas")).as("what the first marketer earned stays theirs").isEqualTo(8_982L);
+        assertThat(list(affiliates.page(other, false), "clients")).hasSize(1);
+        pay(office);
+        assertThat(totals(affiliates.page(other, false)).get("pendingHalalas")).as("10% of 449.10").isEqualTo(4_491L);
     }
 
     @Test

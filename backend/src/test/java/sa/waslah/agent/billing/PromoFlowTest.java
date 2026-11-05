@@ -257,4 +257,46 @@ class PromoFlowTest extends IntegrationTest {
         promos.setActive(p.id(), true);
         assertThat(promos.usable(p.code()).code()).isEqualTo(p.code());
     }
+
+    PromoService.NewPromo edit(PromoService.Promo p, String kind, Integer pct, BigDecimal amount, Integer periods, Integer max,
+                               LocalDate expiresOn, String note) {
+        return new PromoService.NewPromo(p.code(), kind, pct, amount, null, periods, p.plans(), p.cycles(), p.newCustomersOnly(),
+                max, null, expiresOn, note, null);
+    }
+
+    @Test
+    void anUnusedCodeCanChangeEverything() {
+        PromoService.Promo p = percent("EDIT", 10, 3);
+        PromoService.Promo e = promos.update(p.id(), new PromoService.NewPromo(" edited" + tag.toLowerCase() + " ", "FIXED", null,
+                new BigDecimal("50"), null, 2, List.of("GROWTH"), List.of(), false, 5, null, LocalDate.now().plusDays(30), "معرض", null));
+        assertThat(e.code()).isEqualTo("EDITED" + tag);
+        assertThat(e.kind()).isEqualTo("FIXED");
+        assertThat(e.amountOffHalalas()).isEqualTo(5_000L);
+        assertThat(e.percentOff()).isNull();
+        assertThat(e.durationPeriods()).isEqualTo(2);
+        assertThat(e.plans()).containsExactly("GROWTH");
+        assertThat(e.newCustomersOnly()).isFalse();
+        assertThat(e.maxRedemptions()).isEqualTo(5);
+        assertThat(promos.find(p.code())).as("the old code is gone").isEmpty();
+    }
+
+    @Test
+    void aUsedCodeKeepsItsTermsButTheRestCanChange() {
+        PromoService.Promo p = percent("USED", 10, null);
+        as(office, () -> promos.apply(p.code()));
+        assertThatThrownBy(() -> promos.update(p.id(), edit(p, "PERCENT", 20, null, null, null, null, null)))
+                .isInstanceOf(ApiException.class).hasMessageContaining("أنشئ كوداً جديداً");
+        assertThatThrownBy(() -> promos.update(p.id(), edit(p, "PERCENT", 10, null, 3, null, null, null)))
+                .as("nor how many payments it covers").isInstanceOf(ApiException.class);
+
+        PromoService.Promo e = promos.update(p.id(), edit(p, "PERCENT", 10, null, null, 5, LocalDate.now().plusDays(10), "معرض"));
+        assertThat(e.maxRedemptions()).isEqualTo(5);
+        assertThat(e.note()).isEqualTo("معرض");
+        assertThat(e.expiresAt()).isAfter(Instant.now());
+
+        UUID second = newOffice();
+        as(second, () -> promos.apply(p.code()));
+        assertThatThrownBy(() -> promos.update(p.id(), edit(p, "PERCENT", 10, null, null, 1, null, null)))
+                .as("the limit is not below the uses so far").hasMessageContaining("لا يقل");
+    }
 }

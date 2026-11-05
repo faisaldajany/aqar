@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -291,7 +292,14 @@ public class PromoService {
                 .param(affiliateId).query(PromoService::map).list();
     }
 
-    public Promo create(NewPromo n) {
+    /** A code's settings, checked and normalized; shared by create and edit. */
+    private record Fields(String code, String kind, Integer percent, Long amount, Integer trial, Integer duration,
+                          List<String> plans, List<String> cycles, boolean newOnly, Integer max, Instant starts, Instant expires,
+                          String note) {
+    }
+
+    private Fields fields(NewPromo n) {
+        if (n == null) throw ApiException.badRequest("bad_promo", "بيانات الكود ناقصة.");
         String code = normalize(n.code());
         if (!code.matches("[A-Z0-9_-]{3,32}")) {
             throw ApiException.badRequest("bad_code", "الكود من 3 إلى 32 حرفاً إنجليزياً أو رقماً (بدون مسافات).");
@@ -344,26 +352,107 @@ public class PromoService {
         if (starts != null && expires != null && !expires.isAfter(starts)) {
             throw ApiException.badRequest("bad_dates", "تاريخ الانتهاء بعد تاريخ البداية.");
         }
-        if (find(code).isPresent()) throw ApiException.conflict("code_taken", "هذا الكود موجود.");
-        if (n.affiliateId() != null && !jdbc.sql("select exists(select 1 from affiliates where id = ? and active)")
-                .param(n.affiliateId()).query(Boolean.class).single()) {
+        return new Fields(code, kind, percent, amount, trial, duration, plans, cycles,
+                n.newCustomersOnly() == null || n.newCustomersOnly(), n.maxRedemptions(), starts, expires,
+                n.note() == null || n.note().isBlank() ? null : n.note().trim());
+    }
+
+    public Promo create(NewPromo n) {
+        Fields f = fields(n);
+        return tx.execute(status -> {
+            if (find(f.code()).isPresent()) throw ApiException.conflict("code_taken", "هذا الكود موجود.");
+            requireActiveAffiliate(n.affiliateId());
+            oneActiveCodePerMarketer(n.affiliateId(), null);
+            UUID id = jdbc.sql("""
+                            insert into promo_codes (code, kind, percent_off, amount_off_halalas, trial_days, duration_periods, plans,
+                                                     cycles, new_customers_only, max_redemptions, starts_at, expires_at, note, affiliate_id)
+                            values (?, ?, ?, ?, ?, ?, string_to_array(?, ','), string_to_array(?, ','), ?, ?, ?, ?, ?, ?) returning id""")
+                    .params(f.code(), f.kind(), f.percent(), f.amount(), f.trial(), f.duration(), String.join(",", f.plans()),
+                            String.join(",", f.cycles()), f.newOnly(), f.max(),
+                            f.starts() == null ? null : Timestamp.from(f.starts()), f.expires() == null ? null : Timestamp.from(f.expires()),
+                            f.note(), n.affiliateId())
+                    .query(UUID.class).single();
+            return byId(id).orElseThrow();
+        });
+    }
+
+    /**
+     * Edits a code. Until an office uses it, everything can change. Once used, its terms (the code itself, the kind,
+     * the discount, and how many payments it covers) stay as they are, so offices already on it are not repriced; for
+     * other terms, create a new code and switch this one off. The rest can change: dates, limit (not below the uses so
+     * far), plans, cycles, new customers only, note, and the marketer. A new marketer takes over the code's current
+     * clients from now on; what the previous marketer earned stays theirs.
+     */
+    public Promo update(UUID id, NewPromo n) {
+        Fields f = fields(n);
+        return tx.execute(status -> {
+            Promo old = jdbc.sql("select " + COLUMNS + " from promo_codes where id = ? for update").param(id)
+                    .query(PromoService::map).optional()
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no_promo", "الكود غير موجود."));
+            if (old.redemptions() > 0 && (!f.code().equals(old.code()) || !f.kind().equals(old.kind())
+                    || !Objects.equals(f.percent(), old.percentOff()) || !Objects.equals(f.amount(), old.amountOffHalalas())
+                    || !Objects.equals(f.trial(), old.trialDays()) || !Objects.equals(f.duration(), old.durationPeriods()))) {
+                throw ApiException.conflict("promo_in_use", "استُخدم هذا الكود، فلا يتغير الكود ولا الخصم ولا عدد دفعاته حتى لا يتغير السعر "
+                        + "على المكاتب التي تستخدمه. لعرض جديد أنشئ كوداً جديداً وأوقف هذا.");
+            }
+            if (!f.code().equals(old.code()) && find(f.code()).isPresent()) {
+                throw ApiException.conflict("code_taken", "هذا الكود موجود.");
+            }
+            // A code keeps its marketer even after the marketer is switched off; a new one must be active.
+            if (!Objects.equals(n.affiliateId(), old.affiliateId())) {
+                requireActiveAffiliate(n.affiliateId());
+                if (old.active()) oneActiveCodePerMarketer(n.affiliateId(), id);
+            }
+            if (f.max() != null && f.max() < old.redemptions()) {
+                throw ApiException.badRequest("bad_max", "استُخدم الكود " + old.redemptions() + " مرة، فالحد الأقصى لا يقل عن ذلك.");
+            }
+            jdbc.sql("""
+                            update promo_codes set code = ?, kind = ?, percent_off = ?, amount_off_halalas = ?, trial_days = ?,
+                                   duration_periods = ?, plans = string_to_array(?, ','), cycles = string_to_array(?, ','),
+                                   new_customers_only = ?, max_redemptions = ?, starts_at = ?, expires_at = ?, note = ?, affiliate_id = ?
+                            where id = ?""")
+                    .params(f.code(), f.kind(), f.percent(), f.amount(), f.trial(), f.duration(), String.join(",", f.plans()),
+                            String.join(",", f.cycles()), f.newOnly(), f.max(),
+                            f.starts() == null ? null : Timestamp.from(f.starts()), f.expires() == null ? null : Timestamp.from(f.expires()),
+                            f.note(), n.affiliateId(), id)
+                    .update();
+            if (!Objects.equals(n.affiliateId(), old.affiliateId())) affiliates.reassign(id, n.affiliateId());
+            return byId(id).orElseThrow();
+        });
+    }
+
+    private void requireActiveAffiliate(UUID affiliateId) {
+        if (affiliateId != null && !jdbc.sql("select exists(select 1 from affiliates where id = ? and active)")
+                .param(affiliateId).query(Boolean.class).single()) {
             throw ApiException.badRequest("bad_affiliate", "المسوّق غير موجود أو موقوف.");
         }
-        UUID id = jdbc.sql("""
-                        insert into promo_codes (code, kind, percent_off, amount_off_halalas, trial_days, duration_periods, plans,
-                                                 cycles, new_customers_only, max_redemptions, starts_at, expires_at, note, affiliate_id)
-                        values (?, ?, ?, ?, ?, ?, string_to_array(?, ','), string_to_array(?, ','), ?, ?, ?, ?, ?, ?) returning id""")
-                .params(code, kind, percent, amount, trial, duration, String.join(",", plans), String.join(",", cycles),
-                        n.newCustomersOnly() == null || n.newCustomersOnly(), n.maxRedemptions(),
-                        starts == null ? null : Timestamp.from(starts), expires == null ? null : Timestamp.from(expires),
-                        n.note() == null || n.note().isBlank() ? null : n.note().trim(), n.affiliateId())
-                .query(UUID.class).single();
-        return jdbc.sql("select " + COLUMNS + " from promo_codes where id = ?").param(id).query(PromoService::map).single();
+    }
+
+    public Optional<Promo> byId(UUID id) {
+        return jdbc.sql("select " + COLUMNS + " from promo_codes where id = ?").param(id).query(PromoService::map).optional();
     }
 
     public void setActive(UUID id, boolean active) {
-        int n = jdbc.sql("update promo_codes set active = ? where id = ?").params(active, id).update();
-        if (n == 0) throw new ApiException(HttpStatus.NOT_FOUND, "no_promo", "الكود غير موجود.");
+        tx.executeWithoutResult(status -> {
+            Promo p = byId(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no_promo", "الكود غير موجود."));
+            if (active && !p.active()) oneActiveCodePerMarketer(p.affiliateId(), id);
+            jdbc.sql("update promo_codes set active = ? where id = ?").params(active, id).update();
+        });
+    }
+
+    /**
+     * A marketer has one active code at a time: to change what they offer, edit their code, or switch it off first.
+     * Serialized per marketer (row lock), so two requests cannot both add one.
+     */
+    private void oneActiveCodePerMarketer(UUID affiliateId, UUID exceptCode) {
+        if (affiliateId == null) return;
+        jdbc.sql("select id from affiliates where id = ? for update").param(affiliateId).query(UUID.class).optional();
+        jdbc.sql("select code from promo_codes where affiliate_id = ? and active and id <> ? order by created_at limit 1")
+                .params(affiliateId, exceptCode == null ? new UUID(0, 0) : exceptCode).query(String.class).optional()
+                .ifPresent(code -> {
+                    throw ApiException.conflict("affiliate_has_code", "لهذا المسوّق كود فعّال: " + code
+                            + ". عدّله، أو أوقفه قبل أن تعطيه كوداً آخر.");
+                });
     }
 
     static Promo map(ResultSet rs, int n) throws SQLException {

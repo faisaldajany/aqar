@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import sa.waslah.agent.affiliate.AffiliateLedger;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.office.OfficeAlerts;
 
@@ -48,9 +49,12 @@ public class BillingService {
     private final PromoService promos;
     private final TransactionTemplate tx;
     private final BillingMail mail;
+    private final AffiliateLedger affiliates;
 
     public BillingService(JdbcClient jdbc, PaymentGateways gateways, BillingProperties props, Subscription subscription,
-                          PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx, BillingMail mail) {
+                          PlanLimits plans, OfficeAlerts alerts, PromoService promos, TransactionTemplate tx, BillingMail mail,
+                          AffiliateLedger affiliates) {
+        this.affiliates = affiliates;
         this.mail = mail;
         this.promos = promos;
         this.tx = tx;
@@ -186,6 +190,8 @@ public class BillingService {
                     .query((rs, n) -> rs.getObject(1, UUID.class)).optional().orElse(null);
             promos.onPaid(promoId);
         }
+        // The office's marketer earns their share (not on test payments: the ledger checks the invoice).
+        if (changed == 1) affiliates.onPaid(inv.id());
         return changed == 1;
     }
 
@@ -364,6 +370,7 @@ public class BillingService {
                 subscription.takeBack("ANNUAL".equals(inv.cycle()) ? 12 : 1);
                 takenBack = true;
             }
+            affiliates.onRefund(invoiceId);
             return Optional.of(new Refund(find(invoiceId).orElseThrow(), amount, full, takenBack));
         });
     }

@@ -95,6 +95,8 @@ public class BillingController {
             pm.put("periodsUsed", a.periodsUsed());
             pm.put("remainingPeriods", a.remainingPeriods());
             pm.put("usedUp", a.usedUp());
+            // A marketer's code: the office is told what the marketer can see (the billing page says so).
+            pm.put("fromMarketer", a.promo().affiliateId() != null);
             out.put("promo", pm);
         } else {
             out.put("promo", null);

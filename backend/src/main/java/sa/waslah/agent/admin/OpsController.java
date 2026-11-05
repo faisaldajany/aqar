@@ -401,6 +401,7 @@ public class OpsController {
         m.put("active", p.active());
         m.put("note", p.note());
         m.put("createdAt", p.createdAt().toString());
+        m.put("affiliateId", p.affiliateId());
         return m;
     }
 

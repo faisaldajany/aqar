@@ -52,6 +52,15 @@ public class AffiliateLedger {
                 .params(TenantContext.require(), promoCodeId).update();
     }
 
+    /** The team gave the code to another marketer (or none): its current clients go with it, from now on. */
+    public void reassign(UUID promoCodeId, UUID affiliateId) {
+        if (affiliateId == null) {
+            jdbc.sql("delete from affiliate_clients where promo_code_id = ?").param(promoCodeId).update();
+        } else {
+            jdbc.sql("update affiliate_clients set affiliate_id = ? where promo_code_id = ?").params(affiliateId, promoCodeId).update();
+        }
+    }
+
     record Link(UUID affiliateId, UUID promoCodeId, BigDecimal percent) {
     }
 

@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.auth.PasswordResetService;
@@ -378,6 +379,14 @@ public class OpsController {
         return promoView(p);
     }
 
+    @PutMapping("/api/ops/promos/{id}")
+    Map<String, Object> promoUpdate(HttpServletRequest http, @PathVariable UUID id, @RequestBody PromoService.NewPromo n) {
+        ops.require(http);
+        PromoService.Promo p = promos.update(id, n);
+        audit(http, "PROMO_UPDATED", null, p.code(), p.summary());
+        return promoView(p);
+    }
+
     @PostMapping("/api/ops/promos/{id}/active")
     Map<String, Object> promoActive(HttpServletRequest http, @PathVariable UUID id, @RequestBody Active a) {
         ops.require(http);
@@ -386,6 +395,8 @@ public class OpsController {
         audit(http, on ? "PROMO_ON" : "PROMO_OFF", null, id.toString(), null);
         return Map.of("id", id, "active", on);
     }
+
+    static final java.time.ZoneId RIYADH_ZONE = java.time.ZoneId.of("Asia/Riyadh");
 
     static Map<String, Object> promoView(PromoService.Promo p) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -402,6 +413,15 @@ public class OpsController {
         m.put("note", p.note());
         m.put("createdAt", p.createdAt().toString());
         m.put("affiliateId", p.affiliateId());
+        // What the edit form needs, and the dates as the team typed them (the last day is inclusive).
+        m.put("percentOff", p.percentOff());
+        m.put("amountOffHalalas", p.amountOffHalalas());
+        m.put("trialDays", p.trialDays());
+        m.put("durationPeriods", p.durationPeriods());
+        m.put("plans", p.plans());
+        m.put("cycles", p.cycles());
+        m.put("startsOn", p.startsAt() == null ? null : p.startsAt().atZone(RIYADH_ZONE).toLocalDate().toString());
+        m.put("expiresOn", p.expiresAt() == null ? null : p.expiresAt().atZone(RIYADH_ZONE).toLocalDate().minusDays(1).toString());
         return m;
     }
 

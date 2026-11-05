@@ -45,7 +45,7 @@ export function PartnerView({ page, team = false }: { page: PartnerPage; team?: 
             <tbody>{codes.map((c) => (
               <tr key={c.code}>
                 <td><b dir="ltr">{c.code}</b></td>
-                <td className="small">{c.summary}{c.newCustomersOnly ? " · للمكاتب الجديدة" : ""}{c.expiresAt ? ` · حتى ${day(c.expiresAt)}` : ""}</td>
+                <td className="small">{c.summary}{c.newCustomersOnly ? " · للمكاتب الجديدة" : ""}{c.expiresOn ? ` · حتى ${day(c.expiresOn)}` : ""}</td>
                 <td>{c.redemptions}{c.maxRedemptions ? ` / ${c.maxRedemptions}` : ""}</td>
                 <td>{c.active ? <span className="pill p-ok">فعّال</span> : <span className="pill p-idle">موقوف</span>}</td>
                 <td><button type="button" className="btn" onClick={() => void copy(c.code)}>{copied === c.code ? "نُسخ" : "نسخ رابط التسجيل"}</button></td>

@@ -22,6 +22,8 @@ export type PartnerClient = {
 
 export type PartnerCode = {
   id?: string; code: string; summary: string; newCustomersOnly: boolean; active: boolean; expiresAt: string | null;
+  /** The last day it can be used (YYYY-MM-DD). */
+  expiresOn?: string | null;
   redemptions: number; maxRedemptions: number | null;
 };
 

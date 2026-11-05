@@ -31,6 +31,7 @@ import sa.waslah.agent.tenant.TenantContext;
 class AffiliateTest extends IntegrationTest {
 
     static final String KEY = "test-admin-token-0123456789";
+    static final String IBAN = "SA0380000000608010167519";
 
     @Autowired AuthService auth;
     @Autowired PromoService promos;
@@ -227,6 +228,7 @@ class AffiliateTest extends IntegrationTest {
 
     @Test
     void marketersHaveTheirOwnSession() {
+        affiliates.update(marketer, new AffiliateService.Changes(null, null, null, IBAN, "ملاحظة داخلية", null));
         assertThat(call(HttpMethod.GET, "/api/partner/me", null, null, false).getStatusCode().value()).isEqualTo(401);
 
         String token = partnerAuth.link(marketer, true).url().split("token=")[1];
@@ -264,6 +266,7 @@ class AffiliateTest extends IntegrationTest {
 
     @Test
     void theTeamConsoleNeedsTheOperator() {
+        affiliates.update(marketer, new AffiliateService.Changes(null, null, null, IBAN, "ملاحظة داخلية", null));
         assertThat(call(HttpMethod.GET, "/api/ops/affiliates", null, null, false).getStatusCode().value()).isEqualTo(404);
         ResponseEntity<List> all = http.exchange("/api/ops/affiliates", HttpMethod.GET, new HttpEntity<>(headers()), List.class);
         assertThat(all.getStatusCode().value()).isEqualTo(200);
@@ -273,7 +276,7 @@ class AffiliateTest extends IntegrationTest {
         assertThat(created.getStatusCode().value()).isEqualTo(200);
         assertThat((String) created.getBody().get("inviteUrl")).contains("/partner/set-password?token=");
         ResponseEntity<Map> page = call(HttpMethod.GET, "/api/ops/affiliates/" + marketer, null, null, true);
-        assertThat(((Map) page.getBody().get("affiliate"))).containsKeys("iban", "note");
+        assertThat(((Map) page.getBody().get("affiliate"))).containsEntry("iban", IBAN).containsKey("note");
     }
 
     HttpHeaders headers() {

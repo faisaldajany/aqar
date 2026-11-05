@@ -38,7 +38,7 @@ export type OpsOverview = {
 export type OpsPromo = {
   id: string; code: string; kind: "PERCENT" | "FIXED" | "TRIAL_DAYS"; summary: string; redemptions: number;
   maxRedemptions: number | null; newCustomersOnly: boolean; startsAt: string | null; expiresAt: string | null;
-  active: boolean; note: string | null; createdAt: string;
+  active: boolean; note: string | null; createdAt: string; affiliateId: string | null;
 };
 
 export type OpsSupport = {
@@ -137,6 +137,7 @@ export const ACTION_LABELS: Record<string, string> = {
   USER_DISABLED: "إيقاف مستخدم", USER_ENABLED: "تفعيل مستخدم", RESET_LINK: "رابط كلمة مرور", PROMO_CREATED: "كود خصم جديد",
   PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
   AI_REVIEW: "مراجعة ردود بالذكاء الاصطناعي", CONVERSATION_VIEWED: "فتح محادثة", EXPORT: "تصدير محادثات",
+  AFFILIATE_CREATED: "مسوّق جديد", AFFILIATE_UPDATED: "تعديل مسوّق", AFFILIATE_INVITE: "رابط دخول لمسوّق", AFFILIATE_PAYOUT: "تحويل لمسوّق",
 };
 
 /** "2 نوفمبر 2026، 3:15 م" in Riyadh time, or "—". */

@@ -144,6 +144,12 @@ function BillingView() {
                 : b.promo.remainingPeriods != null && b.promo.periodsUsed > 0 ? ` · باقي ${b.promo.remainingPeriods} من ${b.promo.durationPeriods}` : ""}
             </span>
             <button type="button" className="btn" disabled={busy === "promo"} onClick={removePromo}>إزالة الكود</button>
+            {b.promo.fromMarketer && (
+              <p className="small muted" style={{ flexBasis: "100%", margin: 0 }}>
+                هذا الكود من أحد مسوّقي حداء. ما دمت تستخدمه يرى المسوّق اسم مكتبك وباقتك وحالة اشتراكك وتاريخ التجديد
+                والمبالغ المدفوعة، ولا يرى عملاءك ولا محادثاتك ولا بيانات التواصل.
+              </p>
+            )}
           </div>
         ) : (
           <form className="row" onSubmit={applyPromo} style={{ alignItems: "flex-end" }}>

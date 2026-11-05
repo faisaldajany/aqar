@@ -14,6 +14,7 @@ const NAV = [
   { href: "/ops/usage", label: "الاستخدام والتكلفة", icon: "chart" },
   { href: "/ops/reviews", label: "مراجعة الردود", icon: "chat" },
   { href: "/ops/promos", label: "أكواد الخصم", icon: "card" },
+  { href: "/ops/affiliates", label: "المسوّقون بالعمولة", icon: "people" },
   { href: "/ops/support", label: "رسائل الدعم", icon: "help" },
   { href: "/ops/audit", label: "سجل العمليات", icon: "check" },
 ];

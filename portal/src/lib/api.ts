@@ -200,6 +200,8 @@ export type Plan = {
 export type BillingPromo = {
   code: string; kind: "PERCENT" | "FIXED" | "TRIAL_DAYS"; summary: string; percentOff: number | null; amountOffSar: string | null;
   durationPeriods: number | null; periodsUsed: number; remainingPeriods: number | null; usedUp: boolean;
+  /** The code belongs to one of Hidaa's marketers, who sees the office's business details while it is used. */
+  fromMarketer?: boolean;
 };
 export type Billing = {
   status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "EXPIRED" | "CANCELLED"; plan: Plan["id"]; cycle: "MONTHLY" | "ANNUAL";

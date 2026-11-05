@@ -43,7 +43,7 @@ class PromoFlowTest extends IntegrationTest {
 
     PromoService.Promo percent(String code, int pct, Integer periods) {
         return promos.create(new PromoService.NewPromo(code + tag, "PERCENT", pct, null, null, periods, List.of(), List.of(),
-                true, null, null, null, null));
+                true, null, null, null, null, null));
     }
 
     <T> T as(UUID o, java.util.concurrent.Callable<T> c) {
@@ -110,7 +110,7 @@ class PromoFlowTest extends IntegrationTest {
     @Test
     void fixedAmountOnlyOnItsPlanAndCycle() {
         PromoService.Promo p = promos.create(new PromoService.NewPromo("GROW" + tag, "FIXED", null, new BigDecimal("100"),
-                null, null, List.of("GROWTH"), List.of("MONTHLY"), true, null, null, null, "حملة النمو"));
+                null, null, List.of("GROWTH"), List.of("MONTHLY"), true, null, null, null, "حملة النمو", null));
         assertThat(p.summary()).contains("100 ريال").contains("النمو").contains("كل الدفعات");
         as(office, () -> promos.apply(p.code()));
         assertThat(as(office, () -> billing.checkout(office, PlanLimits.Plan.BASIC, "MONTHLY")).discountHalalas()).isZero();
@@ -125,7 +125,7 @@ class PromoFlowTest extends IntegrationTest {
     @Test
     void trialDaysAtSignupAndOnlyOnce() {
         PromoService.Promo p = promos.create(new PromoService.NewPromo("CITY" + tag, "TRIAL_DAYS", null, null, 16, null,
-                List.of(), List.of(), true, null, null, null, null));
+                List.of(), List.of(), true, null, null, null, null, null));
         String t = UUID.randomUUID().toString().substring(0, 8);
         UUID o = auth.signup(new AuthService.Signup("مكتب " + t, "1100012345", "مالك", t + "@promo.sa", "password123",
                 p.code())).officeId();
@@ -147,7 +147,7 @@ class PromoFlowTest extends IntegrationTest {
     @Test
     void limitsExpiryNewCustomersAndOneDiscountAtATime() {
         PromoService.Promo once = promos.create(new PromoService.NewPromo("ONCE" + tag, "PERCENT", 10, null, null, 1,
-                List.of(), List.of(), false, 1, null, null, null));
+                List.of(), List.of(), false, 1, null, null, null, null));
         as(office, () -> promos.apply(once.code()));
         BillingService.Invoice inv = as(office, () -> billing.checkout(office, PlanLimits.Plan.BASIC, "MONTHLY"));
         as(office, () -> billing.mockPay(inv.id()));
@@ -156,7 +156,7 @@ class PromoFlowTest extends IntegrationTest {
                 .isInstanceOf(ApiException.class).hasMessageContaining("عدد مرات");
 
         PromoService.Promo expired = promos.create(new PromoService.NewPromo("OLD" + tag, "PERCENT", 10, null, null, null,
-                List.of(), List.of(), false, null, LocalDate.now().minusDays(10), LocalDate.now().minusDays(2), null));
+                List.of(), List.of(), false, null, LocalDate.now().minusDays(10), LocalDate.now().minusDays(2), null, null));
         assertThatThrownBy(() -> promos.usable(expired.code())).hasMessageContaining("انتهت");
 
         PromoService.Promo newOnly = percent("NEW", 20, 1);
@@ -171,7 +171,7 @@ class PromoFlowTest extends IntegrationTest {
         BillingService.Invoice paid = as(fresh, () -> billing.checkout(fresh, PlanLimits.Plan.BASIC, "MONTHLY"));
         as(fresh, () -> billing.mockPay(paid.id()));
         PromoService.Promo c = promos.create(new PromoService.NewPromo("CCC" + tag, "PERCENT", 50, null, null, 1,
-                List.of(), List.of(), false, null, null, null, null));
+                List.of(), List.of(), false, null, null, null, null, null));
         assertThatThrownBy(() -> as(fresh, () -> promos.apply(c.code())))
                 .as("b is running").hasMessageContaining("خصم فعّال");
     }
@@ -179,7 +179,7 @@ class PromoFlowTest extends IntegrationTest {
     @Test
     void aCappedCodesUseIsTakenWhenAppliedAndGivenBackWhenRemovedUnused() {
         PromoService.Promo one = promos.create(new PromoService.NewPromo("CAP" + tag, "PERCENT", 10, null, null, 1,
-                List.of(), List.of(), false, 1, null, null, null));
+                List.of(), List.of(), false, 1, null, null, null, null));
         as(office, () -> promos.apply(one.code()));
         assertThat(promos.find(one.code()).orElseThrow().redemptions()).isEqualTo(1);
         assertThat(as(office, () -> promos.apply(one.code())).code()).as("applying the held code again is fine").isEqualTo(one.code());
@@ -217,7 +217,7 @@ class PromoFlowTest extends IntegrationTest {
     @Test
     void parallelTrialCodeExtendsTheTrialOnce() throws Exception {
         PromoService.Promo p = promos.create(new PromoService.NewPromo("TWICE" + tag, "TRIAL_DAYS", null, null, 16, null,
-                List.of(), List.of(), true, null, null, null, null));
+                List.of(), List.of(), true, null, null, null, null, null));
         List<Object> results = parallel(6, () -> as(office, () -> promos.apply(p.code())));
         assertThat(results).filteredOn(r -> r instanceof PromoService.Promo).hasSize(1);
         assertThat(as(office, () -> subscription.state().trialDaysLeft(Instant.now()))).isEqualTo(30);

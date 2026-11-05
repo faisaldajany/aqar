@@ -36,8 +36,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // /admin/** and /api/ops/** check the operator key or session themselves (OpsAuth).
-                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/ops/**", "/api/public/**", "/internal/jobs/**").permitAll()
+                        // /admin/** and /api/ops/** check the operator key or session themselves (OpsAuth);
+                        // /api/partner/** checks the marketer's own session (PartnerAuth).
+                        .requestMatchers("/webhooks/**", "/api/auth/**", "/actuator/health/**", "/actuator/health", "/actuator/prometheus", "/dev/**", "/admin/**", "/api/ops/**", "/api/partner/**", "/api/public/**", "/internal/jobs/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(bearerTokenResolver())
@@ -52,7 +53,7 @@ public class SecurityConfig {
         return request -> {
             String path = request.getRequestURI();
             if (path.startsWith("/api/auth/") || path.startsWith("/webhooks/") || path.startsWith("/dev/") || path.startsWith("/admin/")
-                    || path.startsWith("/api/ops/") || path.startsWith("/api/public/") || path.startsWith("/internal/")) {
+                    || path.startsWith("/api/ops/") || path.startsWith("/api/partner/") || path.startsWith("/api/public/") || path.startsWith("/internal/")) {
                 return null;
             }
             String header = request.getHeader("Authorization");

@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import sa.waslah.agent.affiliate.AffiliateLedger;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.tenant.TenantContext;
 
@@ -34,6 +35,8 @@ import sa.waslah.agent.tenant.TenantContext;
  *   <li>A use is taken from the code's limit when the code is applied, atomically, so a capped code never goes over
  *       its cap; removing a discount before any invoice used it gives the use back. A discount the office has started
  *       keeps going for its duration even if the code later expires or is switched off.</li>
+ *   <li>A code can belong to a marketer: the office that applies it becomes the marketer's client, who earns on its
+ *       payments while the code is on (see {@link AffiliateLedger}).</li>
  * </ul>
  * Office-side methods run under the office's tenant.
  */
@@ -45,7 +48,7 @@ public class PromoService {
     public record Promo(UUID id, String code, String kind, Integer percentOff, Long amountOffHalalas, Integer trialDays,
                         Integer durationPeriods, List<String> plans, List<String> cycles, boolean newCustomersOnly,
                         Integer maxRedemptions, int redemptions, Instant startsAt, Instant expiresAt, boolean active,
-                        String note, Instant createdAt) {
+                        String note, Instant createdAt, UUID affiliateId) {
 
         public boolean discount() {
             return "PERCENT".equals(kind) || "FIXED".equals(kind);
@@ -83,23 +86,26 @@ public class PromoService {
         }
     }
 
+    /** @param affiliateId the marketer the code belongs to (they earn from the offices that use it), or null */
     public record NewPromo(String code, String kind, Integer percentOff, BigDecimal amountOffSar, Integer trialDays,
                            Integer durationPeriods, List<String> plans, List<String> cycles, Boolean newCustomersOnly,
-                           Integer maxRedemptions, LocalDate startsOn, LocalDate expiresOn, String note) {
+                           Integer maxRedemptions, LocalDate startsOn, LocalDate expiresOn, String note, UUID affiliateId) {
     }
 
     private static final List<String> FIELDS = List.of("id", "code", "kind", "percent_off", "amount_off_halalas",
             "trial_days", "duration_periods", "plans", "cycles", "new_customers_only", "max_redemptions", "redemptions",
-            "starts_at", "expires_at", "active", "note", "created_at");
+            "starts_at", "expires_at", "active", "note", "created_at", "affiliate_id");
     private static final String COLUMNS = String.join(", ", FIELDS);
     private static final String P_COLUMNS = String.join(", ", FIELDS.stream().map(f -> "p." + f).toList());
 
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
+    private final AffiliateLedger affiliates;
 
-    public PromoService(JdbcClient jdbc, TransactionTemplate tx) {
+    public PromoService(JdbcClient jdbc, TransactionTemplate tx, AffiliateLedger affiliates) {
         this.jdbc = jdbc;
         this.tx = tx;
+        this.affiliates = affiliates;
     }
 
     /** Uppercase, no spaces: " launch30 " is LAUNCH30. */
@@ -155,6 +161,8 @@ public class PromoService {
                     throw ApiException.badRequest("promo_trial_only", "أيام التجربة الإضافية للحسابات التي لم تشترك بعد.");
                 }
                 claim(office, p);
+                // A marketer's trial code makes the office theirs; a plain one leaves the office's marketer as it is.
+                if (p.affiliateId() != null) affiliates.attribute(p.id(), p.affiliateId());
                 jdbc.sql("""
                         update offices set subscription_status = 'TRIAL',
                                trial_ends_at = greatest(trial_ends_at, now()) + make_interval(days => ?)""")
@@ -163,7 +171,10 @@ public class PromoService {
             }
 
             Optional<Applied> current = current();
-            if (current.isPresent() && current.get().promo().id().equals(p.id())) return p;
+            if (current.isPresent() && current.get().promo().id().equals(p.id())) {
+                affiliates.attribute(p.id(), p.affiliateId());
+                return p;
+            }
             if (current.isPresent() && current.get().periodsUsed() > 0 && !current.get().usedUp()) {
                 throw ApiException.conflict("promo_active", "لديك خصم فعّال حالياً (" + current.get().promo().code()
                         + "). يمكنك استخدام كود جديد بعد انتهائه.");
@@ -178,6 +189,7 @@ public class PromoService {
             }
             current.ifPresent(this::releaseIfUnused);
             jdbc.sql("update offices set promo_code_id = ?, promo_periods_used = 0").param(p.id()).update();
+            affiliates.attribute(p.id(), p.affiliateId());
             return p;
         });
     }
@@ -186,7 +198,10 @@ public class PromoService {
     public void remove() {
         tx.executeWithoutResult(status -> {
             lockOffice();
-            current().ifPresent(this::releaseIfUnused);
+            current().ifPresent(a -> {
+                releaseIfUnused(a);
+                affiliates.detach(a.promo().id());
+            });
             jdbc.sql("update offices set promo_code_id = null, promo_periods_used = 0").update();
         });
     }
@@ -270,6 +285,12 @@ public class PromoService {
         return jdbc.sql("select " + COLUMNS + " from promo_codes order by created_at desc").query(PromoService::map).list();
     }
 
+    /** A marketer's codes, newest first. */
+    public List<Promo> forAffiliate(UUID affiliateId) {
+        return jdbc.sql("select " + COLUMNS + " from promo_codes where affiliate_id = ? order by created_at desc")
+                .param(affiliateId).query(PromoService::map).list();
+    }
+
     public Promo create(NewPromo n) {
         String code = normalize(n.code());
         if (!code.matches("[A-Z0-9_-]{3,32}")) {
@@ -324,14 +345,18 @@ public class PromoService {
             throw ApiException.badRequest("bad_dates", "تاريخ الانتهاء بعد تاريخ البداية.");
         }
         if (find(code).isPresent()) throw ApiException.conflict("code_taken", "هذا الكود موجود.");
+        if (n.affiliateId() != null && !jdbc.sql("select exists(select 1 from affiliates where id = ? and active)")
+                .param(n.affiliateId()).query(Boolean.class).single()) {
+            throw ApiException.badRequest("bad_affiliate", "المسوّق غير موجود أو موقوف.");
+        }
         UUID id = jdbc.sql("""
                         insert into promo_codes (code, kind, percent_off, amount_off_halalas, trial_days, duration_periods, plans,
-                                                 cycles, new_customers_only, max_redemptions, starts_at, expires_at, note)
-                        values (?, ?, ?, ?, ?, ?, string_to_array(?, ','), string_to_array(?, ','), ?, ?, ?, ?, ?) returning id""")
+                                                 cycles, new_customers_only, max_redemptions, starts_at, expires_at, note, affiliate_id)
+                        values (?, ?, ?, ?, ?, ?, string_to_array(?, ','), string_to_array(?, ','), ?, ?, ?, ?, ?, ?) returning id""")
                 .params(code, kind, percent, amount, trial, duration, String.join(",", plans), String.join(",", cycles),
                         n.newCustomersOnly() == null || n.newCustomersOnly(), n.maxRedemptions(),
                         starts == null ? null : Timestamp.from(starts), expires == null ? null : Timestamp.from(expires),
-                        n.note() == null || n.note().isBlank() ? null : n.note().trim())
+                        n.note() == null || n.note().isBlank() ? null : n.note().trim(), n.affiliateId())
                 .query(UUID.class).single();
         return jdbc.sql("select " + COLUMNS + " from promo_codes where id = ?").param(id).query(PromoService::map).single();
     }
@@ -348,7 +373,7 @@ public class PromoService {
                 strings(rs.getArray("plans")), strings(rs.getArray("cycles")), rs.getBoolean("new_customers_only"),
                 (Integer) rs.getObject("max_redemptions"), rs.getInt("redemptions"), instant(rs.getTimestamp("starts_at")),
                 instant(rs.getTimestamp("expires_at")), rs.getBoolean("active"), rs.getString("note"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(), rs.getObject("affiliate_id", UUID.class));
     }
 
     private static List<String> strings(Array a) throws SQLException {

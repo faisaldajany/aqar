@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { day, PLAN_NAMES, type OpsOffice, type OpsPromo } from "@/lib/ops";
 
 type Kind = OpsPromo["kind"];
+type Marketer = { id: string; fullName: string; commissionPercent: number };
 
 export default function OpsPromos() {
   const [promos, setPromos] = useState<OpsPromo[] | null>(null);
@@ -12,12 +14,18 @@ export default function OpsPromos() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [origin, setOrigin] = useState("https://hidaaco.com");
+  const [marketers, setMarketers] = useState<Marketer[]>([]);
+  const [marketer, setMarketer] = useState("");
 
   const load = useCallback(async () => setPromos(await api<OpsPromo[]>("/ops/promos")), []);
   useEffect(() => {
     setOrigin(window.location.origin);
+    // "Create a code for this marketer" links here with ?affiliate=<id>.
+    setMarketer(new URLSearchParams(window.location.search).get("affiliate") ?? "");
+    api<Marketer[]>("/ops/affiliates/options").then(setMarketers).catch(() => undefined);
     load().catch(() => setNotice({ ok: false, text: "تعذّر التحميل." }));
   }, [load]);
+  const marketerName = (id: string | null) => marketers.find((m) => m.id === id)?.fullName;
 
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,6 +49,7 @@ export default function OpsPromos() {
           newCustomersOnly: f.get("newOnly") === "on",
           maxRedemptions: num("max"),
           startsOn: text("startsOn"), expiresOn: text("expiresOn"), note: text("note"),
+          affiliateId: marketer || null,
         },
       });
       setNotice({ ok: true, text: `أُنشئ ${p.code}: ${p.summary}` });
@@ -117,6 +126,13 @@ export default function OpsPromos() {
           <label className="f" htmlFor="expiresOn">ينتهي في (شاملاً)<input id="expiresOn" name="expiresOn" type="date" /></label>
         </div>
         <label className="check"><input type="checkbox" name="newOnly" defaultChecked />للمشتركين الجدد فقط (لم يدفعوا اشتراكاً من قبل)</label>
+        <label className="f" htmlFor="marketer">المسوّق صاحب الكود
+          <select id="marketer" value={marketer} onChange={(e) => setMarketer(e.target.value)}>
+            <option value="">بلا مسوّق</option>
+            {marketers.map((m) => <option key={m.id} value={m.id}>{m.fullName} (عمولة {m.commissionPercent}٪)</option>)}
+          </select>
+          {marketer && <span className="small muted">المكتب الذي يطبّق الكود يصبح عميلاً لهذا المسوّق، ويكسب عمولته من كل دفعة ما دام الكود فعّالاً. يُفضّل ترك «عدد الدفعات المخصومة» فارغاً.</span>}
+        </label>
         <label className="f" htmlFor="note">ملاحظة داخلية<input id="note" name="note" maxLength={200} placeholder="مثل: معرض سيتي سكيب" /></label>
         {notice && <p className={notice.ok ? "small" : "err"} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
         <div><button className="btn primary" disabled={busy === "create"}>{busy === "create" ? "جارٍ الإنشاء…" : "أنشئ الكود"}</button></div>
@@ -129,7 +145,8 @@ export default function OpsPromos() {
           {promos?.length === 0 && <tr><td colSpan={6} className="muted">لا أكواد بعد.</td></tr>}
           {promos?.map((p) => (
             <tr key={p.id}>
-              <td><b dir="ltr">{p.code}</b>{p.note && <><br /><span className="small muted">{p.note}</span></>}</td>
+              <td><b dir="ltr">{p.code}</b>{p.note && <><br /><span className="small muted">{p.note}</span></>}
+                {p.affiliateId && <><br /><Link className="small" href={`/ops/affiliates/${p.affiliateId}`}>المسوّق: {marketerName(p.affiliateId) ?? "—"}</Link></>}</td>
               <td className="small">{p.summary}{p.newCustomersOnly ? " · للجدد" : ""}</td>
               <td>{p.redemptions}{p.maxRedemptions ? ` / ${p.maxRedemptions}` : ""}</td>
               <td className="small">{p.startsAt ? `من ${day(p.startsAt)} ` : ""}{p.expiresAt ? `حتى ${day(p.expiresAt)}` : "بلا انتهاء"}</td>

@@ -1,3 +1,8 @@
+"use client";
+
+import { useLang } from "./LangProvider";
+import type { Lang } from "@/lib/i18n";
+
 /** Hidaa mark: two messages, and the reply rising from them. */
 export function LogoMark({ size = 28, inverted = false }: { size?: number; inverted?: boolean }) {
   const dot = inverted ? "#FFFFFF" : "#17213F";
@@ -11,12 +16,13 @@ export function LogoMark({ size = 28, inverted = false }: { size?: number; inver
   );
 }
 
-/** Mark + name, for headers. */
-export function Logo({ size = 28, inverted = false }: { size?: number; inverted?: boolean }) {
+/** Mark + name, for headers: «حداء» in Arabic, "Hidaa" in English (the page's language unless {@code lang} says). */
+export function Logo({ size = 28, inverted = false, lang }: { size?: number; inverted?: boolean; lang?: Lang }) {
+  const page = useLang().lang;
   return (
     <span className="logo" style={{ fontSize: size * 0.95 }}>
       <LogoMark size={size} inverted={inverted} />
-      <span className="logo-word">حداء</span>
+      <span className="logo-word">{(lang ?? page) === "en" ? "Hidaa" : "حداء"}</span>
     </span>
   );
 }

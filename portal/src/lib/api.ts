@@ -1,3 +1,4 @@
+import { browserLang } from "./i18n";
 export class ApiError extends Error {
   /** For invalid input: a message for each wrong field, keyed by the field's name in the request. */
   constructor(public status: number, public code: string, message: string, public fields: Record<string, string> = {}) {
@@ -21,7 +22,8 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const { json, ...rest } = init ?? {};
   const res = await fetch(`/api${path}`, {
     ...rest,
-    headers: { ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...rest.headers },
+    // The server answers in the page's language where it can.
+    headers: { "Accept-Language": browserLang(), ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...rest.headers },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
     credentials: "same-origin",
     cache: "no-store",

@@ -25,6 +25,8 @@ export type OpsDetail = Omit<OpsOffice, "users"> & {
   usage: { conversations: number; included: number; overage: number };
   audit: OpsAudit[];
   templates?: TemplateRow[];
+  /** The office's linked WhatsApp numbers. */
+  waAccounts?: { phoneNumberId: string; wabaId: string; displayPhone: string | null; verifiedName: string | null; connectedAt: string }[];
   /** Where the office is in the WhatsApp setup guide. */
   waSetup?: { done: number; total: number; current: string | null; phone: string | null; readyOn: string | null; hasBusinessApp: boolean | null;
     steps: { key: string; label: string; done: boolean }[] };
@@ -139,7 +141,7 @@ export const ACTION_LABELS: Record<string, string> = {
   LOGIN: "دخول للإدارة", FAL_VERIFIED: "توثيق فال", FAL_REJECTED: "رفض فال", TRIAL_EXTENDED: "تمديد التجربة",
   COMP_MONTHS: "أشهر مجانية", PLAN_CHANGED: "تغيير الباقة", SUSPENDED: "إيقاف المكتب", REACTIVATED: "إعادة تفعيل المكتب",
   USER_DISABLED: "إيقاف مستخدم", USER_ENABLED: "تفعيل مستخدم", RESET_LINK: "رابط كلمة مرور", PROMO_CREATED: "كود خصم جديد",
-  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", PROMO_UPDATED: "تعديل كود", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
+  PROMO_ON: "تفعيل كود", PROMO_OFF: "إيقاف كود", PROMO_UPDATED: "تعديل كود", WA_MANUAL_LINK: "ربط رقم واتساب يدوياً", TEMPLATES_SYNC: "تحديث قوالب واتساب", INVOICE_PAID: "تسجيل دفعة يدوية",
   AI_REVIEW: "مراجعة ردود بالذكاء الاصطناعي", CONVERSATION_VIEWED: "فتح محادثة", EXPORT: "تصدير محادثات",
   AFFILIATE_CREATED: "مسوّق جديد", AFFILIATE_UPDATED: "تعديل مسوّق", AFFILIATE_INVITE: "رابط دخول لمسوّق", AFFILIATE_PAYOUT: "تحويل لمسوّق",
 };

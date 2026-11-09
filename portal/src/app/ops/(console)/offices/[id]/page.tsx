@@ -187,6 +187,44 @@ export default function OpsOfficePage() {
         <p className="small muted">يتوقف الوكيل عن الرد، ويُسجَّل خروج كل مستخدمي المكتب ولا يستطيعون الدخول حتى إعادة التفعيل. البيانات تبقى كما هي.</p>
       </div>
 
+      <div className="card">
+        <h2>أرقام واتساب</h2>
+        {(o.waAccounts ?? []).length === 0 ? <p className="small muted">لا رقم مربوط.</p> : (
+          <div className="tbl"><table>
+            <thead><tr><th>الرقم</th><th>الاسم في واتساب</th><th>Phone number ID</th><th>رُبط</th></tr></thead>
+            <tbody>{o.waAccounts!.map((a) => (
+              <tr key={a.phoneNumberId}>
+                <td><bdi dir="ltr">{a.displayPhone ?? "—"}</bdi></td>
+                <td>{a.verifiedName ?? "—"}</td>
+                <td className="small"><bdi dir="ltr">{a.phoneNumberId}</bdi></td>
+                <td className="small">{when(a.connectedAt)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        <details>
+          <summary className="small"><b>ربط رقم يدوياً</b> (رقم Meta التجريبي أثناء مراجعة التطبيق)</summary>
+          <p className="small muted">
+            من developers.facebook.com ← تطبيق Hidaa ← WhatsApp ← API Setup: انسخ «Phone number ID» و«WhatsApp Business Account ID»،
+            وتوكن دائماً من System user له صلاحيتا whatsapp_business_messaging وwhatsapp_business_management على هذا الحساب
+            (توكن صفحة API Setup ينتهي خلال يوم). يحتاج WA_MODE=cloud وMETA_APP_SECRET وضبط الويبهوك.
+          </p>
+          <form className="row" style={{ alignItems: "end" }} onSubmit={async (e) => {
+            const f = form(e);
+            const el = e.currentTarget;
+            const ok = await act("walink", `/ops/offices/${o.id}/whatsapp/manual`, {
+              wabaId: String(f.get("wabaId") ?? ""), phoneNumberId: String(f.get("phoneNumberId") ?? ""), accessToken: String(f.get("accessToken") ?? ""),
+            }, "رُبط الرقم بالمكتب.");
+            if (ok) el.reset();
+          }}>
+            <label className="f" htmlFor="waba" style={{ flex: "1 1 200px" }}>WhatsApp Business Account ID<input id="waba" name="wabaId" dir="ltr" inputMode="numeric" required /></label>
+            <label className="f" htmlFor="pnid" style={{ flex: "1 1 200px" }}>Phone number ID<input id="pnid" name="phoneNumberId" dir="ltr" inputMode="numeric" required /></label>
+            <label className="f" htmlFor="tok" style={{ flex: "2 1 280px" }}>Access token<input id="tok" name="accessToken" type="password" dir="ltr" autoComplete="off" required /></label>
+            <button className="btn primary" disabled={busy === "walink"}>{busy === "walink" ? "جارٍ الربط…" : "اربط الرقم"}</button>
+          </form>
+        </details>
+      </div>
+
       {o.whatsappConnected && (
         <TemplateStatus rows={o.templates ?? []} busy={busy === "templates"}
           onSync={() => void act("templates", `/ops/offices/${o.id}/templates/sync`, {}, "حُدّثت حالة القوالب.")} />

@@ -70,6 +70,34 @@ public class EmbeddedSignupService {
         return new Result(id, info.displayPhone(), r.coexistence());
     }
 
+    /**
+     * The team links a number to the current office by hand, with the number's IDs and a token that can manage its
+     * WhatsApp Business Account: Meta's test number while the app is in review, or a number added in WhatsApp
+     * Manager. Same steps as Embedded Signup after the code exchange (subscribe the app, read the number, save, add the
+     * templates), without registering the number (a test number already is).
+     */
+    public Result connectManually(String wabaId, String phoneNumberId, String accessToken) {
+        UUID officeId = TenantContext.require();
+        String waba = wabaId == null ? "" : wabaId.trim();
+        String phone = phoneNumberId == null ? "" : phoneNumberId.trim();
+        String token = accessToken == null ? "" : accessToken.trim();
+        if (!waba.matches("\\d{5,30}")) throw ApiException.badRequest("bad_waba", "«WhatsApp Business Account ID»: أرقام فقط، من صفحة API Setup.");
+        if (!phone.matches("\\d{5,30}")) throw ApiException.badRequest("bad_phone_id", "«Phone number ID»: أرقام فقط، من صفحة API Setup.");
+        if (token.length() < 20 || token.contains(" ")) throw ApiException.badRequest("bad_token", "«Access token»: الصق التوكن كاملاً.");
+        if (props.whatsapp().isMock()) {
+            throw ApiException.conflict("wa_mock", "حداء يعمل بواتساب التجريبي (WA_MODE=mock). غيّره إلى cloud أولاً ليصل الرقم بواتساب الحقيقي.");
+        }
+        if (accounts.officeForPhoneNumberId(phone).isPresent()) {
+            throw ApiException.conflict("number_taken", "هذا الرقم مربوط بمكتب في حداء.");
+        }
+        meta.subscribeApp(waba, token);
+        MetaGraphClient.PhoneInfo info = meta.phoneInfo(phone, token);
+        UUID id = tx.execute(s -> accounts.save(officeId, waba, phone, info.displayPhone(), info.verifiedName(), token, false));
+        log.info("Office {} linked WhatsApp number {} by hand", officeId, phone);
+        provisionTemplates(id);
+        return new Result(id, info.displayPhone(), false);
+    }
+
     /** The office's own copies of Hidaa's templates; a failure here never fails the connection (the sync job retries). */
     private void provisionTemplates(UUID accountId) {
         try {

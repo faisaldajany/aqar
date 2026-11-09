@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "سياسة الإلغاء والاسترجاع — حداء" };
+export const metadata: Metadata = { title: "سياسة الإلغاء والاسترجاع — حداء", alternates: { languages: { en: "/en/refund" } } };
 
 export default function Refund() {
   return (
-    <LegalPage title="سياسة الإلغاء والاسترجاع" updated="2 نوفمبر 2026">
+    <LegalPage title="سياسة الإلغاء والاسترجاع" updated="2 نوفمبر 2026" other="/en/refund">
       <p>هدفنا أن تجرّب حداء قبل أن تدفع، وأن تلغي متى شئت بدون عقد ولا رسوم إلغاء.</p>
 
       <h2>التجربة المجانية</h2>

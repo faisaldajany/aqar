@@ -3,11 +3,11 @@ import Link from "next/link";
 import { COMPANY } from "@/components/CompanyLine";
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "الشروط والأحكام — حداء" };
+export const metadata: Metadata = { title: "الشروط والأحكام — حداء", alternates: { languages: { en: "/en/terms" } } };
 
 export default function Terms() {
   return (
-    <LegalPage title="الشروط والأحكام" updated="4 نوفمبر 2026">
+    <LegalPage title="الشروط والأحكام" updated="4 نوفمبر 2026" other="/en/terms">
       <p>منصة حداء تقدمها {COMPANY.legalName} ({COMPANY.form}، السجل التجاري <bdi>{COMPANY.cr}</bdi>)، ويُشار إليها في هذه الشروط بـ«حداء». باستخدامك المنصة فإنك توافق على هذه الشروط نيابة عن مكتبك.</p>
       <h2>الخدمة</h2>
       <p>يرد حداء على عملاء مكتبك في واتساب من بيانات العقارات التي يرفعها المكتب، ويحجز المعاينات ويحوّل العملاء للمسوّقين. المكتب مسؤول عن صحة بيانات العقارات وتراخيص الإعلانات ورخصة فال، وعن الالتزام بأنظمة الهيئة العامة للعقار.</p>

@@ -379,3 +379,9 @@ details > summary { cursor: pointer; }
 .tbl.pv td.num, .tbl.pv td.nw { white-space: nowrap; }
 .tbl.pv .pill { white-space: nowrap; }
 .card input:disabled, .card select:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Arabic/English switch at the top of the public pages */
+.lang-bar { display: flex; justify-content: flex-end; padding: 6px 16px; background: #17213f; }
+.lang-bar a { display: inline-flex; align-items: center; gap: 6px; color: #fff; font-size: 13px; font-weight: 600; text-decoration: none; padding: 2px 6px; border-radius: 6px; }
+.lang-bar a:hover { background: rgba(255, 255, 255, 0.12); }
+.lang-bar a:focus-visible { outline: 2px solid #f0a8b3; outline-offset: 2px; }

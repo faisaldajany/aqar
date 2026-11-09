@@ -2,9 +2,29 @@
 
 import { useEffect } from "react";
 
-/** Sale/rent switch in the hero chat and the FAQ accordion, for the static home page markup. */
-export function HomeInteractions() {
+const TEXT = {
+  ar: {
+    incomplete: "اكتب اسمك وجوالك أو بريدك ورسالة من 10 أحرف على الأقل.",
+    sending: "جارٍ الإرسال…",
+    topic: "سؤال عن الخدمة",
+    failed: "تعذّر الإرسال. حاول مرة أخرى.",
+    sent: "وصلتنا رسالتك، ونرد عليك خلال يوم عمل.",
+    offline: "تعذّر الإرسال. تحقق من الاتصال وحاول مرة أخرى.",
+  },
+  en: {
+    incomplete: "Write your name, your mobile or email, and a message of at least 10 characters.",
+    sending: "Sending…",
+    topic: "Question about the service (English site)",
+    failed: "Couldn't send. Please try again.",
+    sent: "We got your message and will reply within one working day.",
+    offline: "Couldn't send. Check your connection and try again.",
+  },
+};
+
+/** Sale/rent switch in the hero chat and the FAQ accordion, for the static home page markup (Arabic or English). */
+export function HomeInteractions({ lang = "ar" }: { lang?: "ar" | "en" }) {
   useEffect(() => {
+    const t = TEXT[lang];
     const root = document.getElementById("home");
     if (!root) return;
     const cleanups: (() => void)[] = [];
@@ -59,26 +79,27 @@ export function HomeInteractions() {
         const name = String(f.get("name") ?? "").trim();
         const contact = String(f.get("contact") ?? "").trim();
         const message = String(f.get("message") ?? "").trim();
-        if (!name || !contact || message.length < 10) { say("اكتب اسمك وجوالك أو بريدك ورسالة من 10 أحرف على الأقل.", false); return; }
+        if (!name || !contact || message.length < 10) { say(t.incomplete, false); return; }
         const isEmail = contact.includes("@");
         const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
         if (button) button.disabled = true;
-        say("جارٍ الإرسال…", true);
+        say(t.sending, true);
         try {
           const res = await fetch("/api/public/support", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name, email: isEmail ? contact : null, phone: isEmail ? null : contact,
-              topic: "سؤال عن الخدمة", message, source: "website", website: f.get("website"),
+              topic: t.topic, message, source: "website", website: f.get("website"),
             }),
           });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) { say(data.message ?? "تعذّر الإرسال. حاول مرة أخرى.", false); return; }
+          // The server's messages are in Arabic: the English page shows its own.
+          if (!res.ok) { say(lang === "en" ? t.failed : data.message ?? t.failed, false); return; }
           form.reset();
-          say("وصلتنا رسالتك، ونرد عليك خلال يوم عمل.", true);
+          say(t.sent, true);
         } catch {
-          say("تعذّر الإرسال. تحقق من الاتصال وحاول مرة أخرى.", false);
+          say(t.offline, false);
         } finally {
           if (button) button.disabled = false;
         }
@@ -88,6 +109,6 @@ export function HomeInteractions() {
     }
 
     return () => cleanups.forEach((c) => c());
-  }, []);
+  }, [lang]);
   return null;
 }

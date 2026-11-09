@@ -132,6 +132,11 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <excludedGroups>${excluded.groups}</excludedGroups>
+          <systemPropertyVariables>
+            <!-- Docker Engine 29 refuses Testcontainers 1.x's default API version (1.32); 1.44 is the oldest it accepts.
+                 Also in src/test/resources/docker-java.properties. Drop both after moving to Testcontainers 2. -->
+            <api.version>1.44</api.version>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

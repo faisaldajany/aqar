@@ -32,6 +32,7 @@ import sa.waslah.agent.common.Mailer;
 import sa.waslah.agent.common.RateLimiter;
 import sa.waslah.agent.office.OfficeAlerts;
 import sa.waslah.agent.tenant.TenantContext;
+import sa.waslah.agent.whatsapp.EmbeddedSignupService;
 import sa.waslah.agent.whatsapp.WaTemplates;
 import sa.waslah.agent.whatsapp.WhatsAppSetup;
 
@@ -80,11 +81,13 @@ public class OpsController {
     private final WaTemplates templates;
     private final PaymentGateways gateways;
     private final WhatsAppSetup waSetup;
+    private final EmbeddedSignupService signup;
 
     public OpsController(JdbcClient jdbc, OpsAuth ops, PlanLimits plans, OfficeAlerts alerts, BillingService billing,
                          PromoService promos, PasswordResetService resets, SessionGuard sessions, Mailer mailer,
-                         WaTemplates templates, PaymentGateways gateways, WhatsAppSetup waSetup) {
+                         WaTemplates templates, PaymentGateways gateways, WhatsAppSetup waSetup, EmbeddedSignupService signup) {
         this.waSetup = waSetup;
+        this.signup = signup;
         this.gateways = gateways;
         this.templates = templates;
         this.jdbc = jdbc;
@@ -195,9 +198,34 @@ public class OpsController {
             o.put("templates", templates.statuses());
             // Where the office is in the WhatsApp setup, for support calls ("I'm stuck at…").
             o.put("waSetup", waSetup.state());
+            o.put("waAccounts", jdbc.sql("""
+                            select phone_number_id, waba_id, display_phone, verified_name, connected_at from wa_accounts
+                            order by connected_at""")
+                    .query((rs, n) -> {
+                        Map<String, Object> a = new LinkedHashMap<>();
+                        a.put("phoneNumberId", rs.getString(1));
+                        a.put("wabaId", rs.getString(2));
+                        a.put("displayPhone", rs.getString(3));
+                        a.put("verifiedName", rs.getString(4));
+                        a.put("connectedAt", iso(rs.getTimestamp(5)));
+                        return a;
+                    }).list());
         });
         o.put("audit", auditRows(id, 50));
         return o;
+    }
+
+    record ManualNumber(String wabaId, String phoneNumberId, String accessToken) {
+    }
+
+    /** Links a WhatsApp number to an office by hand (Meta's test number while the app is in review). */
+    @PostMapping("/api/ops/offices/{id}/whatsapp/manual")
+    EmbeddedSignupService.Result linkNumber(HttpServletRequest http, @PathVariable UUID id, @RequestBody ManualNumber m) {
+        ops.require(http);
+        EmbeddedSignupService.Result r = TenantContext.call(id, () -> signup.connectManually(
+                m == null ? null : m.wabaId(), m == null ? null : m.phoneNumberId(), m == null ? null : m.accessToken()));
+        audit(http, "WA_MANUAL_LINK", id, m.phoneNumberId(), r.displayPhone());
+        return r;
     }
 
     @PostMapping({"/api/ops/offices/{id}/fal", "/admin/offices/{id}/fal"})

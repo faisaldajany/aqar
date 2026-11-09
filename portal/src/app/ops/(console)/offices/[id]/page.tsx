@@ -17,6 +17,9 @@ export default function OpsOfficePage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
+  /** Which action the notice belongs to, so a card's own result shows inside that card. */
+  const [noticeFor, setNoticeFor] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [resetLinks, setResetLinks] = useState<Record<string, { url: string; expiresAt: string; emailed: boolean }>>({});
 
@@ -34,6 +37,7 @@ export default function OpsOfficePage() {
   async function act(name: string, path: string, body: unknown, done: string) {
     setBusy(name);
     setNotice(null);
+    setNoticeFor(name);
     try {
       const res = await api<{ warning?: string | null }>(path, { method: "POST", json: body ?? {} });
       setNotice({ ok: true, text: res?.warning ? `${done} تنبيه: ${res.warning}` : done });
@@ -55,6 +59,7 @@ export default function OpsOfficePage() {
   async function resetLink(userId: string, sendEmail: boolean) {
     setBusy(`reset-${userId}`);
     setNotice(null);
+    setNoticeFor("");
     try {
       const r = await api<{ url: string; expiresAt: string; emailed: boolean }>(`/ops/users/${userId}/reset-link`, { method: "POST", json: { sendEmail } });
       setResetLinks((x) => ({ ...x, [userId]: r }));
@@ -87,7 +92,7 @@ export default function OpsOfficePage() {
         </div>
       </div>
       {o.suspended && <p className="err">موقوف{o.suspendedReason ? `: ${o.suspendedReason}` : ""}. الوكيل لا يرد ولا يستطيع أحد من المكتب الدخول.</p>}
-      {notice && <p className={notice.ok ? "card small" : "err"} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
+      {notice && noticeFor !== "walink" && <p className={notice.ok ? "card small" : "err"} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
 
       <div className="grid2">
         <div className="card" style={{ alignSelf: "stretch" }}>
@@ -202,8 +207,14 @@ export default function OpsOfficePage() {
             ))}</tbody>
           </table></div>
         )}
-        <details>
-          <summary className="small"><b>ربط رقم يدوياً</b> (رقم Meta التجريبي أثناء مراجعة التطبيق)</summary>
+        {notice && noticeFor === "walink" && <p className={notice.ok ? "small" : "err"} role={notice.ok ? "status" : "alert"}>{notice.text}</p>}
+        <div className="row" style={{ alignItems: "center" }}>
+          <button type="button" className="btn" aria-expanded={linkOpen} aria-controls="walink" onClick={() => setLinkOpen((x) => !x)}>
+            {linkOpen ? "إخفاء نموذج الربط" : "ربط رقم يدوياً"}
+          </button>
+          <span className="small muted">رقم Meta التجريبي أثناء مراجعة التطبيق.</span>
+        </div>
+        {linkOpen && <div id="walink">
           <p className="small muted">
             من developers.facebook.com ← تطبيق Hidaa ← WhatsApp ← API Setup: انسخ «Phone number ID» و«WhatsApp Business Account ID»،
             وتوكن دائماً من System user له صلاحيتا whatsapp_business_messaging وwhatsapp_business_management على هذا الحساب
@@ -215,14 +226,14 @@ export default function OpsOfficePage() {
             const ok = await act("walink", `/ops/offices/${o.id}/whatsapp/manual`, {
               wabaId: String(f.get("wabaId") ?? ""), phoneNumberId: String(f.get("phoneNumberId") ?? ""), accessToken: String(f.get("accessToken") ?? ""),
             }, "رُبط الرقم بالمكتب.");
-            if (ok) el.reset();
+            if (ok) { el.reset(); setLinkOpen(false); }
           }}>
             <label className="f" htmlFor="waba" style={{ flex: "1 1 200px" }}>WhatsApp Business Account ID<input id="waba" name="wabaId" dir="ltr" inputMode="numeric" required /></label>
             <label className="f" htmlFor="pnid" style={{ flex: "1 1 200px" }}>Phone number ID<input id="pnid" name="phoneNumberId" dir="ltr" inputMode="numeric" required /></label>
             <label className="f" htmlFor="tok" style={{ flex: "2 1 280px" }}>Access token<input id="tok" name="accessToken" type="password" dir="ltr" autoComplete="off" required /></label>
             <button className="btn primary" disabled={busy === "walink"}>{busy === "walink" ? "جارٍ الربط…" : "اربط الرقم"}</button>
           </form>
-        </details>
+        </div>}
       </div>
 
       {o.whatsappConnected && (

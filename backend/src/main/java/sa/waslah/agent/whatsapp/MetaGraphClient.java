@@ -1,11 +1,13 @@
 package sa.waslah.agent.whatsapp;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import sa.waslah.agent.common.ApiException;
 import sa.waslah.agent.config.WaslahProperties;
@@ -22,6 +24,8 @@ public class MetaGraphClient {
     /** A message template on a WhatsApp Business account, as Meta reports it. */
     public record TemplateState(String id, String name, String status, String rejectedReason) {
     }
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RestClient http;
     private final WaslahProperties.WhatsApp cfg;
@@ -144,11 +148,31 @@ public class MetaGraphClient {
         return s.length() > max ? s.substring(0, max) : s;
     }
 
+    /**
+     * Runs one Graph call. A refusal carries Meta's own reason (e.g. "(#200) Permissions error"), so whoever sees it
+     * knows what to fix; a call that never got an answer (network, unreadable reply) says so instead of a bare 500.
+     */
     private JsonNode call(java.util.function.Supplier<JsonNode> request) {
         try {
             return request.get();
         } catch (RestClientResponseException e) {
-            throw ApiException.badGateway("meta_error", "رفضت Meta الطلب (" + e.getStatusCode().value() + ").");
+            String reason = metaReason(e.getResponseBodyAsString());
+            throw ApiException.badGateway("meta_error", "رفضت Meta الطلب (" + e.getStatusCode().value() + ")"
+                    + (reason.isEmpty() ? "." : ": \u2068" + reason + "\u2069")); // isolate Meta's English inside Arabic
+        } catch (RestClientException e) {
+            throw ApiException.badGateway("meta_unreachable", "لم يصل رد مفهوم من Meta: " + truncate(e.getMessage(), 200));
+        }
+    }
+
+    /** Meta's error message from a Graph error body ({"error":{"message":…}}), or "" when there is none. */
+    static String metaReason(String body) {
+        if (body == null || body.isBlank()) return "";
+        try {
+            JsonNode err = JSON.readTree(body).path("error");
+            String msg = err.path("error_user_msg").asText(err.path("message").asText(""));
+            return truncate(msg, 300);
+        } catch (Exception e) {
+            return "";
         }
     }
 }

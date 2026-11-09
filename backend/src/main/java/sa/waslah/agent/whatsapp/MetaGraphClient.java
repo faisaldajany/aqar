@@ -32,7 +32,7 @@ public class MetaGraphClient {
 
     public MetaGraphClient(RestClient.Builder builder, WaslahProperties.WhatsApp cfg) {
         this.cfg = cfg;
-        this.http = builder.baseUrl("https://graph.facebook.com/" + cfg.graphVersion()).build();
+        this.http = GraphHttp.client(builder, cfg.graphVersion());
     }
 
     /** Exchanges the code returned by FB.login for a business integration system user token. */

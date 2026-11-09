@@ -16,7 +16,7 @@ public class CloudApiWhatsAppClient implements WhatsAppClient {
     private final RestClient http;
 
     public CloudApiWhatsAppClient(RestClient.Builder builder, String graphVersion) {
-        this.http = builder.baseUrl("https://graph.facebook.com/" + graphVersion).build();
+        this.http = GraphHttp.client(builder, graphVersion);
     }
 
     @Override

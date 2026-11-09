@@ -30,9 +30,15 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   });
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
+  let data;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    data = undefined; // not JSON, e.g. a proxy's error page
+  }
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    // The status code tells the support team where to look when the server gave no reason.
+    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? `حدث خطأ غير متوقع (${res.status}). حاول مرة أخرى.`,
       data?.fields && typeof data.fields === "object" ? data.fields : {});
   }
   return data as T;

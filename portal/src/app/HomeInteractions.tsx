@@ -14,7 +14,7 @@ const TEXT = {
   en: {
     incomplete: "Write your name, your mobile or email, and a message of at least 10 characters.",
     sending: "Sending…",
-    topic: "Question about the service (English site)",
+    topic: "سؤال عن الخدمة", // the support inbox's own category (Arabic either way)
     failed: "Couldn't send. Please try again.",
     sent: "We got your message and will reply within one working day.",
     offline: "Couldn't send. Check your connection and try again.",

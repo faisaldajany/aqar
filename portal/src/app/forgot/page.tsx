@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { LangToggle, useLang } from "@/components/LangProvider";
 import { api, ApiError } from "@/lib/api";
 
 export default function ForgotPage() {
+  const { t, en } = useLang();
   const [sent, setSent] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,9 +19,9 @@ export default function ForgotPage() {
     setError("");
     try {
       const r = await api<{ message: string }>("/auth/forgot", { method: "POST", json: { email } });
-      setSent(r.message);
+      setSent(en ? "If this email belongs to an account, we've sent it a link to set a new password." : r.message);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "تعذّر الإرسال. حاول مرة أخرى.");
+      setError(err instanceof ApiError ? err.message : t("تعذّر الإرسال. حاول مرة أخرى.", "Couldn't send. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -27,24 +29,28 @@ export default function ForgotPage() {
 
   return (
     <main className="auth">
+      <div className="auth-lang"><LangToggle /></div>
       <Link href="/" className="brand authbrand"><Logo size={30} /></Link>
       {sent ? (
         <div className="card" style={{ maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
-          <h1>تحقق من بريدك</h1>
+          <h1>{t("تحقق من بريدك", "Check your email")}</h1>
           <p>{sent}</p>
-          <p className="small muted">لم يصلك شيء؟ تحقق من الرسائل غير المرغوبة، أو <Link href="/contact">تواصل معنا</Link>.</p>
-          <Link className="btn" href="/login">رجوع لتسجيل الدخول</Link>
+          <p className="small muted">
+            {t(<>لم يصلك شيء؟ تحقق من الرسائل غير المرغوبة، أو <Link href="/contact">تواصل معنا</Link>.</>,
+               <>Nothing arrived? Check your spam folder, or <Link href="/contact">contact us</Link>.</>)}
+          </p>
+          <Link className="btn" href="/login">{t("رجوع لتسجيل الدخول", "Back to sign in")}</Link>
         </div>
       ) : (
         <form className="card" onSubmit={submit}>
-          <h1>نسيت كلمة المرور</h1>
-          <p className="small muted">اكتب بريدك المسجّل وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.</p>
-          <label className="f" htmlFor="email">البريد الإلكتروني
+          <h1>{t("نسيت كلمة المرور", "Forgot your password")}</h1>
+          <p className="small muted">{t("اكتب بريدك المسجّل وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.", "Enter the email you registered with and we'll send you a link to set a new password.")}</p>
+          <label className="f" htmlFor="email">{t("البريد الإلكتروني", "Email")}
             <input id="email" name="email" type="email" autoComplete="email" required />
           </label>
           {error && <p className="err" role="alert">{error}</p>}
-          <button className="btn primary" disabled={busy}>{busy ? "جارٍ الإرسال…" : "أرسل الرابط"}</button>
-          <p className="small muted"><Link href="/login">رجوع لتسجيل الدخول</Link></p>
+          <button className="btn primary" disabled={busy}>{busy ? t("جارٍ الإرسال…", "Sending…") : t("أرسل الرابط", "Send the link")}</button>
+          <p className="small muted"><Link href="/login">{t("رجوع لتسجيل الدخول", "Back to sign in")}</Link></p>
         </form>
       )}
     </main>

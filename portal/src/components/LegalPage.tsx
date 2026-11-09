@@ -15,7 +15,7 @@ export function LegalPage({ title, updated, children, lang = "ar", other }: {
     <>
       {other && <LangSwitch to={other} lang={en ? "ar" : "en"} />}
       <div className="legal" lang={lang} dir={en ? "ltr" : "rtl"}>
-        <header><Link href={en ? "/en" : "/"} aria-label={en ? "Hidaa, home" : "حداء، الصفحة الرئيسية"}><Logo size={28} /></Link></header>
+        <header><Link href={en ? "/en" : "/"} aria-label={en ? "Hidaa, home" : "حداء، الصفحة الرئيسية"}><Logo size={28} lang={lang} /></Link></header>
         <main>
           <h1>{title}</h1>
           <p className="muted small">{en ? "Last updated: " : "آخر تحديث: "}{updated}</p>

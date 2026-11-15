@@ -1,6 +1,7 @@
 package sa.waslah.agent.support;
 
 import jakarta.mail.internet.MimeMessage;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -11,6 +12,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,12 +23,17 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import sa.waslah.agent.common.ApiException;
+import sa.waslah.agent.config.SecurityConfig;
+import sa.waslah.agent.tenant.TenantContext;
+import sa.waslah.agent.tenant.TenantFilter;
 
 /**
  * Public support form (portal /contact and the website). Every message is stored first, then forwarded
@@ -38,23 +45,36 @@ public class SupportService {
 
     private static final Logger log = LoggerFactory.getLogger(SupportService.class);
     static final int MAX_PER_HOUR = 5;
+    static final int MAX_REPORTS_PER_HOUR = 10;
+    static final String REPORT_TOPIC = "بلاغ خطأ";
+    private static final String EMAIL = "[^@\\s]+@[^@\\s]+\\.[^@\\s]+";
     static final List<String> TOPICS = List.of("سؤال عن الخدمة", "مشكلة تقنية", "الاشتراك والفواتير", "ربط واتساب", "اقتراح", "أخرى");
 
     public record Request(String name, String email, String phone, String topic, String message, String office,
                           String source, String website) {
     }
 
+    /**
+     * An error a person reported from the portal with «أبلغ عن الخطأ»: what they saw, the API call behind it, and the
+     * request id that finds it in the logs. email is asked only when nobody is signed in.
+     */
+    public record ErrorReport(String code, Integer status, String message, String requestId, String method, String path,
+                              String page, String note, String email, String website) {
+    }
+
     private final JdbcClient jdbc;
     private final ObjectProvider<JavaMailSender> mail;
+    private final ObjectProvider<JwtDecoder> jwt;
     private final String mailHost, forwardTo, from, adminToken;
 
-    public SupportService(JdbcClient jdbc, ObjectProvider<JavaMailSender> mail,
+    public SupportService(JdbcClient jdbc, ObjectProvider<JavaMailSender> mail, ObjectProvider<JwtDecoder> jwt,
                           @Value("${spring.mail.host:}") String mailHost,
                           @Value("${waslah.support.forward-to:}") String forwardTo,
                           @Value("${waslah.support.from:no-reply@hidaaco.com}") String from,
                           @Value("${waslah.admin-token:}") String adminToken) {
         this.jdbc = jdbc;
         this.mail = mail;
+        this.jwt = jwt;
         this.mailHost = mailHost;
         this.forwardTo = forwardTo;
         this.from = from;
@@ -75,12 +95,14 @@ public class SupportService {
         String topic = TOPICS.contains(r.topic()) ? r.topic() : "أخرى";
         if (name == null) throw ApiException.badRequest("no_name", "اكتب اسمك.");
         if (email == null && phone == null) throw ApiException.badRequest("no_contact", "اكتب بريدك أو جوالك لنرد عليك.");
-        if (email != null && !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) throw ApiException.badRequest("bad_email", "البريد غير صحيح.");
+        if (email != null && !email.matches(EMAIL)) throw ApiException.badRequest("bad_email", "البريد غير صحيح.");
         if (phone != null && !phone.replaceAll("[\\s+\\-]", "").matches("[0-9٠-٩]{9,15}")) throw ApiException.badRequest("bad_phone", "الجوال غير صحيح.");
         if (message == null || message.length() < 10) throw ApiException.badRequest("short", "اكتب رسالتك (10 أحرف على الأقل).");
 
         String ip = ipHash(http);
-        int recent = jdbc.sql("select count(*) from support_messages where ip_hash = ? and created_at > now() - interval '1 hour'")
+        int recent = jdbc.sql("""
+                select count(*) from support_messages
+                where ip_hash = ? and source <> 'error-report' and created_at > now() - interval '1 hour'""")
                 .param(ip).query(Integer.class).single();
         if (recent >= MAX_PER_HOUR) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "too_many", "وصلتنا رسائلك. حاول مرة أخرى بعد ساعة.");
@@ -92,8 +114,95 @@ public class SupportService {
                 values (?, ?, ?, ?, ?, ?, ?) returning id""")
                 .params(name, email, phone, topic, body, source, ip).query(UUID.class).single();
         forward(id);
-        String ref = id.toString().substring(0, 8).toUpperCase();
-        return Map.of("ok", true, "reference", ref);
+        return Map.of("ok", true, "reference", reference(id));
+    }
+
+    /**
+     * «أبلغ عن الخطأ» from the portal. Stored and emailed to the support inbox like a support message, with who
+     * reported it (from the office session when there is one) and the request id to search the logs for. The same
+     * request reported twice gives the same reference.
+     */
+    @PostMapping("/api/public/support/error-report")
+    Map<String, Object> errorReport(@RequestBody ErrorReport r, HttpServletRequest http) {
+        if (r.website() != null && !r.website().isBlank()) return Map.of("ok", true);
+        String requestId = r.requestId() != null && r.requestId().matches("[A-Za-z0-9._-]{8,64}") ? r.requestId() : null;
+        String email = trim(r.email(), 200);
+        if (email != null && !email.matches(EMAIL)) throw ApiException.badRequest("bad_email", "البريد غير صحيح.");
+        if (requestId != null) {
+            Optional<UUID> same = jdbc.sql("""
+                    select id from support_messages
+                    where source = 'error-report' and position(? in message) > 0 and created_at > now() - interval '1 day'
+                    order by created_at limit 1""").param(requestId).query(UUID.class).optional();
+            if (same.isPresent()) return Map.of("ok", true, "reference", reference(same.get()));
+        }
+        String ip = ipHash(http);
+        int recent = jdbc.sql("""
+                select count(*) from support_messages
+                where ip_hash = ? and source = 'error-report' and created_at > now() - interval '1 hour'""")
+                .param(ip).query(Integer.class).single();
+        if (recent >= MAX_REPORTS_PER_HOUR) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "too_many", "وصلتنا بلاغاتك ونتابعها. حاول مرة أخرى بعد ساعة.");
+        }
+        Reporter who = reporter(http).orElse(null);
+        String name = who == null ? "زائر" : who.name();
+        String replyTo = who == null ? email : who.email();
+        String status = r.status() == null || r.status() < 0 || r.status() > 599 ? "—" : String.valueOf(r.status());
+        String body = String.join("\n",
+                "الصفحة: " + or(trim(r.page(), 300)),
+                "الطلب: " + or(trim(r.method(), 10)) + " " + or(trim(r.path(), 300)),
+                "النتيجة: " + status + " · " + or(trim(r.code(), 60)),
+                "ما ظهر للمستخدم: " + or(trim(r.message(), 600)),
+                "رقم الطلب في السجلات: " + or(requestId),
+                "المكتب: " + (who == null ? "— (لم يسجّل الدخول)" : who.office() + " · " + who.officeId()),
+                "المستخدم: " + name + (replyTo == null ? "" : " <" + replyTo + ">"),
+                "المتصفح: " + or(trim(http.getHeader("User-Agent"), 200)),
+                "",
+                "ملاحظة المستخدم:",
+                or(trim(r.note(), 2000)),
+                "",
+                requestId == null ? "" : "في Cloud Logging ابحث عن: \"" + requestId + "\"");
+        UUID id = jdbc.sql("""
+                insert into support_messages (office_id, name, email, phone, topic, message, source, ip_hash)
+                values (?, ?, ?, null, ?, ?, 'error-report', ?) returning id""")
+                .params(who == null ? null : who.officeId(), name, replyTo, REPORT_TOPIC, body.strip(), ip)
+                .query(UUID.class).single();
+        forward(id);
+        return Map.of("ok", true, "reference", reference(id));
+    }
+
+    record Reporter(UUID officeId, String office, String name, String email) {
+    }
+
+    /** The signed-in office user, read from the session cookie (public paths do not resolve it), if any. */
+    private Optional<Reporter> reporter(HttpServletRequest http) {
+        Cookie[] cookies = http.getCookies();
+        JwtDecoder decoder = jwt.getIfAvailable();
+        if (cookies == null || decoder == null) return Optional.empty();
+        for (Cookie c : cookies) {
+            if (!SecurityConfig.SESSION_COOKIE.equals(c.getName()) || c.getValue().isBlank()) continue;
+            try {
+                Jwt token = decoder.decode(c.getValue());
+                UUID user = UUID.fromString(token.getSubject());
+                UUID office = UUID.fromString(token.getClaimAsString(TenantFilter.OFFICE_CLAIM));
+                return TenantContext.call(office, () -> jdbc.sql("""
+                        select o.name, u.full_name, u.email from users u join offices o on o.id = u.office_id
+                        where u.id = ? and u.office_id = ?""")
+                        .params(user, office)
+                        .query((rs, n) -> new Reporter(office, rs.getString(1), rs.getString(2), rs.getString(3)))
+                        .optional());
+            } catch (RuntimeException e) {
+                return Optional.empty(); // expired or forged: report as a visitor
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static String reference(UUID id) {
+        return id.toString().substring(0, 8).toUpperCase();
+    }
+
+    private static String or(String s) {
+        return s == null ? "—" : s;
     }
 
     /** Retries messages that could not be emailed (e.g. mail server down or not yet configured). */
@@ -151,7 +260,8 @@ public class SupportService {
             JavaMailSender sender = mail.getObject();
             MimeMessage msg = sender.createMimeMessage();
             MimeMessageHelper h = new MimeMessageHelper(msg, false, "UTF-8");
-            h.setFrom(from, "حداء — نموذج الدعم");
+            boolean report = "error-report".equals(m.get("source"));
+            h.setFrom(from, report ? "حداء — بلاغ خطأ" : "حداء — نموذج الدعم");
             h.setTo(forwardTo);
             if (m.get("email") != null) h.setReplyTo((String) m.get("email"));
             h.setSubject("[حداء دعم] " + m.get("topic") + " — " + m.get("name") + " #" + id.toString().substring(0, 8).toUpperCase());

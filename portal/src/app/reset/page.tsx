@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { LangToggle, useLang } from "@/components/LangProvider";
+import { Field, Form, Submit } from "@/components/Form";
 import { api, ApiError } from "@/lib/api";
 
 export default function ResetPage() {
@@ -15,29 +16,16 @@ function ResetForm() {
   const { t } = useLang();
   const token = useSearchParams().get("token") ?? "";
   const [done, setDone] = useState(false);
-  const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
-  const [busy, setBusy] = useState(false);
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const password = String(f.get("password") ?? "");
-    if (password !== String(f.get("confirm") ?? "")) {
-      setError(t("كلمتا المرور غير متطابقتين.", "The two passwords don't match."));
-      return;
-    }
-    setBusy(true);
-    setError("");
+  async function save(f: FormData) {
     setExpired(false);
     try {
-      await api("/auth/reset", { method: "POST", json: { token, password } });
+      await api("/auth/reset", { method: "POST", json: { token, password: String(f.get("password") ?? "") } });
       setDone(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("تعذّر الحفظ. حاول مرة أخرى.", "Couldn't save. Please try again."));
       setExpired(err instanceof ApiError && err.code === "reset_invalid");
-    } finally {
-      setBusy(false);
+      throw err;
     }
   }
 
@@ -58,17 +46,24 @@ function ResetForm() {
           <Link className="btn" href="/forgot">{t("اطلب رابطاً جديداً", "Ask for a new link")}</Link>
         </div>
       ) : (
-        <form className="card" onSubmit={submit}>
+        <Form className="card" onSubmit={save} fieldFor={{ weak_password: "password" }}
+          validate={(f): Record<string, string> => {
+            const p = String(f.get("password") ?? ""), c = String(f.get("confirm") ?? "");
+            if (p && p.length < 8) return { password: t(`8 أحرف على الأقل (كتبت ${p.length}).`, `At least 8 characters (you typed ${p.length}).`) };
+            return p && c && p !== c ? { confirm: t("لا تطابق كلمة المرور الأولى. اكتبها مرة أخرى.", "Doesn't match the first password. Type it again.") } : {};
+          }}>
           <h1>{t("كلمة مرور جديدة", "New password")}</h1>
-          <label className="f" htmlFor="password">{t("كلمة المرور الجديدة", "New password")} <span className="small muted">{t("8 أحرف على الأقل", "At least 8 characters")}</span>
-            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={128} />
-          </label>
-          <label className="f" htmlFor="confirm">{t("أعد كتابتها", "Type it again")}
-            <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} maxLength={128} />
-          </label>
-          {error && <p className="err" role="alert">{error}{expired && <> <Link href="/forgot">{t("اطلب رابطاً جديداً", "Ask for a new link")}</Link></>}</p>}
-          <button className="btn primary" disabled={busy}>{busy ? t("جارٍ الحفظ…", "Saving…") : t("احفظ كلمة المرور", "Save password")}</button>
-        </form>
+          <Field name="password" label={t("كلمة المرور الجديدة", "New password")} hint={t("8 أحرف على الأقل. اخلط الحروف والأرقام لتكون أقوى.", "At least 8 characters. Mix letters and numbers to make it stronger.")}>
+            <input type="password" autoComplete="new-password" maxLength={128} required placeholder={t("كلمة مرور جديدة لحسابك", "A new password for your account")}
+              data-required={t("اختر كلمة مرور جديدة.", "Choose a new password.")} />
+          </Field>
+          <Field name="confirm" label={t("أعد كتابتها", "Type it again")}>
+            <input type="password" autoComplete="new-password" maxLength={128} required placeholder={t("الكلمة نفسها مرة أخرى", "The same password again")}
+              data-required={t("اكتب كلمة المرور مرة أخرى للتأكد.", "Type the password again to confirm it.")} />
+          </Field>
+          <Submit>{t("احفظ كلمة المرور", "Save password")}</Submit>
+          {expired && <p className="small"><Link href="/forgot">{t("اطلب رابطاً جديداً", "Ask for a new link")}</Link></p>}
+        </Form>
       )}
     </main>
   );

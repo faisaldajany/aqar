@@ -1,9 +1,28 @@
 import { browserLang } from "./i18n";
+/** Where a failed call went, so «أبلغ عن الخطأ» can tell the support team exactly what to look up. */
+export type CallInfo = { requestId?: string; method?: string; path?: string };
+
 export class ApiError extends Error {
-  /** For invalid input: a message for each wrong field, keyed by the field's name in the request. */
-  constructor(public status: number, public code: string, message: string, public fields: Record<string, string> = {}) {
+  /**
+   * status 0 means the call never reached the server (offline, DNS, blocked).
+   * fields: for invalid input, a message for each wrong field, keyed by the field's name in the request.
+   */
+  constructor(public status: number, public code: string, message: string, public fields: Record<string, string> = {},
+              public call: CallInfo = {}) {
     super(message);
   }
+}
+
+function fallbackMessage(status: number): string {
+  const en = browserLang() === "en";
+  if (status === 0) {
+    return en ? "Couldn't reach Hidaa. Check your internet connection and try again." : "تعذّر الاتصال بحداء. تحقق من اتصال الإنترنت وأعد المحاولة.";
+  }
+  if (status >= 500) {
+    return en ? "Something went wrong on our side and your request didn't complete. Try again; if it happens again, report it."
+      : "حدث خطأ من جهتنا ولم يكتمل طلبك. أعد المحاولة، وإن تكرر فأبلغنا.";
+  }
+  return en ? `Something unexpected happened (${status}). Try again.` : `حدث خطأ غير متوقع (${status}). حاول مرة أخرى.`;
 }
 
 /** "عميل واحد", "عميلان", "5 عملاء", "12 عميلاً". */
@@ -17,17 +36,35 @@ export function latinDigits(s: string): string {
     .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
 }
 
+/**
+ * A Saudi mobile as the server stores it (9665XXXXXXXX), or null. Accepts 05…, 5…, 9665…, +9665…, 009665…, Arabic
+ * digits, spaces and dashes, the same as the server.
+ */
+export function saudiMobile(raw: string): string | null {
+  let d = latinDigits(raw).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("05")) d = "966" + d.slice(1);
+  else if (d.startsWith("5") && d.length === 9) d = "966" + d;
+  return /^9665\d{8}$/.test(d) ? d : null;
+}
+
 /** Calls the Spring API through the same-origin /api proxy; the session cookie rides along. */
 export async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const { json, ...rest } = init ?? {};
-  const res = await fetch(`/api${path}`, {
-    ...rest,
-    // The server answers in the page's language where it can.
-    headers: { "Accept-Language": browserLang(), ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...rest.headers },
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-    credentials: "same-origin",
-    cache: "no-store",
-  });
+  const call: CallInfo = { method: (rest.method ?? "GET").toUpperCase(), path: `/api${path.split("?")[0]}` };
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      ...rest,
+      // The server answers in the page's language where it can.
+      headers: { "Accept-Language": browserLang(), ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...rest.headers },
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(0, "network", fallbackMessage(0), {}, call);
+  }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   let data;
@@ -37,9 +74,10 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
     data = undefined; // not JSON, e.g. a proxy's error page
   }
   if (!res.ok) {
-    // The status code tells the support team where to look when the server gave no reason.
-    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? `حدث خطأ غير متوقع (${res.status}). حاول مرة أخرى.`,
-      data?.fields && typeof data.fields === "object" ? data.fields : {});
+    // The request id finds this call in the server logs; it rides along when the person reports the error.
+    call.requestId = res.headers.get("X-Request-Id") ?? (typeof data?.requestId === "string" ? data.requestId : undefined);
+    throw new ApiError(res.status, data?.error ?? "error", data?.message ?? fallbackMessage(res.status),
+      data?.fields && typeof data.fields === "object" ? data.fields : {}, call);
   }
   return data as T;
 }

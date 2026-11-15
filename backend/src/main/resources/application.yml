@@ -151,3 +151,8 @@ waslah:
     # internal = timers inside the app (single server); external = Cloud Scheduler calls /internal/jobs/* (Cloud Run).
     scheduler: ${JOBS_SCHEDULER:internal}
     token: ${JOBS_TOKEN:}
+
+logging:
+  pattern:
+    # The request id (X-Request-Id, also shown in «أبلغ عن الخطأ» reports) on every line, to find one request's logs.
+    level: "%5p [%X{requestId:-}]"

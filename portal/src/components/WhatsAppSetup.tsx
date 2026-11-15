@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, ReactNode, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { ReactNode, useState } from "react";
+import { api, saudiMobile } from "@/lib/api";
+import { ErrorNote, Field, Form, Submit } from "./Form";
 import { Icon } from "./Icon";
 
 export type SetupStepKey = "number" | "app" | "registered" | "profile" | "facebook" | "active" | "connect" | "test";
@@ -41,22 +42,24 @@ export function WhatsAppSetupGuide({ state, onChange, connect }: {
   connect: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ key: string; text: string } | null>(null);
+  const [error, setError] = useState<{ key: string; error: unknown } | null>(null);
   const has = state.hasBusinessApp === true;
 
-  async function call(key: string, path: string, init: RequestInit & { json?: unknown }) {
+  /** Steps confirmed from a form pass the error back to it (shown under the field); buttons show it under the step. */
+  async function call(key: string, path: string, init: RequestInit & { json?: unknown }, fromForm = false) {
     setBusy(true);
     setError(null);
     try {
       onChange(await api<WaSetup>(path, init));
     } catch (e) {
-      setError({ key, text: e instanceof ApiError ? e.message : "تعذّر الحفظ. حاول مرة أخرى." });
+      if (fromForm) throw e;
+      setError({ key, error: e });
     } finally {
       setBusy(false);
     }
   }
   const confirm = (key: SetupStepKey, value?: string) =>
-    call(key, `/whatsapp/setup/steps/${key}`, { method: "POST", json: value === undefined ? {} : { value } });
+    call(key, `/whatsapp/setup/steps/${key}`, { method: "POST", json: value === undefined ? {} : { value } }, value !== undefined);
   const undo = (key: SetupStepKey) => call(key, `/whatsapp/setup/steps/${key}`, { method: "DELETE" });
   const choose = (v: boolean) => call("path", "/whatsapp/setup/path", { method: "POST", json: { hasBusinessApp: v } });
 
@@ -70,7 +73,7 @@ export function WhatsAppSetupGuide({ state, onChange, connect }: {
           <button className="btn primary" disabled={busy} onClick={() => choose(false)}>لا، ليس بعد</button>
           <button className="btn" disabled={busy} onClick={() => choose(true)}>نعم، مسجّل</button>
         </div>
-        {error?.key === "path" && <p className="err" role="alert">{error.text}</p>}
+        {error?.key === "path" && <ErrorNote error={error.error} />}
       </section>
     );
   }
@@ -81,7 +84,7 @@ export function WhatsAppSetupGuide({ state, onChange, connect }: {
   function body(key: SetupStepKey): ReactNode {
     switch (key) {
       case "number":
-        return <NumberStep busy={busy} has={has} onSave={(v) => confirm("number", v)} />;
+        return <NumberStep has={has} onSave={(v) => confirm("number", v)} />;
       case "app":
         return (
           <>
@@ -95,7 +98,7 @@ export function WhatsAppSetupGuide({ state, onChange, connect }: {
           </>
         );
       case "registered":
-        return <RegisteredStep busy={busy} has={has} phone={state.phone} onSave={(v) => confirm("registered", v)} />;
+        return <RegisteredStep has={has} phone={state.phone} onSave={(v) => confirm("registered", v)} />;
       case "profile":
         return (
           <>
@@ -202,7 +205,7 @@ export function WhatsAppSetupGuide({ state, onChange, connect }: {
                 {open && (
                   <div className="stepcontent">
                     {body(s.key)}
-                    {error?.key === s.key && <p className="err" role="alert">{error.text}</p>}
+                    {error?.key === s.key && <ErrorNote error={error.error} />}
                   </div>
                 )}
               </div>
@@ -218,31 +221,28 @@ function Done({ label, busy, onClick }: { label: string; busy: boolean; onClick:
   return <button className="btn primary" disabled={busy} onClick={onClick}><Icon name="check" size={16} /> {label}</button>;
 }
 
-function NumberStep({ busy, has, onSave }: { busy: boolean; has: boolean; onSave: (v: string) => void }) {
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    onSave(String(new FormData(e.currentTarget).get("phone") ?? ""));
-  }
+function NumberStep({ has, onSave }: { has: boolean; onSave: (v: string) => Promise<void> }) {
   return (
-    <form onSubmit={submit} className="stepform">
+    <Form className="stepform" onSubmit={(d) => onSave(String(d.get("phone") ?? ""))} fieldFor={{ bad_phone: "phone" }}
+      validate={(d): Record<string, string> => {
+        const v = String(d.get("phone") ?? "").trim();
+        return v && !saudiMobile(v) ? { phone: "رقم جوال سعودي من 10 أرقام يبدأ بـ 05، مثل 0512345678." } : {};
+      }}>
       <p>{has ? "رقم الجوال المسجّل في واتساب للأعمال للمكتب." : "الرقم الذي سيراسله العملاء: جوال سعودي يستقبل رسالة SMS أو اتصالاً لرمز التحقق، ويبقى معك."}</p>
       {!has && <p className="small muted">إن كان الرقم على واتساب العادي فلا بأس: عند تسجيله في واتساب للأعمال ينقل التطبيق حسابه ومحادثاته.</p>}
-      <label className="f" htmlFor="wa-phone">رقم جوال المكتب
-        <input id="wa-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="05XXXXXXXX" required />
-      </label>
-      <button className="btn primary" disabled={busy}><Icon name="check" size={16} /> تأكيد الرقم</button>
-    </form>
+      <Field name="phone" label="رقم جوال المكتب" hint={<>جوال سعودي يبدأ بـ 05، ويقبل أيضاً <bdi dir="ltr">+966</bdi>.</>}>
+        <input id="wa-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="0512345678" maxLength={20} required
+          data-required="اكتب رقم جوال المكتب الذي سيراسله العملاء." />
+      </Field>
+      <Submit busyLabel="جارٍ الحفظ…"><Icon name="check" size={16} /> تأكيد الرقم</Submit>
+    </Form>
   );
 }
 
-function RegisteredStep({ busy, has, phone, onSave }: { busy: boolean; has: boolean; phone: string | null; onSave: (v: string) => void }) {
+function RegisteredStep({ has, phone, onSave }: { has: boolean; phone: string | null; onSave: (v: string) => Promise<void> }) {
   const max = today();
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    onSave(String(new FormData(e.currentTarget).get("since") ?? ""));
-  }
   return (
-    <form onSubmit={submit} className="stepform">
+    <Form className="stepform" onSubmit={(d) => onSave(String(d.get("since") ?? ""))} fieldFor={{ bad_date: "since" }}>
       {has ? (
         <p>متى بدأ المكتب استخدام هذا الرقم على واتساب للأعمال؟ يكفي تاريخ تقريبي.</p>
       ) : (
@@ -253,11 +253,12 @@ function RegisteredStep({ busy, has, phone, onSave }: { busy: boolean; has: bool
           <li>اكتب اسم المكتب واختر صورة له، ثم ارجع هنا.</li>
         </ol>
       )}
-      <label className="f" htmlFor="wa-since">{has ? "تاريخ البدء" : "تاريخ التسجيل"}
-        <input id="wa-since" name="since" type="date" max={max} defaultValue={max} required />
-      </label>
-      <button className="btn primary" disabled={busy}><Icon name="check" size={16} /> {has ? "تأكيد التاريخ" : "سجّلته"}</button>
-    </form>
+      <Field name="since" label={has ? "تاريخ البدء" : "تاريخ التسجيل"} hint={has ? "يكفي تاريخ تقريبي، مثل أول الشهر الذي بدأتم فيه." : "اليوم إن سجّلته الآن."}>
+        <input id="wa-since" type="date" min="2018-01-01" max={max} defaultValue={max} required
+          data-required={has ? "اختر تاريخ بدء استخدام الرقم على واتساب للأعمال." : "اختر تاريخ تسجيل الرقم في التطبيق."} />
+      </Field>
+      <Submit busyLabel="جارٍ الحفظ…"><Icon name="check" size={16} /> {has ? "تأكيد التاريخ" : "سجّلته"}</Submit>
+    </Form>
   );
 }
 

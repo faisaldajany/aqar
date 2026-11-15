@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { LangToggle, useLang } from "@/components/LangProvider";
-import { api, ApiError, type Me } from "@/lib/api";
+import { Field, Form, Submit } from "@/components/Form";
+import { api, saudiMobile, type Me } from "@/lib/api";
 
 /** The support inbox's topics are stored in Arabic; English pages show these names for them. */
 const TOPICS_EN: Record<string, string> = {
@@ -22,33 +23,34 @@ export default function ContactPage() {
   const [topics, setTopics] = useState<string[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [ref, setRef] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api<string[]>("/public/support/topics").then(setTopics).catch(() => setTopics(["أخرى"]));
     api<Me>("/me").then(setMe).catch(() => undefined);
   }, []);
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api<{ reference?: string }>("/public/support", {
-        method: "POST",
-        json: {
-          name: f.get("name"), email: f.get("email"), phone: f.get("phone"), topic: f.get("topic"),
-          message: f.get("message"), office: me?.office.name ?? f.get("office"), website: f.get("website"), source: "portal",
-        },
-      });
-      setRef(r.reference ?? t("تم", "Done"));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("تعذّر الإرسال. حاول مرة أخرى.", "Couldn't send. Please try again."));
-    } finally {
-      setBusy(false);
+  async function send(f: FormData) {
+    const r = await api<{ reference?: string }>("/public/support", {
+      method: "POST",
+      json: {
+        name: f.get("name"), email: f.get("email"), phone: f.get("phone"), topic: f.get("topic"),
+        message: f.get("message"), office: me?.office.name ?? f.get("office"), website: f.get("website"), source: "portal",
+      },
+    });
+    setRef(r.reference ?? t("تم", "Done"));
+  }
+
+  /** The server needs one way to reply; say so under both fields, and check the mobile's shape. */
+  function check(f: FormData): Record<string, string> {
+    const email = String(f.get("email") ?? "").trim(), phone = String(f.get("phone") ?? "").trim();
+    if (!email && !phone) {
+      const both = t("اكتب بريدك أو جوالك لنرد عليك.", "Enter your email or mobile so we can reply.");
+      return { email: both, phone: both };
     }
+    if (phone && !saudiMobile(phone) && !/^\+?[0-9\s-]{9,16}$/.test(phone)) {
+      return { phone: t("رقم الجوال غير صحيح، مثل 0512345678.", "Not a valid mobile number, e.g. 0512345678.") };
+    }
+    return {};
   }
 
   if (ref) {
@@ -70,22 +72,38 @@ export default function ContactPage() {
     <main className="auth">
       <div className="auth-lang"><LangToggle /></div>
       <Link href="/" className="brand authbrand"><Logo size={30} /></Link>
-      <form className="card" onSubmit={submit}>
+      <Form className="card" onSubmit={send} validate={check}
+        fieldFor={{ no_name: "name", bad_email: "email", bad_phone: "phone", no_contact: "email", short: "message" }}>
         <h1>{t("تواصل مع دعم حداء", "Contact Hidaa support")}</h1>
         <p className="small muted">{t("اكتب سؤالك أو المشكلة، ونرد عليك خلال يوم عمل.", "Write your question or the problem, and we'll reply within one working day.")}</p>
-        <label className="f" htmlFor="name">{t("الاسم", "Name")}<input id="name" name="name" type="text" required maxLength={120} defaultValue={me?.user.fullName} key={me?.user.id} /></label>
-        {!me && <label className="f" htmlFor="office">{t("اسم المكتب (اختياري)", "Office name (optional)")}<input id="office" name="office" type="text" maxLength={200} /></label>}
-        <label className="f" htmlFor="email">{t("البريد الإلكتروني", "Email")}<input id="email" name="email" type="email" dir="ltr" maxLength={200} defaultValue={me?.user.email} key={`e${me?.user.id}`} /></label>
-        <label className="f" htmlFor="phone">{t("الجوال", "Mobile")} <span className="small muted">{t("البريد أو الجوال مطلوب", "Email or mobile is required")}</span><input id="phone" name="phone" type="tel" dir="ltr" placeholder="05xxxxxxxx" maxLength={30} /></label>
-        <label className="f" htmlFor="topic">{t("الموضوع", "Topic")}
-          <select id="topic" name="topic">{topics.map((x) => <option key={x} value={x}>{en ? TOPICS_EN[x] ?? x : x}</option>)}</select></label>
-        <label className="f" htmlFor="message">{t("الرسالة", "Message")}<textarea id="message" name="message" rows={5} required minLength={10} maxLength={4000} /></label>
+        <Field name="name" label={t("الاسم", "Name")}>
+          <input type="text" required maxLength={120} autoComplete="name" defaultValue={me?.user.fullName} key={me?.user.id}
+            placeholder={t("مثال: فهد العتيبي", "e.g. Fahad Alotaibi")} data-required={t("اكتب اسمك لنعرف من نخاطب.", "Enter your name so we know who to address.")} />
+        </Field>
+        {!me && (
+          <Field name="office" label={t("اسم المكتب", "Office name")} optional>
+            <input type="text" maxLength={200} autoComplete="organization" placeholder={t("مثال: مكتب الريادة للعقارات", "e.g. Al Riyada Real Estate")} />
+          </Field>
+        )}
+        <Field name="email" label={t("البريد الإلكتروني", "Email")} hint={t("البريد أو الجوال: واحد منهما يكفي.", "Email or mobile: one of them is enough.")}>
+          <input type="email" dir="ltr" maxLength={200} autoComplete="email" defaultValue={me?.user.email} key={`e${me?.user.id}`} placeholder="name@example.com" />
+        </Field>
+        <Field name="phone" label={t("الجوال", "Mobile")}>
+          <input type="tel" dir="ltr" inputMode="tel" autoComplete="tel" maxLength={30} placeholder="0512345678" />
+        </Field>
+        <Field name="topic" label={t("الموضوع", "Topic")}>
+          <select>{topics.map((x) => <option key={x} value={x}>{en ? TOPICS_EN[x] ?? x : x}</option>)}</select>
+        </Field>
+        <Field name="message" label={t("الرسالة", "Message")} hint={t("كلما ذكرت تفاصيل أكثر (الصفحة، وما ظهر لك) رددنا أسرع.", "The more detail (the page, what you saw), the faster we can help.")}>
+          <textarea rows={5} required minLength={10} maxLength={4000}
+            placeholder={t("مثال: حاولت ربط رقم المكتب وظهرت رسالة «الرقم غير مؤهل».", "e.g. I tried to connect the office number and got \"number not eligible\".")}
+            data-required={t("اكتب رسالتك.", "Write your message.")} />
+        </Field>
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", width: 1, height: 1, margin: -1, padding: 0, border: 0, overflow: "hidden", clipPath: "inset(50%)", opacity: 0, pointerEvents: "none" }} />
-        {error && <p className="err" role="alert">{error}</p>}
-        <button className="btn primary" disabled={busy}>{busy ? t("جارٍ الإرسال…", "Sending…") : t("إرسال", "Send")}</button>
+        <Submit busyLabel={t("جارٍ الإرسال…", "Sending…")}>{t("إرسال", "Send")}</Submit>
         <p className="small muted"><Link href={me ? "/dashboard" : "/login"}>{t("رجوع", "Back")}</Link></p>
-      </form>
+      </Form>
     </main>
   );
 }

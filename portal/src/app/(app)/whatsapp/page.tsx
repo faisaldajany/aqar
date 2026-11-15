@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+import { Notice } from "@/lib/errors";
+import { ErrorNote } from "@/components/Form";
 import { useSession } from "../session";
 import { TemplateStatus, type TemplateRow } from "@/components/TemplateStatus";
 import { FirstMessageStep, WhatsAppSetupGuide, type WaSetup } from "@/components/WhatsAppSetup";
@@ -28,7 +30,7 @@ declare global {
 export default function WhatsAppPage() {
   const { me, refresh } = useSession();
   const [config, setConfig] = useState<Config | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -66,7 +68,7 @@ export default function WhatsAppPage() {
   const info = useRef<SignupInfo>({ coexistence: true });
 
   useEffect(() => {
-    api<Config>("/whatsapp/config").then(setConfig).catch(() => setError("تعذّر تحميل إعدادات الربط."));
+    api<Config>("/whatsapp/config").then(setConfig).catch(setError);
   }, []);
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export default function WhatsAppPage() {
             coexistence: data.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
           };
         } else if (data.event === "CANCEL") {
-          setError("أُغلقت نافذة Meta قبل اكتمال الربط.");
+          setError(new Notice("blocked", "أُغلقت نافذة Meta قبل اكتمال الربط. اضغط «اربط عبر Meta» لتبدأ من جديد."));
         }
       } catch {
         /* not a signup message */
@@ -104,12 +106,12 @@ export default function WhatsAppPage() {
 
   async function finish(code: string | null) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await api("/whatsapp/connect", { method: "POST", json: { code, ...info.current } });
       await refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "تعذّر إكمال الربط.");
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -117,13 +119,13 @@ export default function WhatsAppPage() {
 
   function connectWithMeta() {
     if (!window.FB || !config) {
-      setError("لم تُحمّل نافذة Meta بعد. انتظر لحظة ثم أعد المحاولة.");
+      setError(new Notice("offline", "لم تُحمّل نافذة Meta بعد. انتظر لحظة ثم أعد المحاولة، وإن استمر فعطّل مانع الإعلانات لهذه الصفحة."));
       return;
     }
     window.FB.login(
       (r) => {
         if (r.authResponse?.code) void finish(r.authResponse.code);
-        else setError("لم تكتمل نافذة Meta.");
+        else setError(new Notice("blocked", "لم تكتمل نافذة Meta، فلم يُربط الرقم. أعد المحاولة وأكمل كل خطواتها."));
       },
       {
         config_id: config.configId,
@@ -163,14 +165,14 @@ export default function WhatsAppPage() {
       <div className="card wasetup">
         <h1>اربط رقم واتساب المكتب</h1>
         {setupFailed ? button : <p className="muted">جارٍ التحميل…</p>}
-        {error && <p className="err" role="alert">{error}</p>}
+        {error != null && <ErrorNote error={error} />}
       </div>
     );
   }
   return (
     <>
       <WhatsAppSetupGuide state={setup} onChange={setSetup} connect={button} />
-      {error && <p className="err" role="alert">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
     </>
   );
 }

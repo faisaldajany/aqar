@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { LangToggle, useLang } from "@/components/LangProvider";
+import { DoneNote, ErrorNote, Field, Form, Submit } from "@/components/Form";
 import { api, ApiError, type Me } from "@/lib/api";
 
 /** After signup: type the 6-digit code from the email (or click its link) before using the portal. */
@@ -13,9 +14,8 @@ export default function VerifyEmailPage() {
   const { t } = useLang();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");
+  const [resendError, setResendError] = useState<unknown>(null);
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(60);
 
   useEffect(() => {
@@ -33,22 +33,14 @@ export default function VerifyEmailPage() {
     return () => clearTimeout(id);
   }, [wait]);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await api("/verify-email", { method: "POST", json: { code } });
-      router.replace("/dashboard");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("تعذّر التحقق. حاول مرة أخرى.", "Couldn't verify. Please try again."));
-    } finally {
-      setBusy(false);
-    }
+  async function confirm() {
+    setNote("");
+    await api("/verify-email", { method: "POST", json: { code } });
+    router.replace("/dashboard");
   }
 
   async function resend() {
-    setError("");
+    setResendError(null);
     setNote("");
     try {
       const r = await api<{ sent: boolean; verified: boolean }>("/verify-email/resend", { method: "POST" });
@@ -57,7 +49,7 @@ export default function VerifyEmailPage() {
       setCode("");
       setWait(60);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("تعذّر الإرسال. حاول بعد قليل.", "Couldn't send. Try again in a moment."));
+      setResendError(err);
     }
   }
 
@@ -70,24 +62,26 @@ export default function VerifyEmailPage() {
     <main className="auth">
       <div className="auth-lang"><LangToggle /></div>
       <Link href="/" className="brand authbrand"><Logo size={30} /></Link>
-      <form className="card" onSubmit={submit}>
+      <Form className="card" onSubmit={confirm} fieldFor={{ code_wrong: "code", bad_code: "code", code_expired: "code" }}
+        validate={(): Record<string, string> => code.length === 6 ? {} : {
+          code: code ? t(`الرمز 6 أرقام، وكتبت ${code.length}.`, `The code is 6 digits; you typed ${code.length}.`)
+            : t("اكتب الرمز الذي وصلك في البريد.", "Type the code from the email."),
+        }}>
         <h1>{t("أكّد بريدك", "Confirm your email")}</h1>
         <p className="small">
           {t(<>أرسلنا رمزاً من 6 أرقام إلى <b dir="ltr">{email || "…"}</b>. اكتبه هنا، أو اضغط زر «تأكيد البريد» في الرسالة.</>,
              <>We sent a 6-digit code to <b>{email || "…"}</b>. Type it here, or press the button in the email.</>)}
         </p>
-        <label className="f" htmlFor="code">{t("رمز التحقق", "Verification code")}
-          <input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" dir="ltr" maxLength={7} required
+        <Field name="code" label={t("رمز التحقق", "Verification code")}
+          hint={t("6 أرقام، صالح لمدة 30 دقيقة. لم تصلك الرسالة؟ راجع مجلد الرسائل غير المرغوبة.", "6 digits, valid for 30 minutes. No email? Check your spam folder.")}>
+          <input inputMode="numeric" autoComplete="one-time-code" dir="ltr" maxLength={7}
                  value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9٠-٩]/g, "").slice(0, 6))}
                  style={{ fontSize: 26, letterSpacing: 8, textAlign: "center", fontFamily: "ui-monospace, Menlo, monospace" }}
-                 placeholder="••••••" aria-describedby="code-help" />
-        </label>
-        <span id="code-help" className="small muted">
-          {t("الرمز صالح لمدة 30 دقيقة. لم تصلك الرسالة؟ راجع مجلد الرسائل غير المرغوبة.", "The code is valid for 30 minutes. No email? Check your spam folder.")}
-        </span>
-        {error && <p className="err" role="alert">{error}</p>}
-        {note && <p className="small" role="status">{note}</p>}
-        <button className="btn primary" disabled={busy || code.length !== 6}>{busy ? t("جارٍ التحقق…", "Verifying…") : t("تأكيد", "Confirm")}</button>
+                 placeholder="••••••" />
+        </Field>
+        <Submit busyLabel={t("جارٍ التحقق…", "Verifying…")}>{t("تأكيد", "Confirm")}</Submit>
+        {note && <DoneNote>{note}</DoneNote>}
+        {resendError != null && <ErrorNote error={resendError} />}
         <div className="row" style={{ justifyContent: "space-between" }}>
           <button type="button" className="linkbtn small" disabled={wait > 0} onClick={() => void resend()}>
             {wait > 0 ? t(`أرسل الرمز مرة أخرى بعد ${wait} ث`, `Send the code again in ${wait}s`) : t("أرسل الرمز مرة أخرى", "Send the code again")}
@@ -97,7 +91,7 @@ export default function VerifyEmailPage() {
         <p className="small muted" style={{ margin: 0 }}>
           {t("البريد خطأ؟ سجّل الخروج وأنشئ الحساب من جديد، أو راسلنا على support@hidaaco.com.", "Wrong email? Sign out and create the account again, or write to support@hidaaco.com.")}
         </p>
-      </form>
+      </Form>
     </main>
   );
 }
